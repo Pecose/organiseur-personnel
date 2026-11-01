@@ -39,8 +39,17 @@
 | D11 | Google Agenda **dans les deux sens**, créations/modifications/suppressions et récurrences ; connexion OAuth Google **distincte** de Firebase Auth ; aucune synchronisation destructive lors de l'association initiale |
 | D12 | Synchronisation Google **à l'ouverture et pendant l'utilisation** d'abord ; **à distance lorsque la PWA est fermée** seulement après mise en service d'un Worker/ordonnanceur gratuit, avec accès OAuth sécurisé. Ce n'est pas une synchronisation instantanée garantie |
 | D13 | Pour Google Calendar, **moindre privilège, quotas gratuits, consentement et protection des jetons** ; si une exigence impose un paiement, une vérification payante ou un niveau de risque non accepté, STOP et décision de l'utilisateur |
+| D14 | Cinq onglets **fixes et dans cet ordre** : **Calendrier · Tâches · Jour (central) · Habitudes · Listes**. Ouverture sur Jour à la date d'aujourd'hui. Musique, décoration et paramètres restent accessibles en navigation secondaire |
+| D15 | Un **objet métier unique `Activity`** : tâche = sans horaire ni récurrence (date facultative) ; habitude = récurrence (avec ou sans heure) ; événement = horaire défini (avec ou sans récurrence). Un même objet peut apparaître dans plusieurs vues, **sans duplication** |
+| D16 | Jour affiche uniquement les éléments prévus pour la date choisie : **sans horaire d'abord**, puis **avec horaire triés chronologiquement**. Aucun séparateur Habitudes/Tâches/Événements ni bloc « À planifier ». Les tâches sans date demeurent dans l'onglet Tâches |
+| D17 | Chaque ligne : **icône personnalisable à gauche, ouvrant la fiche complète** ; **validation à droite**. Ajouter une heure propose une validation automatique préactivée, désactivable et réversible ; fin si prévue, sinon heure de début. Une validation automatique reste une **présomption** |
+| D18 | À l'entrée sur Aujourd'hui, une **seule fenêtre groupée** peut proposer le report des **tâches de la veille sans horaire, non récurrentes et inachevées** : déplacer à aujourd'hui, conserver à hier ou redemander plus tard. Pas de report automatique ni de doublon |
+| D19 | Importance facultative **1 à 3 étoiles** ; bilan mensuel des réalisations triées 3→2→1 puis chronologiquement, filtre par nombre d'étoiles, distinction entre réalisations confirmées et présumées |
+| D20 | **Listes libres** indépendantes (courses, bagages…), associables à une activité via un ID stable ; cocher les articles ne termine pas automatiquement l'activité |
+| D21 | Calendrier **semaine** : six cases lundi–samedi et dimanche accessible par **dépliage visible** ; noms si la place le permet, sinon compteurs. Toucher un jour affiche cette date sur Jour ; bouton « Aujourd'hui » pour revenir |
+| D22 | Interface minimaliste : formes très arrondies, couleurs apaisantes, lecture claire ; gestes facultatifs et explicites, **aucun geste à deux doigts obligatoire** |
 
-**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F02 et F04–F05 existent déjà (documentation)** ; **F03 est retiré** ; **F06–F47 et les fonctions M01–M120 restent `PLANNED`** à la date ci-dessus. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
+**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F02 et F04–F05 existent déjà (documentation)** ; **F03 est retiré** ; **F06–F56 et les fonctions M01–M160 restent `PLANNED`, sauf les anciennes signatures M30–M44/M91/M101–M102 qui sont `SUPERSEDED` et ne doivent pas être implémentées** à la date ci-dessus. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
 
 **Source de vérité :** `AGENTS.md` pour le processus, **ce fichier** pour les contrats d'architecture, `ROADMAP.md` pour l'ordre des livraisons. En cas de conflit : STOP et demande utilisateur.
 
@@ -68,10 +77,10 @@ Les chemins sont **proposés/planifiés**, non présumés existants. Les répert
 ├── src/app/state.ts                       [F16] état transversal
 ├── src/domain/types.ts                    [F17] types contractuels
 ├── src/domain/dates.ts                    [F18] calendriers/fuseaux/récurrences
-├── src/ui/screens.ts                      [F19] écrans Accueil/Agenda/Tâches/Musique/Décor/Paramètres
+├── src/ui/screens.ts                      [F19] Jour/Calendrier/Tâches/Habitudes/Listes + écrans secondaires
 ├── src/ui/components.ts                   [F20] composants UI communs
-├── src/features/agenda.ts                 [F21] opérations agenda
-├── src/features/tasks.ts                  [F22] opérations tâches et listes
+├── src/features/agenda.ts                 [F21] calendrier semaine et adaptation Google
+├── src/features/tasks.ts                  [F22] filtre Tâches sur activités unifiées
 ├── src/features/reminders.ts              [F23] logique rappels
 ├── src/features/music.ts                  [F24] catalogue musical et playlists
 ├── src/features/player.ts                 [F25] lecteur audio
@@ -96,12 +105,21 @@ Les chemins sont **proposés/planifiés**, non présumés existants. Les répert
 ├── tests/reminders.test.ts                [F44] rappels, double-envoi, DST
 ├── src/features/googleCalendar.ts         [F45] façade métier, liaison/conciliation agenda Google
 ├── src/services/googleCalendarBridge.ts   [F46] appels HTTP sécurisés de la PWA vers le Worker
-└── tests/googleCalendar.test.ts           [F47] OAuth, CRUD, conflits, synchronisation Google
+├── tests/googleCalendar.test.ts           [F47] OAuth, CRUD, conflits, synchronisation Google
+├── src/features/activities.ts             [F48] entité unique, horaires, étoiles, statuts
+├── src/features/habits.ts                 [F49] récurrences et occurrences
+├── src/features/checklists.ts            [F50] listes indépendantes et leurs articles
+├── src/features/day.ts                   [F51] date choisie, deux groupes, report
+├── src/features/monthlyReview.ts          [F52] bilan mensuel des accomplissements
+├── src/ui/dayComponents.ts                [F53] icône gauche, validation droite, édition
+├── tests/activities.test.ts               [F54] activités, complétions, report, récurrences
+├── tests/navigation.test.ts               [F55] onglets, semaine 6+1, date sélectionnée
+└── tests/monthlyReview.test.ts            [F56] étoiles, filtres et états présumés
 ```
 
 **F03 était l'alias `agent.md`, supprimé par demande explicite de l'utilisateur (2026-11-01) ; son identifiant reste réservé pour traçabilité et ne doit pas être réutilisé.**
 
-**Règle :** les fichiers `F06`–`F47` sont des contrats de destination, **pas** un engagement sur une bibliothèque non choisie. Un renommage vers une structure imposée par un bundler/framework exige une demande d'approbation préalable. Les tests peuvent utiliser des fichiers temporaires générés uniquement hors du dépôt versionné.
+**Règle :** les fichiers `F06`–`F56` sont des contrats de destination, **pas** un engagement sur une bibliothèque non choisie. Un renommage vers une structure imposée par un bundler/framework exige une demande d'approbation préalable. Les tests peuvent utiliser des fichiers temporaires générés uniquement hors du dépôt versionné.
 
 ## 3. Modèle de domaine : objets, champs, relations et propriétaires
 
@@ -110,11 +128,11 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 | Objet | ID | Champs fonctionnels (contrat) | Relations et lieu |
 |---|---|---|---|
 | `AuthUser` | O01 | `uid:string; email:string|null` | Firebase Auth ; 1 utilisateur logique |
-| `CalendarEvent` | O02 | `id; title; startsAt; endsAt; timeZone; allDay; description?; categoryId?; recurrence?; updatedAt; deletedAt?; googleLink?:GoogleEventLink` | `uid → events/{id}` ; 0..n `Reminder` |
-| `TaskList` | O03 | `id; name; sortOrder; archived; updatedAt` | `uid → lists/{id}`; 0..n `Task` |
-| `Task` | O04 | `id; listId?; title; description?; completed; priority; dueAt?; timeZone?; recurrence?; updatedAt` | `uid → tasks/{id}` ; 0..n `Reminder` |
+| `CalendarEvent` | O02 | **SUPERSEDED (jamais implémenté)** : projection externe Google Calendar, remplacée par O31 | Ne pas créer de source métier `events` parallèle |
+| `TaskList` | O03 | **SUPERSEDED (jamais implémenté)** : listes libres O34 | Identifiant historique réservé |
+| `Task` | O04 | **SUPERSEDED (jamais implémenté)** : activité unifiée O31 | Identifiant historique réservé |
 | `RecurrenceRule` | O05 | `frequency:daily|weekly|monthly|yearly; interval; until?; count?; weekdays?` | incluse dans O02/O04 ; calendrier local et rappels |
-| `Reminder` | O06 | `id; ownerType:event|task; ownerId; scheduledFor; leadMinutes; timeZone; enabled; occurrenceKey; dispatchStatus` | `uid → reminders/{id}` ; O02 ou O04 ; Worker |
+| `Reminder` | O06 | `id; activityId; occurrenceKey; scheduledFor; leadMinutes; timeZone; enabled; dispatchStatus` | `uid → reminders/{id}` ; O31/O32 ; Worker |
 | `ProfilePreferences` | O07 | `themeId; backgroundImageId?; autoSeason; locale; timeZone; notificationEnabled; updatedAt` | `uid → preferences/profile` |
 | `TrackMetadata` | O08 | `id; title; artist?; album?; source:bundled|imported; catalogId?; mediaId?; artworkId?; duration?; favorite; updatedAt` | Cloud léger pour métadonnées ; binaire O10 en local |
 | `Playlist` | O09 | `id; name; trackIds[]; updatedAt` | `uid → playlists/{id}`; référence O08 |
@@ -128,9 +146,38 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 | `AppVersion` | O17 | `version; cacheRevision; catalogRevision; releasedAt` | embarquée dans app + manifeste/catalogue |
 | `PlaybackState` | O18 | `trackId?; queueIds[]; position; paused; repeatMode; shuffle` | runtime et éventuel stockage local, pas de lecture distante |
 | `DispatchReceipt` | O19 | `reminderId; occurrenceKey; attemptedAt; outcome; retryAfter?` | anti-doublon pour Worker, accès serveur sécurisé |
-| `UiRoute` | O20 | `name:home|agenda|tasks|music|decor|settings|signin; params?` | navigation locale |
+| `UiRoute` | O20 | `name:calendar|tasks|day|habits|lists|music|decor|settings|signin|monthlyReview; params?` | Les cinq premières routes correspondent aux onglets D14 ; les autres sont secondaires |
 | `MediaArchiveManifest` | O21 | `schemaVersion; createdAt; mediaEntries[]; metadata; checksums` | export/import des fichiers personnels |
 | `NotificationTestResult` | O22 | `supported; permitted; subscribed; sent?; message?` | retour état des diagnostics, pas garantie de livraison |
+
+### Modèle unifié (D14–D22, approuvé, non implémenté)
+
+**Priorité contractuelle :** O31–O38 remplacent les anciens O02/O03/O04 jamais implémentés. Une tâche qui reçoit un horaire ou une répétition **conserve son ID**.
+
+| Objet | ID | Champs essentiels | Dépendances et stockage |
+|---|---|---|---|
+| `Activity` | O31 | `id; uid; title; description?; iconId?; imageId?; stars?:1|2|3; plannedOn?:LocalDate; startAt?:ISOInstant; endAt?:ISOInstant; timeZone; recurrence?:RecurrenceRule; autoComplete:boolean; checklistId?; includeInMonthlyReview:boolean; deletedAt?; updatedAt; googleLink?:GoogleEventLink` | **Source canonique** : `users/{uid}/activities/{id}`. Horaire et répétition indépendants. |
+| `ActivityOccurrence` | O32 | `activityId; occurrenceKey; localDate; startsAt?; endsAt?; recurring:boolean` | Vue **calculée** d'O31/O05 sur une plage bornée ; clés stables pour les récurrences |
+| `ActivityCompletion` | O33 | `id; activityId; occurrenceKey; status:pending|manual_done|auto_assumed|manually_undone; completedAt?; overriddenAt?; updatedAt` | `users/{uid}/activityCompletions/{id}` ; état **par occurrence**, l'annulation manuelle interdit la recochage automatique |
+| `Checklist` | O34 | `id; name; iconId?; archived?; updatedAt` | `users/{uid}/checklists/{id}` ; liste autonome et réutilisable |
+| `ChecklistItem` | O35 | `id; checklistId; text; checked; position; updatedAt` | `users/{uid}/checklists/{checklistId}/items/{id}` ; validation indépendante d'O31 |
+| `CarryOverDecision` | O36 | `id; activityId; fromDate; toDate; decision:move|keep|later; promptedAt; decidedAt?; updatedAt` | `users/{uid}/carryOverDecisions/{id}` ; action consentie, journal anti-doublon |
+| `DaySelection` | O37 | `selectedDate:LocalDate; today:LocalDate; source:startup|calendar|navigation` | État UI F16 uniquement ; par défaut date réelle aujourd'hui |
+| `MonthlyReview` | O38 | `month:YYYY-MM; starFilter?:1|2|3; entries:MonthlyAchievement[]; assumedCount` | Vue calculée O31/O32/O33 ; classement par étoiles et date, présumés distingués |
+
+**Vues, sans duplication :** « Tâches » = sans heure ni récurrence, avec ou sans date ; « Habitudes » = récurrence, horaire facultatif ; « Événements » = heure définie, avec ou sans récurrence, visibles dans Calendrier (il n'existe **pas** d'onglet Événements). « Jour » = occurrences prévues à la date sélectionnée, sans heure d'abord puis horaires croissants. « Listes » = O34/O35. Les tâches sans aucune date ne polluent pas Jour.
+
+**Temps :** `LocalDate` = date civile `YYYY-MM-DD` dans le fuseau IANA choisi ; `ISOInstant` = instant UTC. Une date seule n'est **pas** une heure à minuit. Pour une récurrence hebdomadaire à 19 h, l'heure locale est conservée à travers les changements d'heure, sans copier la tâche chaque semaine.
+
+**Validation :** au choix d'une heure, l'UI propose `autoComplete=true` par défaut, que l'utilisatrice peut décocher ; échéance = `endAt` si présente, sinon `startAt`. Une échéance dépassée vaut `auto_assumed`, pas preuve d'exécution réelle ; bouton de droite permet la confirmation ou l'annulation. Une annulation `manually_undone` reste effective même après rafraîchissement. Sans heure : coche manuelle.
+
+**Report :** uniquement les activités datées de **la veille**, **sans heure**, **sans récurrence** et non terminées. À l'ouverture d'Aujourd'hui, proposer une **fenêtre commune** avec décision pour chaque élément : aujourd'hui, rester hier, plus tard. Jamais de report sans accord ; même identifiant, pas de double proposition au prochain rafraîchissement. « Plus tard » peut être reproposé ultérieurement avec modération.
+
+**Listes et étoiles :** la fiche d'une activité ouverte en touchant son **icône gauche** permet titre, description, icône/image, date, heure, répétition, notification, validation auto, étoiles 1–3, lien à une liste O34. Cocher ses articles n'achève pas l'activité. Le bilan du mois trie d'abord 3 étoiles, puis 2, puis 1 ; à importance égale, date chronologique. Filtre 1/2/3 étoiles ; les validations présumées sont étiquetées.
+
+**Calendrier :** six carrés visibles lundi–samedi ; dimanche dépliable (poignée ou bouton visible, pas de geste caché). Cases montrant des événements et habitudes, ou leurs compteurs si peu de place. Toucher une date ouvre Jour sur celle-ci ; retour Aujourd'hui par bouton explicite.
+
+**Google Agenda :** conversion des événements horaires O31 ↔ API Google via O24 ; aucune exportation automatique des tâches sans heure ni des habitudes locales non explicitement reliées. Les exceptions des séries importées doivent conserver l'identité de l'occurrence. Ne pas créer de collection distincte d'événements.
 
 ### Extension Google Agenda approuvée (toujours PLANIFIÉE)
 
@@ -149,9 +196,12 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 
 **Schémas Firestore planifiés (pas encore créés) :**
 ```text
-users/{uid}/events/{eventId}                 → O02
-users/{uid}/tasks/{taskId}                   → O04
-users/{uid}/lists/{listId}                   → O03
+users/{uid}/activities/{activityId}           → O31, source métier unique
+users/{uid}/activityCompletions/{id}         → O33, complétion par occurrence
+users/{uid}/checklists/{checklistId}         → O34, listes libres
+users/{uid}/checklists/{checklistId}/items/{id} → O35, lignes cochables
+users/{uid}/carryOverDecisions/{id}          → O36, traçabilité des reports
+# Anciennes collections events/tasks/lists : SUPERSEDED, ne pas créer
 users/{uid}/reminders/{reminderId}           → O06
 users/{uid}/playlists/{playlistId}           → O09
 users/{uid}/tracks/{trackId}                 → O08 métadonnées seulement
@@ -189,12 +239,12 @@ Contrat commun : fonctions TypeScript typées ; `Result<T, AppError>` désigne r
 | M01 | `bootstrapApp(): Promise<Result<void>>` | M16, M20, M25, M79, M03, M04 ; initialise Firebase, session, persistance, PWA et route |
 | M02 | `navigate(route:UiRoute): void` | O20, M03, M04 ; change route |
 | M03 | `resolveRoute(path:string): UiRoute` | O20 ; pure |
-| M04 | `renderRoute(route:UiRoute): void` | M05–M11, O20 ; affiche écran |
-| M05 | `renderHome(): void` | M33, M58, M68 ; résumé, lecteur compact et thème |
-| M06 | `renderAgenda(): void` | M30–M32 ; jour/semaine/mois |
-| M07 | `renderTasks(): void` | M34–M40, M91 ; listes, filtres |
-| M08 | `renderMusic(): void` | M50–M63, M92–M94, M99 ; bibliothèque/lecteur |
-| M09 | `renderDecor(): void` | M64–M69, M95–M98 ; galerie/thèmes |
+| M04 | `renderRoute(route:UiRoute): void` | M05–M11 et M149–M152 ; cinq onglets et écrans secondaires O20 |
+| M05 | `renderHome(): void` | Page **Jour** centrale, M129/M131/O37, pas une page d'accueil supplémentaire |
+| M06 | `renderAgenda(): void` | Calendrier hebdomadaire M127/M150, dimanche dépliable |
+| M07 | `renderTasks(): void` | Filtre Tâches sur O31, M125 |
+| M08 | `renderMusic(): void` | M50–M63/M92–M94/M99 ; écran **secondaire** hors cinq onglets |
+| M09 | `renderDecor(): void` | M64–M69/M95–M98 ; écran **secondaire** hors cinq onglets |
 | M10 | `renderSettings(): void` | M17–M20, M26–M27, M70–M78 ; compte/sauvegarde |
 | M11 | `renderSignIn(): void` | M17, M19, M20, M90 ; connexion/inscription/récupération |
 | M12 | `renderCommonStatus(status:SyncStatus): void` | O15 ; bannière d'état |
@@ -202,7 +252,7 @@ Contrat commun : fonctions TypeScript typées ; `Result<T, AppError>` désigne r
 | M14 | `getAppState(): Readonly<AppState>` | F16 ; lecture état UI |
 | M15 | `watchAppState(listener:(s:AppState)=>void): Unsubscribe` | F16 ; publication d'état |
 
-`AppState` = agrégat strictement UI : route O20, utilisateur O01 ou null, sync O15, version O17 et paramètres O07. `Unsubscribe=()=>void`; `AppError` et `Result` sont définis dans F17. Les adaptateurs de composants doivent respecter les mêmes contrats quel que soit le framework UI finalement validé.
+`AppState` = agrégat strictement UI : route O20, date sélectionnée O37, utilisateur O01 ou null, sync O15, version O17 et paramètres O07. `Unsubscribe=()=>void`; `AppError` et `Result` sont définis dans F17. Les adaptateurs de composants doivent respecter les mêmes contrats quel que soit le framework UI finalement validé.
 
 ### 4.2 Authentification, Firestore, synchronisation (F27–F30, F39)
 
@@ -221,7 +271,7 @@ Contrat commun : fonctions TypeScript typées ; `Result<T, AppError>` désigne r
 | M26 | `deriveSyncStatus(meta:SnapshotMeta,connectivity:Connectivity): SyncStatus` | O15 ; ne pas annoncer synced sans confirmation |
 | M27 | `observeSyncStatus(cb:(s:SyncStatus)=>void): Unsubscribe` | M24, M26 ; mise à jour UI |
 
-`CloudCollection` = `events|tasks|lists|reminders|playlists|tracks|preferences|pushSubscriptions|dispatchReceipts`. `dispatchReceipts` est réservé aux opérations serveur : M22/M23 **ne doivent pas** l'autoriser côté client. `FirebaseClients`, `PublicFirebaseConfig`, `SnapshotMeta`, `Connectivity`, `AppState` sont des types techniques de F17. **Aucune clé privée dans le navigateur ni dans le dépôt.**
+`CloudCollection` = `activities|activityCompletions|checklists|checklistItems|carryOverDecisions|reminders|playlists|tracks|preferences|pushSubscriptions|dispatchReceipts` (anciennes collections `events|tasks|lists` non utilisées). `dispatchReceipts` est réservé aux opérations serveur : M22/M23 **ne doivent pas** l'autoriser côté client. `FirebaseClients`, `PublicFirebaseConfig`, `SnapshotMeta`, `Connectivity`, `AppState` sont des types techniques de F17. **Aucune clé privée dans le navigateur ni dans le dépôt.**
 
 ### 4.3 Agenda, tâches, récurrences, rappels (F18, F21–F23)
 
