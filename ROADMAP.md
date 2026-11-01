@@ -8,11 +8,29 @@
 > **Environnement de développement :** Windows.  
 > **Dernière mise à jour :** 1er novembre 2026.
 
+## Tableau de bord des objectifs (lecture humaine)
+
+**Ce tableau est le suivi des objectifs officiel.** Il sert à comparer ce que nous voulons obtenir avec les contrats techniques de [l'architecture](docs/ARCHITECTURE.md). **Validation du périmètre ≠ fonction déjà développée** : toutes les fonctions logicielles ci-dessous restent `PLANNED`. L'agent doit actualiser cette correspondance à chaque évolution approuvée.
+
+| ID objectif | Résultat attendu | Architecture à consulter | Test / jalon | Statut |
+|---|---|---|---|---|
+| **G01** | Installation PWA iPhone, mises à jour et hors ligne | D01/D06/D09 ; F08–F09/F14/F35–F36 ; M01/M79–M83 ; C10/C15–C16 | T06, Phase 0–1 | À développer |
+| **G02** | Agenda et **Google Agenda synchronisés dans les deux sens** (créations, modifications, suppressions, récurrences) | D04/D11–D13 ; O02/O05/O23–O30 ; F21/F37/F45–F47 ; M28–M33/M103–M120 ; C20–C26 | T01/T02/T10–T14, Phase 3 bis | À développer |
+| **G03** | Gestion des tâches, listes, filtres et répétitions | O03–O05 ; F22 ; M34–M40/M91/M102 ; C01–C04 | T01/T02, Phase 2 | À développer |
+| **G04** | Authentification Firebase et synchronisation/restauration des données essentielles | D05/D08 ; O01/O15–O16 ; F27–F30/F34/F39 ; M16–M27/M70–M72/M89–M90 ; C02–C05/C17 | T04/T05/T09, Phase 3 | À développer (projet Firebase préparé) |
+| **G05** | Rappels et notifications, y compris appli fermée si réseau disponible | D07 ; O06/O14/O19/O22 ; F23/F33/F35/F37 ; M41–M44/M75–M78/M81/M84–M88/M100 ; C11–C14/C18–C19 | T07, Phase 4 | À développer |
+| **G06** | Musiques Suno locales, playlists, favoris et lecteur | O08–O10/O13/O18 ; F11–F12/F24–F25/F31–F32 ; M46–M63/M92–M94/M99 ; C06–C08 | T03/T08, Phase 5 | À développer |
+| **G07** | Galerie, imports d'images, décoration et thèmes saisonniers | O07/O10–O13 ; F13/F26/F31 ; M64–M69/M95–M98 ; C06–C07 | T03, Phase 6 | À développer |
+| **G08** | Exports, récupération après changement de téléphone, absence de perte lors des mises à jour | D08/D09 ; O16/O21 ; F34–F36 ; M70–M74/M82–M83 ; C09–C10/C16–C17 | T04/T06/T09, Phase 7 | À développer |
+| **G09** | Gratuité, sécurité et gouvernance documentaire | D02/D03/D10/D13 ; F00–F05/F39 ; AGENTS.md ; règles §0 de l'architecture | T05/T07/T10 ; Phase 8 | Gouvernance rédigée, implémentation à valider |
+
+**Légende :** `À développer` = spécifié, pas fonctionnel ; `En cours` = développement commencé et non validé ; `Validé` = testé dans l'environnement cible. Si un objectif n'a aucune correspondance technique, l'agent doit **STOP**, demander un accord explicite, actualiser **d'abord** l'architecture, puis ce tableau et enfin coder.
+
 ## 1. Vision et décisions actées
 
 Construire un organisateur personnel doux, personnalisable et agréable à utiliser, réunissant :
 
-- un **agenda autonome** (sans synchronisation obligatoire avec le calendrier Apple) ;
+- un **agenda intégré avec synchronisation bidirectionnelle à Google Agenda** après connexion volontaire (sans dépendance à Apple Calendar) ;
 - un **gestionnaire de tâches** (priorités, échéances, récurrences) ;
 - des **rappels et notifications**, y compris quand l'application est fermée, sous réserve des limites iOS et de la connexion réseau ;
 - une **bibliothèque de musiques personnelles Suno**, avec lecteur et playlists ;
@@ -30,6 +48,7 @@ Construire un organisateur personnel doux, personnalisable et agréable à utili
 | Hébergement de l'interface | **GitHub Pages** | Hébergement HTTPS statique gratuit ; aucun PC ni serveur personnel à laisser allumé |
 | Authentification | **Firebase Authentication** (adresse e-mail et mot de passe) | Une identité pour retrouver les sauvegardes ; adresse `@icloud.com` possible |
 | Sauvegarde synchronisée | **Cloud Firestore, formule Firebase Spark** | Sauvegardes automatiques de l'agenda, des tâches et des métadonnées légères dans les quotas gratuits |
+| Google Agenda | **Google Calendar API / OAuth** via Worker sécurisé | Connexion et lecture/écriture bidirectionnelles, d'abord à l'ouverture, puis périodiquement à distance ; sans facturation |
 | Données locales | **IndexedDB + persistance Firestore côté navigateur** | Accès hors ligne ; bibliothèque de fichiers personnels sur l'iPhone |
 | Notifications planifiées | **Web Push iOS + Cloudflare Workers/Cron**, à valider en prototype | Rappels possibles sans PC allumé, dans les quotas gratuits des services |
 | Multimédia | **Fichiers Suno personnels et images locales** | Lecture et personnalisation sans dépendance à Deezer |
@@ -49,11 +68,11 @@ Construire un organisateur personnel doux, personnalisable et agréable à utili
 ### Écrans principaux
 
 1. **Accueil** : résumé du jour, prochain rendez-vous, tâches prioritaires, lecteur compact et décor saisonnier.
-2. **Agenda** : vues mois / semaine / jour, création et modification d'événements, horaires, répétitions, descriptions et rappels.
+2. **Agenda** : vues mois / semaine / jour, création et modification d'événements, horaires, répétitions, descriptions et rappels ; **Google Agenda lié dans les deux sens** après autorisation.
 3. **Tâches** : listes, cases à cocher, priorités, dates limites, récurrences, catégories et historique de tâches terminées.
 4. **Musique** : bibliothèque locale, recherche, favoris, playlists, lecture/pause/suivant/précédent, pochettes et import de fichiers.
 5. **Décoration** : fonds par saison, galerie, import Photos/Fichiers, thèmes et couleurs ; petit éditeur simple (recadrage, texte) dans une étape ultérieure.
-6. **Paramètres** : compte, état de synchronisation, notifications, données locales, export/restauration, version de l'application.
+6. **Paramètres** : compte, **connecter/déconnecter Google Agenda et voir son état**, état de synchronisation, notifications, données locales, export/restauration, version de l'application.
 
 ### Contenus dynamiques
 
@@ -69,7 +88,7 @@ Construire un organisateur personnel doux, personnalisable et agréable à utili
 
 | Donnée | Local sur iPhone | Firestore (auto) | Export / restauration |
 |---|---|---|---|
-| Événements, horaires, répétitions | Oui | **Oui** | Oui |
+| Événements, horaires, répétitions | Oui | **Oui** + liaison optionnelle Google Agenda | Oui |
 | Tâches, listes, statuts | Oui | **Oui** | Oui |
 | Préférences, thèmes choisis, favoris et playlists (métadonnées) | Oui | Oui, en volume léger | Oui |
 | Images et décorations importées | **Oui** | Non | **Oui, archive utilisateur** |
@@ -96,6 +115,10 @@ users/{uid}/lists/{listId}
 users/{uid}/playlists/{playlistId}
 users/{uid}/preferences/profile
 users/{uid}/reminders/{reminderId}
+users/{uid}/googleCalendarConnection/status     # statut liaison non secret
+users/{uid}/googleCalendarSync/state            # serveur uniquement
+users/{uid}/googleOAuthGrant/primary             # secret chiffré, serveur uniquement
+users/{uid}/googleCalendarConflicts/{conflictId} # résolution de conflits
 ```
 
 Les playlists cloud contiennent **des références/métadonnées** ; les fichiers musicaux personnels restent dans le stockage local. Après changement de téléphone, les listes peuvent être retrouvées, mais les fichiers personnels doivent être réimportés à partir de l'archive ; afficher clairement les morceaux manquants.
@@ -207,6 +230,22 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 **Critère de sortie :** agenda/tâches restaurés sur un iPhone réinstallé, sans manipulation de sauvegarde à chaque modification.
 
+### Phase 3 bis — Synchronisation bidirectionnelle Google Agenda (objectif G02)
+
+**Périmètre validé :** liaison volontaire au **Google Agenda principal** de l'utilisatrice ; Firebase Auth par e-mail reste inchangé. C'est une nouvelle fonctionnalité approuvée le 1er novembre 2026, **non encore implémentée**. Voir D11–D13, O23–O30, M103–M120 et C20–C26 dans [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+- [ ] Vérifier la configuration gratuite de Google Calendar API, l'écran de consentement OAuth, les scopes minimaux et le fonctionnement durable des jetons (en mode Testing, des jetons peuvent expirer après 7 jours).
+- [ ] Ajouter « Connecter mon Google Agenda » et « Déconnecter », avec consentement explicite, état de connexion et gestion de révocation.
+- [ ] Mettre en place l'échange OAuth **côté Worker uniquement** : état anti-CSRF unique, vérification de l'identité Firebase, stockage chiffré des jetons, aucun secret dans GitHub Pages.
+- [ ] Synchroniser d'abord **lorsque la PWA est ouverte** : lecture Google, créations/modifications/suppressions depuis l'application vers Google et inversement, avec identifiants stables et prévention des doublons.
+- [ ] Tester récurrences, exceptions, fuseaux horaires, événements annulés et conflits concurrents ; aucune suppression silencieuse au premier rapprochement.
+- [ ] Utiliser la synchronisation incrémentale `nextSyncToken`, pagination et reprise propre après invalidation `410 Gone`.
+- [ ] **Seconde étape différée** : ordonnanceur Cloudflare gratuit pour synchroniser même PWA fermée, sans garantir l'instantanéité ; ce compte n'a pas à être créé maintenant.
+- [ ] Vérifier l'absence de facture, la protection des données et le droit réel d'accéder durablement au calendrier avant de déclarer la phase terminée.
+
+**Critère de sortie :** modifications dans les deux sens correctement rapprochées, erreurs et conflits visibles, sans perte ni doublons. Le fonctionnement PWA fermée exige le déploiement séparé de l'ordonnanceur.
+
+
 ### Phase 4 — Rappels et notifications
 
 - [ ] Concevoir les champs de rappel (date/heure, avance, répétition, zone horaire, statut).
@@ -275,6 +314,10 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | Mode avion après premier chargement | Agenda, tâches, médias déjà chargés et décor disponibles |
 | Création d'une tâche sans réseau | Enregistrée localement puis synchronisée à la reconnexion |
 | Nouveau téléphone, même compte | Agenda, tâches, préférences et playlists-métadonnées récupérés |
+| Google Agenda → PWA | Nouveau rendez-vous / modification / suppression visibles après synchronisation | 
+| PWA → Google Agenda | Événements créés, modifiés et supprimés reflétés sans doublon | 
+| Google Agenda, application fermée | Synchronisation seulement après mise en place du Worker planifié ; délais non instantanés |
+| Conflit ou OAuth expiré | Signaler l'erreur, conserver les données, proposer résolution ou reconnexion |
 | Nouvelle installation sans archive multimédia | Médias de base présents ; imports personnels explicitement signalés comme manquants |
 | Export/import de bibliothèque | Fichiers personnels retrouvés dans l'application |
 | Notification à une heure donnée | Reçue si les services/conditions le permettent ; retard/absence correctement documentés |
@@ -289,7 +332,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 |---|---:|---|
 | GitHub (dépôt + Pages) | 0 € | Dépôt public pour le site Pages gratuit selon l'offre retenue ; contenu distribué public |
 | Firebase Authentication + Firestore (Spark) | 0 € | Dans les quotas gratuits ; ne pas activer Blaze ni des produits payants |
-| Cloudflare Workers/Cron | 0 € | Dans les quotas et capacités gratuites du service |
+| Cloudflare Workers/Cron | 0 € | Dans les quotas et capacités gratuites du service ; sera nécessaire au backend OAuth Google et plus tard aux notifications |
+| Google Calendar API / OAuth | 0 € prévu | Dans quotas gratuits, consentement et éventuelle vérification applicables ; ne jamais payer sans accord |
 | Stockage local iPhone | 0 € | Capacité disponible et politiques de purge iOS ; archive exportable indispensable |
 | Apple Developer Program | 0 € | **Non utilisé** : PWA et non application native |
 | Serveur personnel, Mac, abonnement | 0 € | **Non utilisés** |
@@ -299,7 +343,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 ## 10. Ordre réel de priorité
 
 1. **Tester sur l'iPhone** l'installation PWA, la musique écran verrouillé et une notification fermée.
-2. **Sécuriser l'essentiel** : agenda, tâches, offline et synchronisation/restauration Firestore.
+2. **Sécuriser l'essentiel** : agenda, tâches, offline et synchronisation/restauration Firestore ; puis **Google Agenda bidirectionnel (G02)**.
 3. **Personnaliser** : galerie, thèmes saisonniers et bibliothèque Suno locale.
 4. **Fiabiliser** : export multimédia, sauvegarde indépendante, mises à jour et scénarios de changement de téléphone.
 
