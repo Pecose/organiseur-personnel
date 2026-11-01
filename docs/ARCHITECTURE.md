@@ -108,7 +108,7 @@ Types conceptuels de \`F17\`. Les ID sont stables et générés côté client, p
 | \`Task\` | O04 | \`id; listId?; title; description?; completed; priority; dueAt?; timeZone?; recurrence?; updatedAt\` | \`uid → tasks/{id}\` ; 0..n \`Reminder\` |
 | \`RecurrenceRule\` | O05 | \`frequency:daily|weekly|monthly|yearly; interval; until?; count?; weekdays?\` | incluse dans O02/O04 ; calendrier local et rappels |
 | \`Reminder\` | O06 | \`id; ownerType:event|task; ownerId; scheduledFor; leadMinutes; timeZone; enabled; occurrenceKey; dispatchStatus\` | \`uid → reminders/{id}\` ; O02 ou O04 ; Worker |
-| \`ProfilePreferences\` | O07 | \`themeId; autoSeason; locale; timeZone; notificationEnabled; updatedAt\` | \`uid → preferences/profile\` |
+| \`ProfilePreferences\` | O07 | \`themeId; backgroundImageId?; autoSeason; locale; timeZone; notificationEnabled; updatedAt\` | \`uid → preferences/profile\` |
 | \`TrackMetadata\` | O08 | \`id; title; artist?; album?; source:bundled|imported; catalogId?; mediaId?; artworkId?; duration?; favorite; updatedAt\` | Cloud léger pour métadonnées ; binaire O10 en local |
 | \`Playlist\` | O09 | \`id; name; trackIds[]; updatedAt\` | \`uid → playlists/{id}\`; référence O08 |
 | \`LocalMediaBlob\` | O10 | \`id; kind:audio|image; blob; mimeType; byteSize; checksum; importedAt\` | **IndexedDB seulement**, jamais Firestore |
@@ -159,17 +159,17 @@ Contrat commun : fonctions TypeScript typées ; \`Result<T, AppError>\` désigne
 
 | ID | Fonction (entrées → sortie) | Dépendances et effet |
 |---|---|---|
-| M01 | \`bootstrapApp(): Promise<Result<void>>\` | M10, M11, M15, M80 ; initialise Firebase, état, route et PWA |
+| M01 | \`bootstrapApp(): Promise<Result<void>>\` | M16, M20, M25, M79, M03, M04 ; initialise Firebase, session, persistance, PWA et route |
 | M02 | \`navigate(route:UiRoute): void\` | O20, M03, M04 ; change route |
 | M03 | \`resolveRoute(path:string): UiRoute\` | O20 ; pure |
 | M04 | \`renderRoute(route:UiRoute): void\` | M05–M11, O20 ; affiche écran |
-| M05 | \`renderHome(): void\` | M20, M30, M41, M61 ; widgets du jour |
-| M06 | \`renderAgenda(): void\` | M20–M26 ; jour/semaine/mois |
-| M07 | \`renderTasks(): void\` | M30–M35 ; listes, filtres |
-| M08 | \`renderMusic(): void\` | M50–M59 ; bibliothèque/lecteur |
-| M09 | \`renderDecor(): void\` | M60–M65 ; galerie/thèmes |
-| M10 | \`renderSettings(): void\` | M13–M17, M70–M75 ; compte/sauvegarde |
-| M11 | \`renderSignIn(): void\` | M12–M14 ; connexion/récupération |
+| M05 | \`renderHome(): void\` | M33, M58, M68 ; résumé, lecteur compact et thème |
+| M06 | \`renderAgenda(): void\` | M30–M32 ; jour/semaine/mois |
+| M07 | \`renderTasks(): void\` | M34–M40, M91 ; listes, filtres |
+| M08 | \`renderMusic(): void\` | M50–M63, M92–M94, M99 ; bibliothèque/lecteur |
+| M09 | \`renderDecor(): void\` | M64–M69, M95–M98 ; galerie/thèmes |
+| M10 | \`renderSettings(): void\` | M17–M20, M26–M27, M70–M78 ; compte/sauvegarde |
+| M11 | \`renderSignIn(): void\` | M17, M19, M20, M90 ; connexion/inscription/récupération |
 | M12 | \`renderCommonStatus(status:SyncStatus): void\` | O15 ; bannière d'état |
 | M13 | \`setAppState(patch:Partial<AppState>): void\` | F16 ; mutation état UI |
 | M14 | \`getAppState(): Readonly<AppState>\` | F16 ; lecture état UI |
@@ -202,18 +202,18 @@ Contrat commun : fonctions TypeScript typées ; \`Result<T, AppError>\` désigne
 |---|---|---|
 | M28 | \`normalizeInstant(localDate:string,timeZone:string): Result<string>\` | Date/zone IANA ; sortie UTC ISO |
 | M29 | \`expandOccurrences(rule:RecurrenceRule,base:string,range:DateRange): Occurrence[]\` | O05 ; expansion bornée |
-| M30 | \`getAgenda(range:DateRange): Promise<Result<CalendarEvent[]>>\` | M24/M29 ; événements de la plage |
-| M31 | \`saveEvent(input:CalendarEvent): Promise<Result<CalendarEvent>>\` | M22, M28 ; crée/modifie O02 |
+| M30 | \`getAgenda(range:DateRange): Promise<Result<CalendarEvent[]>>\` | M89/M29 ; événements de la plage |
+| M31 | \`saveEvent(input:CalendarEvent): Promise<Result<CalendarEvent>>\` | M101, M22, M28 ; valide puis crée/modifie O02 |
 | M32 | \`deleteEvent(eventId:string): Promise<Result<void>>\` | M23, M42 ; liens rappels gérés |
 | M33 | \`getTodayOverview(date:string): Promise<Result<TodayOverview>>\` | M30, M36, M40 ; accueil |
-| M34 | \`listTaskLists(): Promise<Result<TaskList[]>>\` | M24 ; O03 |
+| M34 | \`listTaskLists(): Promise<Result<TaskList[]>>\` | M89 ; O03 |
 | M35 | \`saveTaskList(input:TaskList): Promise<Result<TaskList>>\` | M22 ; O03 |
-| M36 | \`queryTasks(filter:TaskFilter): Promise<Result<Task[]>>\` | M24 ; O04, filtres |
-| M37 | \`saveTask(input:Task): Promise<Result<Task>>\` | M22 ; O04 |
+| M36 | \`queryTasks(filter:TaskFilter): Promise<Result<Task[]>>\` | M89 ; O04, filtres |
+| M37 | \`saveTask(input:Task): Promise<Result<Task>>\` | M102, M22 ; valide puis crée/modifie O04 |
 | M38 | \`setTaskCompleted(taskId:string,completed:boolean): Promise<Result<void>>\` | M22 ; O04 |
 | M39 | \`deleteTask(taskId:string): Promise<Result<void>>\` | M23, M42 ; rappels associés |
 | M40 | \`getUpcomingTasks(until:string): Promise<Result<Task[]>>\` | M36 ; résumé |
-| M41 | \`getDueReminders(now:string): Promise<Result<Reminder[]>>\` | M24/M29 ; rappel local visible |
+| M41 | \`getDueReminders(now:string): Promise<Result<Reminder[]>>\` | M89/M29 ; rappel local visible |
 | M42 | \`reconcileReminders(ownerType:'event'|'task',ownerId:string): Promise<Result<void>>\` | M22/M23, O06 ; cohérence de liens |
 | M43 | \`saveReminder(input:Reminder): Promise<Result<Reminder>>\` | M22 ; planification O06 |
 | M44 | \`disableReminder(reminderId:string): Promise<Result<void>>\` | M22 ; désactive |
@@ -232,10 +232,10 @@ Contrat commun : fonctions TypeScript typées ; \`Result<T, AppError>\` désigne
 | M50 | \`loadBundledCatalog(): Promise<Result<CatalogEntry[]>>\` | F11 ; manifeste versionné sans contenus privés |
 | M51 | \`resolveCatalogAsset(catalogId:string): Result<string>\` | M50 ; URL média préchargé ou chargeable |
 | M52 | \`importAudio(file:File,metadata:Partial<TrackMetadata>): Promise<Result<TrackMetadata>>\` | M47, M54 ; crée O08 |
-| M53 | \`listTracks(query?:string): Promise<Result<TrackMetadata[]>>\` | M24/M46/M50 ; catalogue et titres |
+| M53 | \`listTracks(query?:string): Promise<Result<TrackMetadata[]>>\` | M89/M46/M50 ; catalogue et titres |
 | M54 | \`saveTrackMetadata(track:TrackMetadata): Promise<Result<void>>\` | M22 ; O08 léger uniquement |
 | M55 | \`savePlaylist(playlist:Playlist): Promise<Result<void>>\` | M22 ; O09 |
-| M56 | \`listPlaylists(): Promise<Result<Playlist[]>>\` | M24 ; O09 |
+| M56 | \`listPlaylists(): Promise<Result<Playlist[]>>\` | M89 ; O09 |
 | M57 | \`setTrackFavorite(trackId:string,favorite:boolean): Promise<Result<void>>\` | M54 ; O08 |
 | M58 | \`playTrack(trackId:string): Promise<Result<void>>\` | M48/M51/M53 ; élément audio navigateur |
 | M59 | \`pausePlayback(): void\` | élément audio local ; O18 |
@@ -256,7 +256,7 @@ Contrat commun : fonctions TypeScript typées ; \`Result<T, AppError>\` désigne
 
 | ID | Fonction (entrées → sortie) | Dépendances et effet |
 |---|---|---|
-| M70 | \`exportDataJson(scope:BackupScope): Promise<Result<Blob>>\` | M24 ; O16 ; export avec schéma et date |
+| M70 | \`exportDataJson(scope:BackupScope): Promise<Result<Blob>>\` | M89 ; O16 ; export avec schéma et date |
 | M71 | \`validateBackup(file:File): Promise<Result<BackupEnvelope>>\` | O16 ; validate schema, taille, intégrité |
 | M72 | \`restoreData(backup:BackupEnvelope,mode:'merge'|'replace'): Promise<Result<RestoreReport>>\` | M22/M23 ; confirmation utilisateur avant écrasement |
 | M73 | \`exportMediaArchive(): Promise<Result<Blob>>\` | M46/M48 ; O21 + fichiers personnels |
@@ -293,6 +293,30 @@ Contrat commun : fonctions TypeScript typées ; \`Result<T, AppError>\` désigne
 | T09 | réinstallation | comptes, données rétablies, médias personnels signalés manquants |
 
 **Convention :** toute nouvelle fonction doit apparaître dans ce registre avant de passer dans le code ; tout nouvel écran doit être enregistré comme artefact et ses interactions ici. Il est interdit de cacher un appel réseau ou une nouvelle responsabilité dans un callback ou un « helper » anonyme pour éviter cette procédure.
+
+
+### 4.7 Opérations complémentaires explicitement prévues (F17, F21–F26, F28–F29, F37)
+
+Ces opérations complètent la couverture des écrans et des scénarios de la roadmap. Elles sont **PLANNED** comme les précédentes.
+
+| ID | Fonction (entrées → sortie) | Dépendances et effet |
+|---|---|---|
+| M89 | `fetchCloudRecords<T>(uid:string,kind:CloudCollection): Promise<Result<T[]>>` | M21 ; lecture ponctuelle depuis cache/serveur conformément à la stratégie offline |
+| M90 | `registerAccount(email:string,password:string): Promise<Result<AuthUser>>` | Firebase Auth ; création compte avec consentement |
+| M91 | `deleteTaskList(listId:string,onTasks:'moveToInbox'|'delete'): Promise<Result<void>>` | M23, M22, M36 ; liste et tâches rattachées, confirmation préalable |
+| M92 | `deletePlaylist(playlistId:string): Promise<Result<void>>` | M23 ; supprime la liste, pas les pistes |
+| M93 | `removeTrack(trackId:string,deleteLocalFile:boolean): Promise<Result<void>>` | M23, M49, M55, M56 ; nettoie références playlists, protège média partagé |
+| M94 | `reorderPlaylist(playlistId:string,trackIds:string[]): Promise<Result<void>>` | M55 ; valide pistes et ordre |
+| M95 | `updateImageMetadata(image:ImageMetadata): Promise<Result<void>>` | M46 ; renomme/classe/tague O11 en local |
+| M96 | `setBackground(imageId:string): Promise<Result<void>>` | M66, O07/O11/O12 ; fond personnel sélectionné |
+| M97 | `cropImage(blob:Blob,rect:CropRect): Promise<Result<Blob>>` | API Canvas/Blob navigateur ; édition locale, contrôles limites |
+| M98 | `composeDecorImage(layers:DecorLayer[]): Promise<Result<Blob>>` | M97, Canvas ; composition simple image/texte (phase ultérieure) |
+| M99 | `setPlaybackQueue(trackIds:string[]): Result<void>` | O18, M53 ; file d'attente interne |
+| M100 | `handlePushTestRequest(authToken:string,deviceId:string): Promise<Result<NotificationTestResult>>` | Worker F37 ; vérifie Firebase ID token et UID avant test push, aucune API publique non authentifiée |
+| M101 | `validateEvent(input:unknown): Result<CalendarEvent>` | O02/O05, dates ; rejet des données invalides |
+| M102 | `validateTask(input:unknown): Result<Task>` | O04/O05, dates/listes ; rejet des données invalides |
+
+`CropRect` = coordonnées numériques bornées ; `DecorLayer` = calque local `image|text` avec position, dimensions et contenu non exécutable (types F17). Les signatures d'une éventuelle bibliothèque d'édition d'image ne sont **pas** approuvées : seules les APIs natives du navigateur sont enregistrées.
 
 ## 5. Connexions et dépendances (registre intégral)
 
@@ -333,7 +357,7 @@ flowchart TD
 | C07 | F32 → Pages/catalog | O13, médias de base | manifest/checksum/droits ; cache selon taille |
 | C08 | F25 → HTMLAudioElement/Media Session (si disponible) | Blob/URL audio + commandes | révocation URLs ; limites iOS testées |
 | C09 | F34 ↔ Fichiers iOS | O16/O21, archives via File API/partage | consentement, validation, pas d'accès silencieux à iCloud |
-| C10 | F35 ↔ CacheStorage/Pages | app shell et versions O17 | pas de purge IndexedDB ;
+| C10 | F35 ↔ CacheStorage/Pages | app shell et versions O17 | pas de purge IndexedDB |
 | C11 | PWA installée → PushManager | permission et abonnement O14 | geste explicite, HTTPS |
 | C12 | F33 → Firestore | O14 | privée par UID, endpoint non public |
 | C13 | Cloudflare Cron → Firestore | requête rappels O06 + receipts O19 | secrets Worker ; autorisation serveur seulement |
@@ -342,6 +366,7 @@ flowchart TD
 | C16 | F36 → Pages/version | O17 | nouvelles versions sans suppression des imports |
 | C17 | F34 → F29 | restauration O02–O09 | confirmation d'écrasement, règles par UID |
 | C18 | F18/F23 → rappels O06 | occurrences + échéances | DST, fuseau, clé occurrence stable |
+| C19 | UI test push → Worker HTTP M100 | Firebase ID token + deviceId, réponse O22 | jeton vérifié côté Worker, UID propriétaire, limites de requêtes ; aucune route publique anonyme |
 
 **Aucune connexion non inscrite** (API Deezer, Calendar Apple, Cloud Storage Firebase, serveur PC, API d'images payante, télémétrie, analytique ou publicité) n'est autorisée sans accord utilisateur et modification préalable de ce document.
 
@@ -364,6 +389,9 @@ M43 enregistre O06 → Firestore → Cron Worker M84/M85 → M86 claim occurrenc
 
 ### FL06 — Mise à jour
 Publication sur \`Pecose/main\` → Pages version O17 → M82 détecte → affichage mise à jour → consentement → M83 recharge cache app ; IndexedDB utilisateur et Firestore restent intacts ; nouveaux catalogues ajoutés sans écraser imports.
+
+### FL08 — Notification de test
+La PWA installée obtient le consentement via M75/M76 → requête HTTPS authentifiée C19 → M100 vérifie le jeton Firebase et le propriétaire de O14 → M87 pousse le message → M78 affiche O22 ; succès d'envoi ≠ garantie d'affichage iOS.
 
 ### FL07 — Sauvegarde indépendante
 M70 export JSON des données légères ; M73 export archive des médias personnels ; sauvegarde par l'utilisatrice dans Fichiers/iCloud Drive ; M71/M72 et M74 valident/restaurent sur un autre appareil. **Synchronisation automatique ≠ historique de sauvegardes.**
