@@ -49,7 +49,7 @@
 | D21 | Calendrier **semaine** : six cases lundi–samedi et dimanche accessible par **dépliage visible** ; noms si la place le permet, sinon compteurs. Toucher un jour affiche cette date sur Jour ; bouton « Aujourd'hui » pour revenir |
 | D22 | Interface minimaliste : formes très arrondies, couleurs apaisantes, lecture claire ; gestes facultatifs et explicites, **aucun geste à deux doigts obligatoire** |
 
-**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F02 et F04–F05 existent déjà (documentation)** ; **F03 est retiré** ; **F06–F56 et les fonctions M01–M160 restent `PLANNED`, sauf les anciennes signatures M30–M44/M91/M101–M102 qui sont `SUPERSEDED` et ne doivent pas être implémentées** à la date ci-dessus. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
+**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F02 et F04–F05 existent déjà (documentation)** ; **F03 est retiré** ; **F06–F56 et les fonctions M01–M160 restent `PLANNED`, sauf les anciennes signatures M30–M40/M91/M101–M102 qui sont `SUPERSEDED` et ne doivent pas être implémentées** à la date ci-dessus. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
 
 **Source de vérité :** `AGENTS.md` pour le processus, **ce fichier** pour les contrats d'architecture, `ROADMAP.md` pour l'ordre des livraisons. En cas de conflit : STOP et demande utilisateur.
 
@@ -279,24 +279,24 @@ Contrat commun : fonctions TypeScript typées ; `Result<T, AppError>` désigne r
 |---|---|---|
 | M28 | `normalizeInstant(localDate:string,timeZone:string): Result<string>` | Date/zone IANA ; sortie UTC ISO |
 | M29 | `expandOccurrences(rule:RecurrenceRule,base:string,range:DateRange): Occurrence[]` | O05 ; expansion bornée |
-| M30 | `getAgenda(range:DateRange): Promise<Result<CalendarEvent[]>>` | M89/M29 ; événements de la plage |
-| M31 | `saveEvent(input:CalendarEvent): Promise<Result<CalendarEvent>>` | M101, M22, M28 ; valide puis crée/modifie O02 |
-| M32 | `deleteEvent(eventId:string): Promise<Result<void>>` | M23, M42 ; liens rappels gérés |
-| M33 | `getTodayOverview(date:string): Promise<Result<TodayOverview>>` | M30, M36, M40 ; accueil |
-| M34 | `listTaskLists(): Promise<Result<TaskList[]>>` | M89 ; O03 |
-| M35 | `saveTaskList(input:TaskList): Promise<Result<TaskList>>` | M22 ; O03 |
-| M36 | `queryTasks(filter:TaskFilter): Promise<Result<Task[]>>` | M89 ; O04, filtres |
-| M37 | `saveTask(input:Task): Promise<Result<Task>>` | M102, M22 ; valide puis crée/modifie O04 |
-| M38 | `setTaskCompleted(taskId:string,completed:boolean): Promise<Result<void>>` | M22 ; O04 |
-| M39 | `deleteTask(taskId:string): Promise<Result<void>>` | M23, M42 ; rappels associés |
-| M40 | `getUpcomingTasks(until:string): Promise<Result<Task[]>>` | M36 ; résumé |
+| M30 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M31 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M32 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M33 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M34 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M35 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M36 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M37 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M38 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M39 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
+| M40 | **SUPERSEDED (jamais implémenté)** : ancienne séparation tâche/événement | Voir M121–M160, O31–O38 ; ne pas implémenter |
 | M41 | `getDueReminders(now:string): Promise<Result<Reminder[]>>` | M89/M29 ; rappel local visible |
 | M42 | `reconcileReminders(ownerType:'event'|'task',ownerId:string): Promise<Result<void>>` | M22/M23, O06 ; cohérence de liens |
 | M43 | `saveReminder(input:Reminder): Promise<Result<Reminder>>` | M22 ; planification O06 |
 | M44 | `disableReminder(reminderId:string): Promise<Result<void>>` | M22 ; désactive |
 | M45 | `formatZonedTime(instant:string,timeZone:string): string` | zone locale ; pure |
 
-`DateRange={from:string,to:string}`, `Occurrence={key:string,startsAt:string}`, `TaskFilter` et `TodayOverview` sont types de F17. Les calculs récurrents doivent traiter changements d'heure, fin de mois et limites de plage ; **pas d'envoi push depuis un minuteur navigateur**.
+`DateRange={from:string,to:string}` et `Occurrence={key:string,startsAt:string}` restent des types F17. Les anciens `TaskFilter` et `TodayOverview` sont remplacés par les vues du modèle O31/O32. Calculer les récurrences en fuseau local, traiter changements d'heure et fins de mois, **pas d'envoi push depuis un minuteur navigateur**.
 
 ### 4.4 Médias, playlist, lecteur, décoration (F24–F26, F31–F32)
 
@@ -385,7 +385,7 @@ Ces opérations complètent la couverture des écrans et des scénarios de la ro
 |---|---|---|
 | M89 | `fetchCloudRecords<T>(uid:string,kind:CloudCollection): Promise<Result<T[]>>` | M21 ; lecture ponctuelle depuis cache/serveur conformément à la stratégie offline |
 | M90 | `registerAccount(email:string,password:string): Promise<Result<AuthUser>>` | Firebase Auth ; création compte avec consentement |
-| M91 | `deleteTaskList(listId:string,onTasks:'moveToInbox'|'delete'): Promise<Result<void>>` | M23, M22, M36 ; liste et tâches rattachées, confirmation préalable |
+| M91 | **SUPERSEDED (jamais implémenté)** | Voir O34/O35 et M143–M146/M159–M160 |
 | M92 | `deletePlaylist(playlistId:string): Promise<Result<void>>` | M23 ; supprime la liste, pas les pistes |
 | M93 | `removeTrack(trackId:string,deleteLocalFile:boolean): Promise<Result<void>>` | M23, M49, M55, M56 ; nettoie références playlists, protège média partagé |
 | M94 | `reorderPlaylist(playlistId:string,trackIds:string[]): Promise<Result<void>>` | M55 ; valide pistes et ordre |
@@ -395,8 +395,8 @@ Ces opérations complètent la couverture des écrans et des scénarios de la ro
 | M98 | `composeDecorImage(layers:DecorLayer[]): Promise<Result<Blob>>` | M97, Canvas ; composition simple image/texte (phase ultérieure) |
 | M99 | `setPlaybackQueue(trackIds:string[]): Result<void>` | O18, M53 ; file d'attente interne |
 | M100 | `handlePushTestRequest(authToken:string,deviceId:string): Promise<Result<NotificationTestResult>>` | Worker F37 ; vérifie Firebase ID token et UID avant test push, aucune API publique non authentifiée |
-| M101 | `validateEvent(input:unknown): Result<CalendarEvent>` | O02/O05, dates ; rejet des données invalides |
-| M102 | `validateTask(input:unknown): Result<Task>` | O04/O05, dates/listes ; rejet des données invalides |
+| M101 | **SUPERSEDED (jamais implémenté)** | Validation unifiée M157 |
+| M102 | **SUPERSEDED (jamais implémenté)** | Validation unifiée M157 |
 
 `CropRect` = coordonnées numériques bornées ; `DecorLayer` = calque local `image|text` avec position, dimensions et contenu non exécutable (types F17). Les signatures d'une éventuelle bibliothèque d'édition d'image ne sont **pas** approuvées : seules les APIs natives du navigateur sont enregistrées.
 
@@ -413,8 +413,8 @@ Toutes les fonctions ci-dessous sont **PLANNED**, pas implémentées. F45 est la
 | M107 | `unlinkGoogleCalendar(uid:string): Promise<Result<void>>` | F46→Worker, token Firebase, révoque/détruit O27, conserve les événements locaux |
 | M108 | `requestGoogleCalendarSync(reason:'startup'|'edit'|'manual'): Promise<Result<CalendarSyncRun>>` | F45/F46→Worker ; UID vérifié, statut O23, flux C20 |
 | M109 | `pullGoogleCalendarChanges(uid:string,cursor:GoogleSyncCursor): Promise<Result<GoogleCalendarChange[]>>` | Worker Google events.list, pagination, syncToken, 410→resync contrôlée |
-| M110 | `pushGoogleCalendarEvent(uid:string,event:CalendarEvent): Promise<Result<GoogleEventLink>>` | Worker events.insert/patch/delete, ETag, idempotence, O24 |
-| M111 | `mapGoogleEvent(change:GoogleCalendarChange,local?:CalendarEvent): Result<CalendarEvent>` | normalise dates/annulations/récurrences et lien O24 ; pas d'écrasement silencieux |
+| M110 | `pushGoogleCalendarEvent(uid:string,event:Activity): Promise<Result<GoogleEventLink>>` | Worker events.insert/patch/delete, ETag, idempotence, O24/O31 ; créneaux Google seulement |
+| M111 | `mapGoogleEvent(change:GoogleCalendarChange,local?:Activity): Result<Activity>` | normalise dates/annulations/récurrences et lien O24/O31 ; pas d'écrasement silencieux |
 | M112 | `reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]): Promise<Result<CalendarSyncRun>>` | O02/O24/O26, M109–M111 ; déduplication, tombstones, conflits |
 | M113 | `resolveGoogleCalendarConflict(conflictId:string,choice:'keepLocal'|'keepGoogle'|'keepBoth'): Promise<Result<void>>` | F45→F46→Worker, O26 ; approbation explicite de l'utilisatrice |
 | M114 | `runGoogleCalendarCron(now:string): Promise<Result<CalendarSyncRun[]>>` | Worker planifié (phase différée), M109/M110/M112, quotas et idempotence |
@@ -426,6 +426,55 @@ Toutes les fonctions ci-dessous sont **PLANNED**, pas implémentées. F45 est la
 | M120 | `validateGoogleOAuthState(state:string): Promise<Result<GoogleOAuthState>>` | Worker, O28 TTL usage unique, contrôle CSRF/liaison UID |
 
 `AuthorizationUrl`, `OAuthTokenResponse` et `GoogleCalendarSyncError` sont des types techniques de F17. `F37` ne doit être déployé qu'une fois l'infrastructure gratuite validée. Les tentatives de création de endpoints non inscrits sont bloquées par la règle §0.
+
+### 4.9 Activités, cinq onglets, reports, listes et bilan (F19–F22, F48–F56)
+
+**Toutes les fonctions M121–M160 sont PLANIFIÉES** et réservées au modèle unique O31. M30–M40, M91 et M101–M102 désignent les anciennes signatures, non implémentables. Les onglets sont des filtres et non des bases de données indépendantes.
+
+| ID | Fonction (entrée → sortie) | Dépendances et effet |
+|---|---|---|
+| M121 | `createActivity(input:ActivityDraft): Promise<Result<Activity>>` | M157/M22/O31 ; ID stable |
+| M122 | `updateActivity(activity:Activity): Promise<Result<Activity>>` | M157/M22/O31 ; conserve liens, ID et historique |
+| M123 | `deleteActivity(id:string): Promise<Result<void>>` | M23/O31/O24 ; tombstone, gérer sync Google sans supprimer liste |
+| M124 | `classifyActivity(activity:Activity): ('task'|'habit'|'event')[]` | O31 ; vue multi-catégories, aucun doublon |
+| M125 | `listTasks(): Promise<Result<Activity[]>>` | M89/M124 ; sans horaire ni récurrence |
+| M126 | `listHabits(): Promise<Result<Activity[]>>` | M89/M124 ; récurrences, horaires facultatifs |
+| M127 | `getCalendarWeek(monday:LocalDate): Promise<Result<CalendarDaySummary[]>>` | M156 ; six jours + dimanche dépliable |
+| M128 | `selectCalendarDate(date:LocalDate): void` | M148/M02 ; bascule vers Jour à la date choisie |
+| M129 | `getDayEntries(date:LocalDate): Promise<Result<ActivityOccurrenceView[]>>` | M89/M130/M155 ; occurrences de ce jour uniquement |
+| M130 | `expandActivityOccurrences(activity:Activity,range:DateRange): ActivityOccurrence[]` | O31/O32/O05/F18 ; occurrences bornées, heure locale |
+| M131 | `groupDayEntries(entries:ActivityOccurrenceView[]): DayGroups` | O32 ; sans horaire puis avec horaire croissant |
+| M132 | `setOccurrenceCompletion(key:string,mode:'manual_done'|'pending'): Promise<Result<ActivityCompletion>>` | M22/O33 ; coche droite par occurrence |
+| M133 | `shouldAutoComplete(occ:ActivityOccurrenceView,now:string): boolean` | O31/O32/O33 ; horaire + option activée + échéance, sauf override |
+| M134 | `undoOccurrenceCompletion(key:string): Promise<Result<ActivityCompletion>>` | M22/O33 ; `manually_undone` bloque toute nouvelle autovalidation |
+| M135 | `findMissedTasks(yesterday:LocalDate): Promise<Result<Activity[]>>` | M125/O31/O33 ; inachevées, datées hier, sans récurrence/heure |
+| M136 | `getCarryOverPrompt(today:LocalDate): Promise<Result<CarryOverPrompt>>` | M135/O36 ; une proposition groupée et non intrusive |
+| M137 | `applyCarryOver(choices:CarryOverChoice[]): Promise<Result<void>>` | M122/M22/O36 ; move/keep/later, ID inchangé, aucun doublon |
+| M138 | `setActivitySchedule(id:string,schedule:ActivitySchedule): Promise<Result<Activity>>` | M122/O31 ; date seule ou horaires, propose auto par défaut |
+| M139 | `setActivityRecurrence(id:string,rule:RecurrenceRule|null): Promise<Result<Activity>>` | M122/M130/O05/O31 ; combinaisons heure + cycles |
+| M140 | `setActivityStars(id:string,stars:1|2|3|null): Promise<Result<Activity>>` | M122/O31 ; priorité du bilan |
+| M141 | `setActivityIcon(id:string,iconId:string): Promise<Result<Activity>>` | M122/O31 ; icône personnalisable |
+| M142 | `attachChecklist(activityId:string,checklistId:string|null): Promise<Result<Activity>>` | M122/O31/O34 ; association réutilisable |
+| M143 | `listChecklists(): Promise<Result<Checklist[]>>` | M89/O34 ; onglet Listes |
+| M144 | `saveChecklist(input:ChecklistDraft): Promise<Result<Checklist>>` | M22/O34 ; CRUD nom/icône |
+| M145 | `deleteChecklist(id:string): Promise<Result<void>>` | M23/M142/O34/O35 ; détacher des activités, confirmation |
+| M146 | `setChecklistItemChecked(id:string,checked:boolean): Promise<Result<ChecklistItem>>` | M22/O35 ; ne coche pas l'activité liée |
+| M147 | `getMonthlyReview(month:string,stars?:1|2|3): Promise<Result<MonthlyReview>>` | M89/O31/O32/O33/O38 ; tri 3→2→1 puis date |
+| M148 | `setSelectedDay(date:LocalDate,source:DaySelection['source']): void` | O37/F16/M13 ; jour actif, retour Aujourd'hui |
+| M149 | `renderDay(date:LocalDate): void` | M129/M131/F53 ; vue centrale, deux groupes |
+| M150 | `renderCalendarWeek(monday:LocalDate,showSunday:boolean): void` | M127/M128 ; cases 6+1 |
+| M151 | `renderHabits(): void` | M126 ; onglet Habitudes |
+| M152 | `renderChecklists(): void` | M143/M160 ; onglet Listes |
+| M153 | `openActivityEditor(activityId:string): void` | F53/O31/M138–M142 ; clic sur icône gauche, tous les champs |
+| M154 | `reconcileDueAutoCompletions(now:string): Promise<Result<number>>` | M129/M133/M158/O33 ; au retour de l'app, pas une alarme OS |
+| M155 | `getOccurrenceCompletion(key:string): Promise<Result<ActivityCompletion|null>>` | M89/O33 ; override prioritaire |
+| M156 | `summarizeCalendarDay(date:LocalDate): Promise<Result<CalendarDaySummary>>` | M129/O31/O32 ; libellés ou compteurs |
+| M157 | `validateActivity(input:unknown): Result<Activity>` | O31/O05/O34 ; dates/heures/récurrences/stars/liens |
+| M158 | `markAutoCompletion(key:string,at:string): Promise<Result<ActivityCompletion>>` | M22/M133/O33 ; statut `auto_assumed` |
+| M159 | `saveChecklistItem(input:ChecklistItemDraft): Promise<Result<ChecklistItem>>` | M22/O35 ; créer/modifier/réordonner |
+| M160 | `getChecklistDetails(id:string): Promise<Result<{list:Checklist;items:ChecklistItem[]}>>` | M89/O34/O35 ; accès via onglet et activité |
+
+**Types techniques dans F17, pas de nouveaux fichiers :** `LocalDate`, `ISOInstant`, `ActivityDraft`, `ActivitySchedule`, `ActivityOccurrenceView`, `DayGroups`, `CalendarDaySummary`, `CarryOverPrompt`, `CarryOverChoice`, `ChecklistDraft`, `ChecklistItemDraft`, `MonthlyAchievement`. La validation auto à heure dépassée s'applique lors de l'utilisation/reprise de l'app ; les rappels push restent indépendants. Côté Google, M109–M112 et O24 emploient l'O31 canonique.
 
 ## 5. Connexions et dépendances (registre intégral)
 
