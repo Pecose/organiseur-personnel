@@ -207,7 +207,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 ## 7. Roadmap de livraison par étapes
 
-> Les cases ne sont pas cochées : **aucune implémentation n'est encore réalisée**.
+> Les cases de développement ne sont pas cochées : **aucune implémentation de l'application n'est encore réalisée**. Seuls les préparatifs de compte/dépôt et les documents ont été établis.
 
 ### Phase 0 — Validation des risques iPhone (priorité absolue)
 
@@ -221,41 +221,75 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 **Critère de sortie :** installation et fonctionnement offline validés ; limitations audio et notifications connues, documentées et acceptées.
 
-### Phase 1 — Fondations & interface
+### Phase 1 — Structure de navigation et expérience iPhone (G10/G14)
 
-- [ ] Initialiser TypeScript et un framework d'interface léger (choix de framework non figé).
-- [ ] Créer navigation, écrans Accueil / Agenda / Tâches / Musique / Décoration / Paramètres.
-- [ ] Définir charte graphique, thèmes et composants adaptés au format iPhone.
-- [ ] Configurer manifeste PWA, icônes, service worker et cache offline robuste.
-- [ ] Créer un système de gestion des erreurs et d'indicateur réseau/synchronisation.
-- [ ] Mettre en place une configuration de développement et une configuration de production distinctes.
+- [ ] Choisir/valider un environnement TypeScript et une interface légère, sans nouvelle dépendance non documentée.
+- [ ] Développer les **cinq onglets fixes** dans cet ordre : **Calendrier | Tâches | Jour | Habitudes | Listes** ; placer Jour au centre, affiché au premier lancement à la date réelle.
+- [ ] Accès secondaire pour musique, décoration, paramètres et bilan, sans remplacer les onglets.
+- [ ] Créer la page Jour **sans sections par type**, avec **seulement Sans horaire et Avec horaire**, ce dernier trié par heure croissante.
+- [ ] Positionner l'**icône/image à gauche** de chaque ligne (tap → fiche d'édition complète) et la **coche de validation à droite**.
+- [ ] Calibrer UI **très arrondie, tons apaisants, espaces suffisants et lisibilité**, utilisable d'une main sur iPhone.
+- [ ] Garder le défilement vertical du contenu ; navigation tactile explicite ; éventuel swipe testé, **jamais** geste deux doigts imposé.
+- [ ] Installer manifeste PWA, service worker, cache hors ligne et états réseau/synchronisation.
+- [ ] Tester navigation clavier/lecteur d'écran, petites tailles d'écran et zones tactiles de l'icône/coche.
 
-**Critère de sortie :** application navigable, installable et esthétique, sans backend requis pour l'ouvrir.
+**Critère de sortie :** navigation 5 onglets et composition de Jour validées sur un iPhone, sans surcharge visuelle.
 
-### Phase 2 — Agenda, tâches et stockage local
+### Phase 2 — Modèle unique d'activité, jour, calendrier, habitudes, listes et bilan
 
-- [ ] CRUD des rendez-vous, heures, descriptions, catégories et répétitions.
-- [ ] Vues jour / semaine / mois et résumé des rendez-vous du jour.
-- [ ] CRUD des tâches et listes, statuts, priorités, dates, récurrences et filtres.
-- [ ] Modèle de données avec identifiants stables, dates UTC + fuseau explicite.
-- [ ] Enregistrement local immédiat ; fonctionnement offline des fonctions principales.
-- [ ] Tests de cohérence après fermeture/réouverture, redémarrage et absence de réseau.
+**Source de vérité :** [ARCHITECTURE.md](docs/ARCHITECTURE.md) : **O31 Activity**, O32 occurrences, O33 validations, O34–O35 listes, O36 reports, O37 date choisie, O38 bilan ; fonctions M121–M160. **Les anciennes entités Task/CalendarEvent/TaskList sont SUPERSEDED et ne doivent pas être implémentées.**
 
-**Critère de sortie :** agenda et tâches utilisables sur le téléphone sans connexion.
+#### Phase 2A — Activités et propriétés (G03/G10)
+
+- [ ] Créer et modifier **un seul objet Activity O31**, avec ID conservé malgré la planification ou la répétition.
+- [ ] Tâche = sans heure ni répétition ; habitude = répétition ; événement = horaire. Ces noms sont des **vues**, non des stores différents ; un élément peut être à la fois récurrent et horaire.
+- [ ] Fiche complète accessible par son icône gauche : titre, description, icône/image, étoiles 1–3, date, début/fin facultatifs, fuseau, cycle, notification, auto-validation, liste liée.
+- [ ] Tâches sans date conservées dans **Tâches**, et non injectées dans chaque Jour ; tâches datées sans heure visibles seulement à la date prévue.
+- [ ] Gérer les changements de date, heures de début/fin, fuseau, changement d'heure et calendrier local, sans créer d'objets doublons.
+
+#### Phase 2B — Jour et calendrier (G02/G10)
+
+- [ ] **Jour** montre la date choisie depuis Calendrier ; bouton **Aujourd'hui** pour revenir à la date réelle.
+- [ ] Calendrier **par semaine**, **six cases du lundi au samedi**, **dimanche dépliable** avec commande visible.
+- [ ] Sur chaque case, montrer quelques libellés si la place le permet, sinon des compteurs d'événements et d'habitudes.
+- [ ] Toucher une case ouvre Jour sur la date sélectionnée.
+- [ ] Sur Jour, toutes les occurrences applicables à cette date : **sans horaire en premier**, puis **avec horaire ordonnées chronologiquement**, sans distinction visuelle obligatoire tâche/habitude/événement.
+
+#### Phase 2C — Habitudes, validations et reports (G03/G11)
+
+- [ ] Habitudes quotidiennes, certains jours de la semaine, mensuelles ou annuelles (choix simple), avec début/fin de période éventuels.
+- [ ] Tester **habitude hebdomadaire à heure fixe** : « Théâtre mercredi 19 h », présente dans Habitudes et sur Jour chaque mercredi.
+- [ ] Valider **chaque occurrence** indépendamment ; conserver l'historique.
+- [ ] Quand un horaire est ajouté, **proposer la validation automatique activée par défaut**, et offrir un réglage explicite pour la désactiver.
+- [ ] Si fin définie, présumer après fin ; sinon après heure prévue. Conserver le statut **présumé automatiquement** distinct de confirmé manuellement.
+- [ ] Permettre d'annuler une validation automatique, et **ne pas la réappliquer au prochain rafraîchissement**.
+- [ ] Pour les tâches **datées d'hier**, **sans horaire**, **non récurrentes**, non effectuées : **une seule fenêtre groupée** proposant reporter aujourd'hui / conserver hier / remettre à plus tard.
+- [ ] Aucun report automatique, aucun doublon, aucune fenêtre intempestive répétée à chaque affichage.
+
+#### Phase 2D — Listes associées et récapitulatif mensuel (G12/G13)
+
+- [ ] Créer, renommer, classer et supprimer des **listes indépendantes**, avec articles à cocher (courses, valise, etc.).
+- [ ] Ouvrir une liste directement depuis l'activité liée ; conserver une liste si l'activité est supprimée ou déplanifiée.
+- [ ] La validation des articles **ne valide pas automatiquement l'activité**.
+- [ ] Attribuer de 1 à 3 étoiles (facultatif) à une activité.
+- [ ] Produire un **bilan de fin de mois** des activités réalisées, tri **3 étoiles, puis 2, puis 1**, puis chronologie ; filtre par étoiles ; les réalisations seulement présumées sont explicitement signalées.
+- [ ] Tester tous les scénarios O31–O38 et les contrats T15–T20.
+
+**Critère de sortie :** page Jour cohérente à toute date, tâches et habitudes non dupliquées, validations et report réversibles, listes accessibles, bilan correct. Toute validation finale reste soumise aux tests iPhone.
 
 ### Phase 3 — Compte, sauvegardes et reprise sur nouvel appareil
 
 - [x] Créer un projet **Firebase Spark**, sans activer de facturation (configuration initiale confirmée par le propriétaire).
 - [ ] Firebase Authentication : connexion e-mail/mot de passe activée ; **restent** à implémenter dans l'application le parcours de connexion et la récupération d'accès.
 - [ ] Firestore : base créée ; **restent** à configurer les règles de sécurité par utilisateur et à tester les refus d'accès croisés.
-- [ ] Activer la persistance locale compatible Safari et la synchronisation automatique.
+- [ ] Activer la persistance locale compatible Safari et la synchronisation automatique des **activités, validations par occurrence, listes et reports** ; règles Firestore par UID.
 - [ ] Gérer conflits/erreurs de synchronisation et états visibles.
 - [ ] Tester modification offline puis retour du réseau.
 - [ ] Tester déconnexion, effacement local et récupération des données cloud après reconnexion.
 - [ ] Ajouter export JSON daté + import/validation + restauration des données.
 - [ ] Vérifier les quotas gratuits et protéger le projet contre une activation involontaire de services payants.
 
-**Critère de sortie :** agenda/tâches restaurés sur un iPhone réinstallé, sans manipulation de sauvegarde à chaque modification.
+**Critère de sortie :** activités O31, occurrences/completions O33, listes O34/O35 et décisions O36 récupérées sur un iPhone réinstallé, sans opération manuelle de sauvegarde à chaque modification.
 
 ### Phase 3 bis — Synchronisation bidirectionnelle Google Agenda (objectif G02)
 
@@ -264,7 +298,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 - [ ] Vérifier la configuration gratuite de Google Calendar API, l'écran de consentement OAuth, les scopes minimaux et le fonctionnement durable des jetons (en mode Testing, des jetons peuvent expirer après 7 jours).
 - [ ] Ajouter « Connecter mon Google Agenda » et « Déconnecter », avec consentement explicite, état de connexion et gestion de révocation.
 - [ ] Mettre en place l'échange OAuth **côté Worker uniquement** : état anti-CSRF unique, vérification de l'identité Firebase, stockage chiffré des jetons, aucun secret dans GitHub Pages.
-- [ ] Synchroniser d'abord **lorsque la PWA est ouverte** : lecture Google, créations/modifications/suppressions depuis l'application vers Google et inversement, avec identifiants stables et prévention des doublons.
+- [ ] Synchroniser d'abord **lorsque la PWA est ouverte** : **événements horaires O31** vers Google et inversement, avec O24 (liaison stable), sans doublons ; ne pas exporter par défaut toutes les tâches ni toutes les habitudes locales.
 - [ ] Tester récurrences, exceptions, fuseaux horaires, événements annulés et conflits concurrents ; aucune suppression silencieuse au premier rapprochement.
 - [ ] Utiliser la synchronisation incrémentale `nextSyncToken`, pagination et reprise propre après invalidation `410 Gone`.
 - [ ] **Seconde étape différée** : ordonnanceur Cloudflare gratuit pour synchroniser même PWA fermée, sans garantir l'instantanéité ; ce compte n'a pas à être créé maintenant.
@@ -275,7 +309,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 ### Phase 4 — Rappels et notifications
 
-- [ ] Concevoir les champs de rappel (date/heure, avance, répétition, zone horaire, statut).
+- [ ] Concevoir les champs de rappel **liés à activityId + occurrenceKey** (date/heure, avance, répétition, zone horaire, statut).
 - [ ] Demander l'autorisation Web Push depuis la PWA installée.
 - [ ] Stocker et maintenir l'abonnement push de l'appareil de façon sécurisée.
 - [ ] Déployer un Cloudflare Worker + Cron Trigger sur l'offre gratuite et la gestion des secrets.
@@ -340,6 +374,16 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | PC éteint | Application et services cloud continuent de fonctionner |
 | Mode avion après premier chargement | Agenda, tâches, médias déjà chargés et décor disponibles |
 | Création d'une tâche sans réseau | Enregistrée localement puis synchronisée à la reconnexion |
+| Navigation cinq onglets | Calendrier, Tâches, **Jour central**, Habitudes, Listes, dans cet ordre |
+| Choix d'une date | Toucher une case du calendrier ouvre Jour à cette date ; retour Aujourd'hui visible |
+| Calendrier 6+1 | Six jours du lundi au samedi, dimanche dépliable ; libellés ou compteurs |
+| Page Jour | Deux groupes uniquement, sans heure puis avec heure croissante, sans troisième bloc |
+| Tâche → événement → habitude horaire | Même identifiant O31, pas de doublon, exemple théâtre mercredi 19 h |
+| Icône / validation | Icône à gauche ouvre la fiche complète ; coche à droite valide l'occurrence |
+| Autovalidation | Proposée activée à l'ajout d'heure ; heure de fin privilégiée ; annulation persistante |
+| Tâche oubliée hier | Fenêtre groupée, report facultatif par tâche, aucune copie ni harcèlement |
+| Liste associée | Ouvrable depuis l'activité ; coches d'articles indépendantes de l'activité |
+| Bilan mensuel | Tri 3→2→1 étoiles, chronologie, filtres ; validations auto présentées comme présumées |
 | Nouveau téléphone, même compte | Agenda, tâches, préférences et playlists-métadonnées récupérés |
 | Google Agenda → PWA | Nouveau rendez-vous / modification / suppression visibles après synchronisation | 
 | PWA → Google Agenda | Événements créés, modifiés et supprimés reflétés sans doublon | 
@@ -370,8 +414,9 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 ## 10. Ordre réel de priorité
 
 1. **Tester sur l'iPhone** l'installation PWA, la musique écran verrouillé et une notification fermée.
-2. **Sécuriser l'essentiel** : agenda, tâches, offline et synchronisation/restauration Firestore ; puis **Google Agenda bidirectionnel (G02)**.
-3. **Personnaliser** : galerie, thèmes saisonniers et bibliothèque Suno locale.
-4. **Fiabiliser** : export multimédia, sauvegarde indépendante, mises à jour et scénarios de changement de téléphone.
+2. **Construire le quotidien** : cinq onglets, Jour à deux groupes, objet unique O31, calendrier, habitudes, liste libre, report et bilans (G02/G03/G10–G14).
+3. **Sécuriser les données** : offline, Firestore et restauration, puis Google Agenda bidirectionnel (G02/G04).
+4. **Personnaliser** : galerie, thèmes saisonniers et bibliothèque Suno locale.
+5. **Fiabiliser** : export multimédia, sauvegarde indépendante, mises à jour et scénarios de changement de téléphone.
 
-> **Décisions restant à préciser avec l'utilisatrice :** nom final de l'application, palette graphique précise, comportements souhaités des rappels et acceptation ou non des limites de lecture audio en arrière-plan. Ces décisions ne bloquent pas la rédaction de la roadmap.
+> **Décisions restant à préciser :** nom final, nuances exactes de la palette douce, règles d'affichage des listes très longues et des tâches d'une date passée autre qu'hier, expérience utilisateur des rappels et limites de lecture audio iOS. Ces choix n'empêchent pas la roadmap ni la construction du noyau approuvé.
