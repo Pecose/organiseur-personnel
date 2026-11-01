@@ -131,7 +131,7 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 | `CalendarEvent` | O02 | **SUPERSEDED (jamais implémenté)** : projection externe Google Calendar, remplacée par O31 | Ne pas créer de source métier `events` parallèle |
 | `TaskList` | O03 | **SUPERSEDED (jamais implémenté)** : listes libres O34 | Identifiant historique réservé |
 | `Task` | O04 | **SUPERSEDED (jamais implémenté)** : activité unifiée O31 | Identifiant historique réservé |
-| `RecurrenceRule` | O05 | `frequency:daily|weekly|monthly|yearly; interval; until?; count?; weekdays?` | incluse dans O02/O04 ; calendrier local et rappels |
+| `RecurrenceRule` | O05 | `frequency:daily|weekly|monthly|yearly; interval; until?; count?; weekdays?` | O31 `Activity` ; occurrences O32, heure locale et fuseau |
 | `Reminder` | O06 | `id; activityId; occurrenceKey; scheduledFor; leadMinutes; timeZone; enabled; dispatchStatus` | `uid → reminders/{id}` ; O31/O32 ; Worker |
 | `ProfilePreferences` | O07 | `themeId; backgroundImageId?; autoSeason; locale; timeZone; notificationEnabled; updatedAt` | `uid → preferences/profile` |
 | `TrackMetadata` | O08 | `id; title; artist?; album?; source:bundled|imported; catalogId?; mediaId?; artworkId?; duration?; favorite; updatedAt` | Cloud léger pour métadonnées ; binaire O10 en local |
@@ -156,11 +156,11 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 
 | Objet | ID | Champs essentiels | Dépendances et stockage |
 |---|---|---|---|
-| `Activity` | O31 | `id; uid; title; description?; iconId?; imageId?; stars?:1|2|3; plannedOn?:LocalDate; startAt?:ISOInstant; endAt?:ISOInstant; timeZone; recurrence?:RecurrenceRule; autoComplete:boolean; checklistId?; includeInMonthlyReview:boolean; deletedAt?; updatedAt; googleLink?:GoogleEventLink` | **Source canonique** : `users/{uid}/activities/{id}`. Horaire et répétition indépendants. |
+| `Activity` | O31 | `id; uid; title; description?; iconId?; imageId?; stars?:1|2|3; plannedOn?:LocalDate; startAt?:ISOInstant; endAt?:ISOInstant; timeZone; recurrence?:RecurrenceRule; autoComplete:boolean; checklistId?; deletedAt?; updatedAt; googleLink?:GoogleEventLink` | **Source canonique** : `users/{uid}/activities/{id}`. Horaire et répétition indépendants. |
 | `ActivityOccurrence` | O32 | `activityId; occurrenceKey; localDate; startsAt?; endsAt?; recurring:boolean` | Vue **calculée** d'O31/O05 sur une plage bornée ; clés stables pour les récurrences |
 | `ActivityCompletion` | O33 | `id; activityId; occurrenceKey; status:pending|manual_done|auto_assumed|manually_undone; completedAt?; overriddenAt?; updatedAt` | `users/{uid}/activityCompletions/{id}` ; état **par occurrence**, l'annulation manuelle interdit la recochage automatique |
 | `Checklist` | O34 | `id; name; iconId?; archived?; updatedAt` | `users/{uid}/checklists/{id}` ; liste autonome et réutilisable |
-| `ChecklistItem` | O35 | `id; checklistId; text; checked; position; updatedAt` | `users/{uid}/checklists/{checklistId}/items/{id}` ; validation indépendante d'O31 |
+| `ChecklistItem` | O35 | `id; checklistId; text; checked; position; updatedAt` | `users/{uid}/checklistItems/{id}` ; `checklistId` clé étrangère, validation indépendante d'O31 |
 | `CarryOverDecision` | O36 | `id; activityId; fromDate; toDate; decision:move|keep|later; promptedAt; decidedAt?; updatedAt` | `users/{uid}/carryOverDecisions/{id}` ; action consentie, journal anti-doublon |
 | `DaySelection` | O37 | `selectedDate:LocalDate; today:LocalDate; source:startup|calendar|navigation` | État UI F16 uniquement ; par défaut date réelle aujourd'hui |
 | `MonthlyReview` | O38 | `month:YYYY-MM; starFilter?:1|2|3; entries:MonthlyAchievement[]; assumedCount` | Vue calculée O31/O32/O33 ; classement par étoiles et date, présumés distingués |
@@ -184,7 +184,7 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 | Objet | ID | Champs fonctionnels (contrat) | Relations et lieu |
 |---|---|---|---|
 | `GoogleCalendarConnection` | O23 | `uid; calendarId:'primary'; googleAccountLabel?; status:disconnected|authorizing|active|reauthorization_required|error; lastSyncAt?; lastError?` | statut non secret visible au propriétaire ; lié à O01, O25 |
-| `GoogleEventLink` | O24 | `calendarId; googleEventId; etag?; remoteUpdatedAt?; pending: none|upsert|delete; source:app|google` | sous-objet d'O02 ; identité stable pour éviter doublons |
+| `GoogleEventLink` | O24 | `calendarId; googleEventId; etag?; remoteUpdatedAt?; pending: none|upsert|delete; source:app|google` | sous-objet O31 ; identité stable et absence de doublons |
 | `GoogleSyncCursor` | O25 | `uid; calendarId; nextSyncToken?; lastFullSyncAt?; lastIncrementalSyncAt?` | Firestore **serveur uniquement** ; reprise API incrémentale |
 | `CalendarSyncConflict` | O26 | `id; uid; localEventId; googleEventId?; kind:update|delete|recurrence|mapping; localVersion; googleVersion; detectedAt; status:open|resolved` | document privé ; résolution explicite obligatoire |
 | `EncryptedGoogleOAuthGrant` | O27 | `uid; calendarId; ciphertext; keyVersion; scopes[]; issuedAt; revokedAt?` | Firestore **serveur uniquement**, jeton de renouvellement chiffré avec clé Worker secret ; jamais accessible à la PWA |
@@ -199,7 +199,7 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 users/{uid}/activities/{activityId}           → O31, source métier unique
 users/{uid}/activityCompletions/{id}         → O33, complétion par occurrence
 users/{uid}/checklists/{checklistId}         → O34, listes libres
-users/{uid}/checklists/{checklistId}/items/{id} → O35, lignes cochables
+users/{uid}/checklistItems/{id}               → O35, lignes cochables avec checklistId
 users/{uid}/carryOverDecisions/{id}          → O36, traçabilité des reports
 # Anciennes collections events/tasks/lists : SUPERSEDED, ne pas créer
 users/{uid}/reminders/{reminderId}           → O06
@@ -421,7 +421,7 @@ Toutes les fonctions ci-dessous sont **PLANNED**, pas implémentées. F45 est la
 | M109 | `pullGoogleCalendarChanges(uid:string,cursor:GoogleSyncCursor): Promise<Result<GoogleCalendarChange[]>>` | Worker Google events.list, pagination, syncToken, 410→resync contrôlée |
 | M110 | `pushGoogleCalendarEvent(uid:string,event:Activity): Promise<Result<GoogleEventLink>>` | Worker events.insert/patch/delete, ETag, idempotence, O24/O31 ; créneaux Google seulement |
 | M111 | `mapGoogleEvent(change:GoogleCalendarChange,local?:Activity): Result<Activity>` | normalise dates/annulations/récurrences et lien O24/O31 ; pas d'écrasement silencieux |
-| M112 | `reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]): Promise<Result<CalendarSyncRun>>` | O02/O24/O26, M109–M111 ; déduplication, tombstones, conflits |
+| M112 | `reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]): Promise<Result<CalendarSyncRun>>` | O31/O24/O26, M109–M111 ; déduplication, tombstones, conflits |
 | M113 | `resolveGoogleCalendarConflict(conflictId:string,choice:'keepLocal'|'keepGoogle'|'keepBoth'): Promise<Result<void>>` | F45→F46→Worker, O26 ; approbation explicite de l'utilisatrice |
 | M114 | `runGoogleCalendarCron(now:string): Promise<Result<CalendarSyncRun[]>>` | Worker planifié (phase différée), M109/M110/M112, quotas et idempotence |
 | M115 | `readGoogleCalendarStatus(): Promise<Result<GoogleCalendarConnection>>` | F45/F46, O23 ; compte et erreurs visibles |
@@ -529,7 +529,7 @@ flowchart TD
 |---|---|---|---|
 | C01 | U → UI → modules F21–F26 | actions et champs typés | validation locale ; accessibilité |
 | C02 | UI → F28 Auth | e-mail/mot de passe, réinitialisation | Firebase SDK ; aucun mot de passe logué |
-| C03 | F21/F22/F23/F24/F26 → F29 | objets O02–O09 | `uid` et validation métier |
+| C03 | F21/F22/F23/F24/F26/F48–F50 → F29 | O31–O36 et métadonnées autorisées | `uid` et validation métier |
 | C04 | F29 → Firebase Firestore | documents par `users/{uid}/…` | TLS + règles F39 ; SDK persistant hors ligne |
 | C05 | F30 → UI | O15 et événements de cache/ACK | statut exact de synchronisation |
 | C06 | F24/F26 → IndexedDB F31 | O10/O11/O18 | fichiers localement, pas de synchronisation cloud binaire |
@@ -543,13 +543,13 @@ flowchart TD
 | C14 | Cloudflare Worker → Web Push → service worker | notif. due, payload minimal | VAPID, anti-doublon, erreurs |
 | C15 | dépôt Pecose `main` → GitHub Pages | HTML/JS/assets HTTPS | jamais publier secrets/données personnelles |
 | C16 | F36 → Pages/version | O17 | nouvelles versions sans suppression des imports |
-| C17 | F34 → F29 | restauration O02–O09 | confirmation d'écrasement, règles par UID |
+| C17 | F34 → F29 | restauration O31–O36 et métadonnées légères | confirmation d'écrasement, règles par UID |
 | C18 | F18/F23 → rappels O06 | occurrences + échéances | DST, fuseau, clé occurrence stable |
 | C19 | UI test push → Worker HTTP M100 | Firebase ID token + deviceId, réponse O22 | jeton vérifié côté Worker, UID propriétaire, limites de requêtes ; aucune route publique anonyme |
 | C20 | PWA F45/F46 → Worker F37 | connexion Google, sync, statut, résolution | Firebase ID token vérifié, UID, HTTPS, quotas et origine validée |
 | C21 | Worker OAuth → Google Accounts OAuth | `code` et `state` → jeton | callback validé par O28 à usage unique, secret Worker ; grant O27 chiffré |
 | C22 | Worker F37 ↔ API Google Calendar | `events.list/insert/patch/delete`, `syncToken`, `etag` | scope `calendar.events.owned`, token renouvelé côté Worker |
-| C23 | Worker F37 ↔ Firestore | O02/O23–O28 + états de sync | permissions serveur distinctes du client ; jamais d'accès public aux secrets |
+| C23 | Worker F37 ↔ Firestore | O31/O23–O28 + états de sync | permissions serveur distinctes du client ; jamais d'accès public aux secrets |
 | C24 | Cron Cloudflare → Google Calendar/Firestore | synchronisation périodique distante | activable en phase différée ; idempotence et limites gratuites |
 | C25 | F45 → écran Agenda/Paramètres | connexion, dernier passage, conflits O26 | consentement, visibilité des erreurs et résolution explicite |
 | C26 | F45 → F21/F23 | changements d'événements, annulation, rappels | O31 + O24, même ID, pas de boucles |
@@ -593,7 +593,7 @@ Lorsqu'un créneau est fixé, proposer autovalidation **activée par défaut**, 
 Depuis l'icône d'une activité O31, ouvrir la fiche M153 et la liste liée M142/M160 → consulter/cocher O35 via M159/M146. Une liste reste accessible dans l'onglet Listes et peut être liée à d'autres activités. Les articles cochés ne modifient pas O33 sans action explicite.
 
 ### FL18 — Bilan mensuel
-M147 lit les réalisations O33 sur le mois et construit O38 à partir des activités O31 marquées pour le bilan : priorité 3 étoiles, 2, 1 puis ordre chronologique ; filtres 1/2/3 étoiles ; éléments `auto_assumed` présentés comme présumés et corrigibles.
+M147 lit les réalisations O33 sur le mois et construit O38 à partir des activités O31 accomplies dans le mois : priorité 3 étoiles, 2, 1 puis ordre chronologique ; filtres 1/2/3 étoiles ; éléments `auto_assumed` présentés comme présumés et corrigibles.
 
 ### FL01 — Première installation
 GitHub Pages HTTPS → téléchargement shell/manifeste/assets → M79+M80 → Safari « Ajouter à l'écran d'accueil » → M16/M25 → M17 → M20 → UI M04 → consultation des données. Offline seulement lorsque ressources et persistance initiale sont réellement prêtes.
