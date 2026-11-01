@@ -360,7 +360,7 @@ Contrat commun : fonctions TypeScript typées ; `Result<T, AppError>` désigne r
 | ID | Fonctions ou scénarios contrôlés | Critère de réussite |
 |---|---|---|
 | T01 | M28/M29/M45, récurrences et fuseaux | changements heure, cas limites, occurrences stables |
-| T02 | M31/M32/M37–M39 | CRUD, références rappels cohérentes |
+| T02 | M121–M123/M132/M138–M139 | CRUD O31, complétion par occurrence, rappels cohérents |
 | T03 | M46–M49/M64/M69 | imports, tailles, MIME, suppression, migrations |
 | T04 | M70–M74 | exports versionnés, restauration sans perte ni écrasement surprise |
 | T05 | M21–M27 et F39 | données non accessibles entre deux UID, statut sincère |
@@ -373,6 +373,12 @@ Contrat commun : fonctions TypeScript typées ; `Result<T, AppError>` désigne r
 | T12 | M109/M118, F47 | pagination, syncToken périmé 410, quotas 429, reprise sans perte locale |
 | T13 | M114, F47 | synchro PWA fermée seulement après Cron, ordre et idempotence, zéro dépense |
 | T14 | M111/M112, F47 | récurrences Google et exceptions, fuseaux, changement d'heure, annulations |
+| T15 | M124–M131/M148–M153 ; F55 | cinq onglets D14, Jour au centre, date choisie, semaine 6+1, deux groupes |
+| T16 | M130–M134/M138–M139/M154/M155/M158 ; F54 | habitude récurrente à 19 h, validation suggérée, correction persistante |
+| T17 | M135–M137 ; F54 | report de la veille avec consentement, regroupement, sans doublon ni répétition |
+| T18 | M140–M146/M159–M160 ; F54 | étoiles, icône gauche, liste liée, coche séparée de celle de l'activité |
+| T19 | M147 ; F56 | bilan par étoiles puis chronologie, filtres et présomptions signalées |
+| T20 | F53/M149 ; iPhone réel | esthétique douce/arrondie, éléments lisibles, zones tactiles accessibles |
 
 **Convention :** toute nouvelle fonction doit apparaître dans ce registre avant de passer dans le code ; tout nouvel écran doit être enregistré comme artefact et ses interactions ici. Il est interdit de cacher un appel réseau ou une nouvelle responsabilité dans un callback ou un « helper » anonyme pour éviter cette procédure.
 
@@ -483,6 +489,17 @@ Toutes les fonctions ci-dessous sont **PLANNED**, pas implémentées. F45 est la
 ```mermaid
 flowchart TD
     U[Utilisatrice iPhone] --> UI[UI: Accueil/Agenda/Tâches/Musique/Décor/Paramètres]
+    UI --> DAY[Page Jour date choisie]
+    UI --> CAL[Calendrier semaine 6+1]
+    UI --> TASKS[Onglet Tâches]
+    UI --> HABITS[Onglet Habitudes]
+    UI --> LISTS[Onglet Listes]
+    DAY --> CORE[Activité unique O31]
+    CAL --> CORE
+    TASKS --> CORE
+    HABITS --> CORE
+    CORE --> CHECKS[Listes O34/O35]
+    LISTS --> CHECKS
     UI --> APP[Services métier]
     APP --> AUTH[Firebase Authentication]
     APP --> DB[Firestore SDK + persistance navigateur]
@@ -535,7 +552,14 @@ flowchart TD
 | C23 | Worker F37 ↔ Firestore | O02/O23–O28 + états de sync | permissions serveur distinctes du client ; jamais d'accès public aux secrets |
 | C24 | Cron Cloudflare → Google Calendar/Firestore | synchronisation périodique distante | activable en phase différée ; idempotence et limites gratuites |
 | C25 | F45 → écran Agenda/Paramètres | connexion, dernier passage, conflits O26 | consentement, visibilité des erreurs et résolution explicite |
-| C26 | F45 → F21/F23 | changements d'événements, annulation, rappels | mapping GoogleEventLink O24, évite boucles et doublons |
+| C26 | F45 → F21/F23 | changements d'événements, annulation, rappels | O31 + O24, même ID, pas de boucles |
+| C27 | Onglets F19 → O37/F51 | date sélectionnée vers Jour | M128/M148 ; cinq onglets fixes avec Jour central |
+| C28 | Vue Jour F53 → F48/F49 | O31/O32/O33 | deux groupes seulement, icône gauche et validation droite |
+| C29 | Activité O31 ↔ liste O34/O35 via F50 | checklistId et articles | validation des articles indépendante du parent |
+| C30 | F51 → O36 via M135–M137 | report des tâches inachevées hier | fenêtre groupée, confirmation, ID stable |
+| C31 | F48 → O33 via M133/M154/M158 | autovalidation d'éléments horaires | présomption modifiable ; annulation ne se réactive pas seule |
+| C32 | F52 → O31/O33/O38 | bilan mensuel et étoiles | tri 3→2→1 puis chronologie ; présomptions signalées |
+| C33 | Google F45/F21 → O31/O24 | événements horaires vers API Google | n'envoyer ni tâches sans heure ni habitudes non liées sans choix explicite |
 
 ### 5.3 Contrat de sécurité Google Calendar
 
@@ -553,11 +577,29 @@ flowchart TD
 
 ## 6. Flux de bout en bout obligatoires
 
+### FL13 — Navigation et journée sélectionnée
+À l'ouverture : O37 sélectionne **aujourd'hui**, M149 affiche Jour. Le calendrier M150 montre six jours lundi–samedi, le dimanche étant dépliable. Toucher une date M128/M148 ouvre Jour sur celle-ci ; M129/M130 calcule les occurrences applicables et M131 les sépare **seulement** en sans horaire / avec horaire chronologique. Icône gauche M153 : fiche complète ; coche droite M132/M134 : statut de cette occurrence.
+
+### FL14 — Transformation sans clone
+Créer une activité O31 non horaire et non cyclique (Tâche) → ajouter une date (Tâche datée sur Jour) → ajouter un horaire (Événement planifié) → ajouter éventuellement une répétition (Habitude à heure fixe). L'identifiant d'activité ne change **jamais** ; les onglets sont des filtres, donc pas d'objet « tâche » à déplacer.
+
+### FL15 — Validation automatique et correction
+Lorsqu'un créneau est fixé, proposer autovalidation **activée par défaut**, désactivable. Après fin programmée, ou après heure de début s'il n'y a pas de fin : M133/M154/M158 crée O33 `auto_assumed` à la reprise de l'app ; la coche droite M134 annule et produit `manually_undone`, qui ne redevient **pas** automatiquement cochée. Les tâches sans heure et les habitudes non horaires restent manuelles.
+
+### FL16 — Proposer les tâches oubliées de la veille
+À l'entrée sur Aujourd'hui : M135 détecte seulement les tâches datées **d'hier**, non répétées, sans horaire et inachevées. M136 présente **une fenêtre unique** avec tous les candidats, chacun pouvant être reporté, conservé hier ou ignoré provisoirement. M137 inscrit O36 et modifie la date du **même** O31 seulement après confirmation. Pas d'auto-report, pas de doublons ni de relances à chaque rendu.
+
+### FL17 — Liste associée
+Depuis l'icône d'une activité O31, ouvrir la fiche M153 et la liste liée M142/M160 → consulter/cocher O35 via M159/M146. Une liste reste accessible dans l'onglet Listes et peut être liée à d'autres activités. Les articles cochés ne modifient pas O33 sans action explicite.
+
+### FL18 — Bilan mensuel
+M147 lit les réalisations O33 sur le mois et construit O38 à partir des activités O31 marquées pour le bilan : priorité 3 étoiles, 2, 1 puis ordre chronologique ; filtres 1/2/3 étoiles ; éléments `auto_assumed` présentés comme présumés et corrigibles.
+
 ### FL01 — Première installation
 GitHub Pages HTTPS → téléchargement shell/manifeste/assets → M79+M80 → Safari « Ajouter à l'écran d'accueil » → M16/M25 → M17 → M20 → UI M04 → consultation des données. Offline seulement lorsque ressources et persistance initiale sont réellement prêtes.
 
-### FL02 — Création/modification d'une tâche ou d'un événement
-UI valide → M31 ou M37/M38 → M22 (Firestore SDK + cache persistant) → affichage optimiste **local/pending** via M24/M26/M27 → ACK serveur → **synced** ; si erreur, laisser état visible et conserver la possibilité de réessayer. M42 rapproche les rappels liés.
+### FL02 — Création/modification d'une activité unifiée
+UI valide → M121/M122/M157 (O31) → M22 (Firestore SDK + cache persistant) → **local/pending** via M24/M26/M27 → ACK serveur → **synced** ; si erreur, conserver les données et la possibilité de réessayer. M42 rapproche les rappels O06 via activityId.
 
 ### FL03 — Changement d'iPhone
 Installer depuis URL GitHub Pages → M17 même compte → M24 récupère données cloud → UI retrouve agenda/tâches/préférences/playlists. Les binaires O10 n'étant **pas** cloud, afficher éléments manquants, puis M74 restaure l'archive locale si disponible.
@@ -578,7 +620,7 @@ La PWA installée obtient le consentement via M75/M76 → requête HTTPS authent
 Paramètres → `M103` → Firebase ID token → Worker `M105` vérifie utilisateur/état → OAuth Google sur le seul agenda principal `M104` → callback avec `code/state` validé `M106` → grant chiffré O27 → statut O23 → première récupération `M109` → rapprochement contrôlé, **sans suppression automatique d'événements préexistants**.
 
 ### FL10 — Modification bidirectionnelle d'un événement
-**Depuis la PWA :** `M31/M32` enregistre O02 + O24 pending → Firestore → `M108` puis `M110` vers Google → mise à jour version et lien, ou conflit O26. **Depuis Google Agenda :** `M109` récupère les changements via syncToken → `M111` mappe → `M112` rapproche → Firestore → mise à jour en temps réel ou prochaine ouverture dans la PWA. Suppressions propagées avec tombstones ; erreurs et conflits visibles.
+**Depuis la PWA :** `M121/M122/M123` enregistre O31 + O24 pending → Firestore → `M108` puis `M110` vers Google → mise à jour version et lien, ou conflit O26. **Depuis Google Agenda :** `M109` récupère les changements via syncToken → `M111` mappe sur O31 → `M112` rapproche → Firestore → mise à jour en temps réel ou prochaine ouverture dans la PWA. Suppressions propagées avec tombstones ; erreurs et conflits visibles.
 
 ### FL11 — Synchronisation PWA fermée (livraison différée)
 Après validation/configuration gratuite de Cloudflare : Cron `M114` → récupération des changements Google + mutations en attente, avec vérifications versions/idempotence ; mise à jour Firestore. Si aucune infrastructure de fond activée, synchronisation **à l'ouverture et pendant utilisation uniquement**. Retards possibles, pas de réveil garanti.
@@ -595,6 +637,8 @@ M70 export JSON des données légères ; M73 export archive des médias personne
 - **Firestore** : autorisation UID stricte ; tests de refus croisés ; pas de règles universelles ouvertes ; index/requêtes/quotas évalués avant mise en production.
 - **Cloudflare** : pas de compte nécessaire maintenant ; Worker planifié pour notifications **et** synchronisation Google à distance. Aucun secret, callback ou ordonnanceur activé à ce stade.
 - **Code de l'application** : hébergé sur GitHub Pages ; Firebase Hosting non requis. Pas de processus Windows permanent.
+- **Ergonomie** : cinq onglets fixes, Jour central et deux groupes seulement ; icône gauche ouvre l'édition et validation à droite ; aucune multiplication des objets métiers.
+- **Validation/report** : horaires → auto proposé et annulable ; tâches oubliées de la veille → proposition groupée consentie, aucune duplication.
 - **Médias** : pas de droits publics présumés sur les chansons Suno ; vérifier avant dépôt public. Fichiers personnels uniquement sur téléphone et archive volontaire.
 - **iOS** : Web Push seulement PWA installée et autorisée ; livraison et lecture arrière-plan à confirmer sur appareil réel ; pas de réveil natif garanti.
 - **Gratuité** : si un changement requiert Blaze, domaine payant, API payante, vérification Google payante, build iOS ou quota dépassé : **STOP + demande utilisateur** ; ne jamais activer de facturation.
