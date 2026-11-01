@@ -29,15 +29,18 @@
 | D01 | Application personnelle **PWA iOS via Safari**, installable depuis GitHub Pages, **pas d'IPA/App Store/Mac** |
 | D02 | GitHub **`Pecose/organiseur-personnel`**, branche `main`, jamais `T-C-Umbral` |
 | D03 | **0 €** : GitHub Pages, Firebase **Spark**, et plus tard Cloudflare Workers en offre gratuite ; pas de facturation activée |
-| D04 | Agenda indépendant d'Apple Calendar ; tâches ; musique Suno personnelle ; galerie d'images ; thèmes saisonniers |
+| D04 | Agenda de l'application + **synchronisation bidirectionnelle facultative avec le Google Agenda principal choisi par l'utilisatrice**, après consentement ; pas de synchronisation Apple Calendar ; tâches ; musique Suno ; images ; thèmes |
 | D05 | Agenda, tâches et métadonnées légères synchronisés par **Firebase Auth + Firestore** ; fichiers personnels **locaux** |
 | D06 | Utilisable hors ligne **après première installation/cache**, sans PC allumé |
 | D07 | Rappels **Web Push** avec programmation distante à prototyper ; **pas de réveil natif garanti hors ligne** |
 | D08 | Réinstallation sur nouvel iPhone : connexion et restauration des données Firestore ; **réimport** des médias personnels |
 | D09 | Ressources de base versionnées, sans écrasement des ressources importées ; aucun secret ni donnée privée dans le dépôt public |
 | D10 | Framework UI **non fixé**. Contrats TypeScript logiques ci-dessous ; choisir une dépendance/framework supplémentaire requiert accord préalable |
+| D11 | Google Agenda **dans les deux sens**, créations/modifications/suppressions et récurrences ; connexion OAuth Google **distincte** de Firebase Auth ; aucune synchronisation destructive lors de l'association initiale |
+| D12 | Synchronisation Google **à l'ouverture et pendant l'utilisation** d'abord ; **à distance lorsque la PWA est fermée** seulement après mise en service d'un Worker/ordonnanceur gratuit, avec accès OAuth sécurisé. Ce n'est pas une synchronisation instantanée garantie |
+| D13 | Pour Google Calendar, **moindre privilège, quotas gratuits, consentement et protection des jetons** ; si une exigence impose un paiement, une vérification payante ou un niveau de risque non accepté, STOP et décision de l'utilisateur |
 
-**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F05 existent déjà (documentation)** ; **F06–F44 et les fonctions M01–M102 restent `PLANNED`** à la date ci-dessus. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
+**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F02 et F04–F05 existent déjà (documentation)** ; **F03 est retiré** ; **F06–F47 et les fonctions M01–M120 restent `PLANNED`** à la date ci-dessus. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
 
 **Source de vérité :** `AGENTS.md` pour le processus, **ce fichier** pour les contrats d'architecture, `ROADMAP.md` pour l'ordre des livraisons. En cas de conflit : STOP et demande utilisateur.
 
@@ -50,7 +53,6 @@ Les chemins sont **proposés/planifiés**, non présumés existants. Les répert
 ├── README.md                              [F00] présentation
 ├── ROADMAP.md                             [F01] calendrier de réalisation (existe)
 ├── AGENTS.md                              [F02] consignes IA canoniques
-├── agent.md                               [F03] compatibilité, renvoie à AGENTS.md
 ├── .github/copilot-instructions.md        [F04] pointeur pour Copilot
 ├── docs/ARCHITECTURE.md                   [F05] présent registre
 ├── package.json                           [F06] scripts et dépendances (choix à valider)
@@ -91,10 +93,15 @@ Les chemins sont **proposés/planifiés**, non présumés existants. Les répert
 ├── tests/storage.test.ts                  [F41] IndexedDB, import/export
 ├── tests/security.test.ts                 [F42] sécurité/règles Firestore
 ├── tests/offline.test.ts                  [F43] synchronisation et PWA
-└── tests/reminders.test.ts                [F44] rappels, double-envoi, DST
+├── tests/reminders.test.ts                [F44] rappels, double-envoi, DST
+├── src/features/googleCalendar.ts         [F45] façade métier, liaison/conciliation agenda Google
+├── src/services/googleCalendarBridge.ts   [F46] appels HTTP sécurisés de la PWA vers le Worker
+└── tests/googleCalendar.test.ts           [F47] OAuth, CRUD, conflits, synchronisation Google
 ```
 
-**Règle :** les fichiers `F06`–`F44` sont des contrats de destination, **pas** un engagement sur une bibliothèque non choisie. Un renommage vers une structure imposée par un bundler/framework exige une demande d'approbation préalable. Les tests peuvent utiliser des fichiers temporaires générés uniquement hors du dépôt versionné.
+**F03 était l'alias `agent.md`, supprimé par demande explicite de l'utilisateur (2026-11-01) ; son identifiant reste réservé pour traçabilité et ne doit pas être réutilisé.**
+
+**Règle :** les fichiers `F06`–`F47` sont des contrats de destination, **pas** un engagement sur une bibliothèque non choisie. Un renommage vers une structure imposée par un bundler/framework exige une demande d'approbation préalable. Les tests peuvent utiliser des fichiers temporaires générés uniquement hors du dépôt versionné.
 
 ## 3. Modèle de domaine : objets, champs, relations et propriétaires
 
@@ -103,7 +110,7 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 | Objet | ID | Champs fonctionnels (contrat) | Relations et lieu |
 |---|---|---|---|
 | `AuthUser` | O01 | `uid:string; email:string|null` | Firebase Auth ; 1 utilisateur logique |
-| `CalendarEvent` | O02 | `id; title; startsAt; endsAt; timeZone; allDay; description?; categoryId?; recurrence?; updatedAt` | `uid → events/{id}` ; 0..n `Reminder` |
+| `CalendarEvent` | O02 | `id; title; startsAt; endsAt; timeZone; allDay; description?; categoryId?; recurrence?; updatedAt; deletedAt?; googleLink?:GoogleEventLink` | `uid → events/{id}` ; 0..n `Reminder` |
 | `TaskList` | O03 | `id; name; sortOrder; archived; updatedAt` | `uid → lists/{id}`; 0..n `Task` |
 | `Task` | O04 | `id; listId?; title; description?; completed; priority; dueAt?; timeZone?; recurrence?; updatedAt` | `uid → tasks/{id}` ; 0..n `Reminder` |
 | `RecurrenceRule` | O05 | `frequency:daily|weekly|monthly|yearly; interval; until?; count?; weekdays?` | incluse dans O02/O04 ; calendrier local et rappels |
@@ -125,6 +132,21 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 | `MediaArchiveManifest` | O21 | `schemaVersion; createdAt; mediaEntries[]; metadata; checksums` | export/import des fichiers personnels |
 | `NotificationTestResult` | O22 | `supported; permitted; subscribed; sent?; message?` | retour état des diagnostics, pas garantie de livraison |
 
+### Extension Google Agenda approuvée (toujours PLANIFIÉE)
+
+| Objet | ID | Champs fonctionnels (contrat) | Relations et lieu |
+|---|---|---|---|
+| `GoogleCalendarConnection` | O23 | `uid; calendarId:'primary'; googleAccountLabel?; status:disconnected|authorizing|active|reauthorization_required|error; lastSyncAt?; lastError?` | statut non secret visible au propriétaire ; lié à O01, O25 |
+| `GoogleEventLink` | O24 | `calendarId; googleEventId; etag?; remoteUpdatedAt?; pending: none|upsert|delete; source:app|google` | sous-objet d'O02 ; identité stable pour éviter doublons |
+| `GoogleSyncCursor` | O25 | `uid; calendarId; nextSyncToken?; lastFullSyncAt?; lastIncrementalSyncAt?` | Firestore **serveur uniquement** ; reprise API incrémentale |
+| `CalendarSyncConflict` | O26 | `id; uid; localEventId; googleEventId?; kind:update|delete|recurrence|mapping; localVersion; googleVersion; detectedAt; status:open|resolved` | document privé ; résolution explicite obligatoire |
+| `EncryptedGoogleOAuthGrant` | O27 | `uid; calendarId; ciphertext; keyVersion; scopes[]; issuedAt; revokedAt?` | Firestore **serveur uniquement**, jeton de renouvellement chiffré avec clé Worker secret ; jamais accessible à la PWA |
+| `GoogleOAuthState` | O28 | `stateId; uid; nonce; redirectPath; expiresAt; consumedAt?` | Firestore **serveur uniquement**, usage unique et durée courte |
+| `GoogleCalendarChange` | O29 | `calendarId; eventId; etag?; status:confirmed|cancelled; updatedAt; start?; end?; recurrence?; payload` | représentation transitoire provenant de l'API Google, non publiée telle quelle |
+| `CalendarSyncRun` | O30 | `uid; calendarId; startedAt; finishedAt?; pulled; pushed; conflicts; status:ok|partial|error; details?` | rapport technique minimisé, pas de données personnelles en journaux publics |
+
+**Décisions de synchronisation :** l'utilisatrice autorise explicitement la liaison à **son Google Agenda principal**. `GoogleEventLink` assure un appariement stable, `deletedAt` évite de perdre une suppression locale avant qu'elle ne soit propagée (tombstone). Aucun événement Google existant n'est supprimé lors de l'association initiale. Les événements avec récurrences/exceptions doivent être testés avant l'activation bidirectionnelle. Les modifications concurrentes se matérialisent en O26 et **ne sont pas écrasées silencieusement**. Google Agenda n'est pas un stockage pour les tâches, images ou musiques.
+
 **Schémas Firestore planifiés (pas encore créés) :**
 ```text
 users/{uid}/events/{eventId}                 → O02
@@ -136,8 +158,13 @@ users/{uid}/tracks/{trackId}                 → O08 métadonnées seulement
 users/{uid}/preferences/profile             → O07
 users/{uid}/pushSubscriptions/{deviceId}    → O14, contrôle d'accès renforcé
 users/{uid}/dispatchReceipts/{receiptId}    → O19, écriture serveur uniquement
+users/{uid}/googleCalendarConnection/status → O23, lecture du propriétaire, écriture serveur
+users/{uid}/googleCalendarSync/state        → O25, lecture/écriture serveur uniquement
+users/{uid}/googleOAuthGrant/primary         → O27, **aucune** lecture/écriture client
+users/{uid}/googleCalendarConflicts/{id}     → O26, lecture propriétaire, résolution via Worker
+serverOAuthStates/{stateId}                  → O28, lecture/écriture serveur uniquement, TTL court
 ```
-Les écritures clients sont autorisées *uniquement* dans leur `users/{auth.uid}`, sauf `dispatchReceipts` (Worker). Les règles de lecture/écriture spécifiques doivent être testées avant tout déploiement. Les collections additionnelles nécessitent autorisation utilisateur.
+Les écritures clients sont autorisées *uniquement* dans leur `users/{auth.uid}` et pour les collections explicitement permises, sauf `dispatchReceipts` et tous les documents Google marqués **serveur** (Worker). La simple présence sous `users/{uid}` ne doit **jamais** donner un accès client global. Les règles F39 doivent interdire la lecture des jetons chiffrés et des états OAuth, même au propriétaire authentifié. Les règles de lecture/écriture spécifiques doivent être testées avant tout déploiement. Les collections additionnelles nécessitent autorisation utilisateur.
 
 **Stores IndexedDB planifiés :**
 `mediaBlobs` (O10) ; `imageMetadata` (O11) ; `playbackState` (O18) ; `localMeta` (version schéma, catalogue installé et journaux de migration). Les données métier cloud sont mises en cache par **la persistance Firestore du SDK**, pas dans une seconde copie IndexedDB écrite en concurrence. Une modification non authentifiée ou sans cache initialisé exige un état d'erreur explicite, pas une promesse de synchronisation invisible.
@@ -291,6 +318,11 @@ Contrat commun : fonctions TypeScript typées ; `Result<T, AppError>` désigne r
 | T07 | M75–M88 | consentement, doubles envois, erreurs, clés jamais exposées |
 | T08 | M58–M63 | comportement iPhone réel, écran verrouillé, playlists |
 | T09 | réinstallation | comptes, données rétablies, médias personnels signalés manquants |
+| T10 | M103–M120, F47 | OAuth distinct Firebase, état unique, tokens hors navigateur, révocation, accès par UID |
+| T11 | M109–M112, F47 | création/modification/suppression dans les deux sens, pas de doublons, conflits visibles |
+| T12 | M109/M118, F47 | pagination, syncToken périmé 410, quotas 429, reprise sans perte locale |
+| T13 | M114, F47 | synchro PWA fermée seulement après Cron, ordre et idempotence, zéro dépense |
+| T14 | M111/M112, F47 | récurrences Google et exceptions, fuseaux, changement d'heure, annulations |
 
 **Convention :** toute nouvelle fonction doit apparaître dans ce registre avant de passer dans le code ; tout nouvel écran doit être enregistré comme artefact et ses interactions ici. Il est interdit de cacher un appel réseau ou une nouvelle responsabilité dans un callback ou un « helper » anonyme pour éviter cette procédure.
 
@@ -318,6 +350,33 @@ Ces opérations complètent la couverture des écrans et des scénarios de la ro
 
 `CropRect` = coordonnées numériques bornées ; `DecorLayer` = calque local `image|text` avec position, dimensions et contenu non exécutable (types F17). Les signatures d'une éventuelle bibliothèque d'édition d'image ne sont **pas** approuvées : seules les APIs natives du navigateur sont enregistrées.
 
+### 4.8 Google Agenda bidirectionnel (F21, F37, F45–F47)
+
+Toutes les fonctions ci-dessous sont **PLANNED**, pas implémentées. F45 est la façade métier PWA ; F46 transporte des requêtes signées vers le Worker F37 ; **seul F37** contacte Google Calendar et détient les jetons. Les objets O23–O30, schémas et règles sont obligatoires.
+
+| ID | Fonction (entrées → sortie) | Dépendances et effet |
+|---|---|---|
+| M103 | `startGoogleCalendarLink(): Promise<Result<AuthorizationUrl>>` | F45→F46, Firebase ID token, M105 ; action volontaire |
+| M104 | `buildGoogleOAuthUrl(uid:string,stateId:string): Result<AuthorizationUrl>` | Worker, scope restreint, redirect URI et état |
+| M105 | `beginGoogleOAuth(idToken:string): Promise<Result<AuthorizationUrl>>` | Worker vérifie Firebase UID, crée O28 puis M104 |
+| M106 | `completeGoogleOAuthCallback(code:string,state:string): Promise<Result<GoogleCalendarConnection>>` | Worker valide O28, échange OAuth, chiffre grant via M116, initialise O23 |
+| M107 | `unlinkGoogleCalendar(uid:string): Promise<Result<void>>` | F46→Worker, token Firebase, révoque/détruit O27, conserve les événements locaux |
+| M108 | `requestGoogleCalendarSync(reason:'startup'|'edit'|'manual'): Promise<Result<CalendarSyncRun>>` | F45/F46→Worker ; UID vérifié, statut O23, flux C20 |
+| M109 | `pullGoogleCalendarChanges(uid:string,cursor:GoogleSyncCursor): Promise<Result<GoogleCalendarChange[]>>` | Worker Google events.list, pagination, syncToken, 410→resync contrôlée |
+| M110 | `pushGoogleCalendarEvent(uid:string,event:CalendarEvent): Promise<Result<GoogleEventLink>>` | Worker events.insert/patch/delete, ETag, idempotence, O24 |
+| M111 | `mapGoogleEvent(change:GoogleCalendarChange,local?:CalendarEvent): Result<CalendarEvent>` | normalise dates/annulations/récurrences et lien O24 ; pas d'écrasement silencieux |
+| M112 | `reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]): Promise<Result<CalendarSyncRun>>` | O02/O24/O26, M109–M111 ; déduplication, tombstones, conflits |
+| M113 | `resolveGoogleCalendarConflict(conflictId:string,choice:'keepLocal'|'keepGoogle'|'keepBoth'): Promise<Result<void>>` | F45→F46→Worker, O26 ; approbation explicite de l'utilisatrice |
+| M114 | `runGoogleCalendarCron(now:string): Promise<Result<CalendarSyncRun[]>>` | Worker planifié (phase différée), M109/M110/M112, quotas et idempotence |
+| M115 | `readGoogleCalendarStatus(): Promise<Result<GoogleCalendarConnection>>` | F45/F46, O23 ; compte et erreurs visibles |
+| M116 | `encryptGoogleOAuthGrant(uid:string,token:OAuthTokenResponse): Promise<Result<EncryptedGoogleOAuthGrant>>` | Worker secret de chiffrement, O27 ; aucun plaintext stocké |
+| M117 | `refreshGoogleCalendarToken(uid:string): Promise<Result<string>>` | Worker secret, O27 ; renouvellement, gestion expiration/retrait de consentement |
+| M118 | `parseGoogleSyncError(error:unknown): GoogleCalendarSyncError` | erreurs Google 401/403/409/410/429 et réauthentification |
+| M119 | `queryGoogleCalendarConflicts(uid:string): Promise<Result<CalendarSyncConflict[]>>` | F45/F46→Worker, O26 ; statut lisible dans l'Agenda |
+| M120 | `validateGoogleOAuthState(state:string): Promise<Result<GoogleOAuthState>>` | Worker, O28 TTL usage unique, contrôle CSRF/liaison UID |
+
+`AuthorizationUrl`, `OAuthTokenResponse` et `GoogleCalendarSyncError` sont des types techniques de F17. `F37` ne doit être déployé qu'une fois l'infrastructure gratuite validée. Les tentatives de création de endpoints non inscrits sont bloquées par la règle §0.
+
 ## 5. Connexions et dépendances (registre intégral)
 
 ### 5.1 Graphe des flux
@@ -339,6 +398,10 @@ flowchart TD
     CRON[Cloudflare Worker Cron] --> CLOUD
     CRON --> WEBPUSH[Service Web Push]
     WEBPUSH --> PUSH
+    UI --> CALBRIDGE[Client passerelle agenda Google]
+    CALBRIDGE --> CALWORKER[Worker OAuth et synchronisation Google]
+    CALWORKER <--> GCAL[(API Google Calendar)]
+    CALWORKER --> CLOUD
     GIT[GitHub Pecose main] --> PAGES[GitHub Pages HTTPS]
     PAGES --> SW
     PAGES --> CATALOG
@@ -367,6 +430,25 @@ flowchart TD
 | C17 | F34 → F29 | restauration O02–O09 | confirmation d'écrasement, règles par UID |
 | C18 | F18/F23 → rappels O06 | occurrences + échéances | DST, fuseau, clé occurrence stable |
 | C19 | UI test push → Worker HTTP M100 | Firebase ID token + deviceId, réponse O22 | jeton vérifié côté Worker, UID propriétaire, limites de requêtes ; aucune route publique anonyme |
+| C20 | PWA F45/F46 → Worker F37 | connexion Google, sync, statut, résolution | Firebase ID token vérifié, UID, HTTPS, quotas et origine validée |
+| C21 | Worker OAuth → Google Accounts OAuth | `code` et `state` → jeton | callback validé par O28 à usage unique, secret Worker ; grant O27 chiffré |
+| C22 | Worker F37 ↔ API Google Calendar | `events.list/insert/patch/delete`, `syncToken`, `etag` | scope `calendar.events.owned`, token renouvelé côté Worker |
+| C23 | Worker F37 ↔ Firestore | O02/O23–O28 + états de sync | permissions serveur distinctes du client ; jamais d'accès public aux secrets |
+| C24 | Cron Cloudflare → Google Calendar/Firestore | synchronisation périodique distante | activable en phase différée ; idempotence et limites gratuites |
+| C25 | F45 → écran Agenda/Paramètres | connexion, dernier passage, conflits O26 | consentement, visibilité des erreurs et résolution explicite |
+| C26 | F45 → F21/F23 | changements d'événements, annulation, rappels | mapping GoogleEventLink O24, évite boucles et doublons |
+
+### 5.3 Contrat de sécurité Google Calendar
+
+- L'identité Firebase (adresse e-mail/mot de passe) **reste indépendante** de l'autorisation OAuth Google Calendar. Ne pas activer le fournisseur `Google` de Firebase Auth sans nouvelle demande explicite.
+- Scope recommandé pour l'agenda **principal appartenant à l'utilisatrice** : `https://www.googleapis.com/auth/calendar.events.owned` (lecture/écriture des événements des agendas possédés), avec consentement explicite. Si le calendrier choisi n'est pas possédé, STOP et demande d'évolution du périmètre. Ne jamais demander le scope global `calendar` sans besoin documenté.
+- OAuth 2.0 : **authorization code avec `state` anti-CSRF, nonce, expiration et vérification UID**, échange du code seulement dans le Worker. Le callback vérifie l'état unique : il n'est pas nécessairement porteur du Firebase ID token mais **ne doit jamais être accepté sans corrélation avec une initiation authentifiée**.
+- Ne jamais conserver de `client_secret`, `refresh_token` ou clé de chiffrement dans GitHub, Pages ou IndexedDB ; chiffrer les grants dans O27, clé gérée par secrets Worker. Ne pas afficher un jeton dans les URL de retour ou journaux.
+- En mode OAuth **Testing**, les refresh tokens pour scopes Calendar peuvent expirer **après sept jours**. Valider les conditions d'un fonctionnement personnel continu, les règles d'écran de consentement Google, la catégorie des scopes et une éventuelle vérification avant de promettre la synchronisation persistante ; pas de passage automatique en production non vérifiée.
+- Synchronisation : `events.list` avec `nextSyncToken` et pagination, gestion des éléments `cancelled`, réponse `410 Gone` par reconstruction contrôlée (sans effacer les données Firestore de l'utilisatrice), et écritures `events.insert/patch/delete` conditionnées à l'appariement et aux versions. Tout appel est idempotent autant que possible.
+- Mode PWA ouverte : demande de synchro via F46 au Worker (authentification Firebase, contrôle UID, limitation de débit), puis écoute Firestore. Mode PWA fermée : ordonnanceur périodique Worker **uniquement après configuration future de Cloudflare** ; pas de promesse de temps réel ni de travail en arrière-plan depuis le navigateur.
+- Pas de conflit traité par « dernière écriture gagne » sans discussion. Résolution explicite dans l'interface et **pas d'effacement de calendrier entier** à la première connexion.
+- **Ressources techniques officielles :** [Google Calendar incremental sync](https://developers.google.com/workspace/calendar/api/guides/sync), [scopes](https://developers.google.com/workspace/calendar/api/auth), [OAuth tokens](https://developers.google.com/identity/protocols/oauth2).
 
 **Aucune connexion non inscrite** (API Deezer, Calendar Apple, Cloud Storage Firebase, serveur PC, API d'images payante, télémétrie, analytique ou publicité) n'est autorisée sans accord utilisateur et modification préalable de ce document.
 
@@ -393,6 +475,18 @@ Publication sur `Pecose/main` → Pages version O17 → M82 détecte → afficha
 ### FL08 — Notification de test
 La PWA installée obtient le consentement via M75/M76 → requête HTTPS authentifiée C19 → M100 vérifie le jeton Firebase et le propriétaire de O14 → M87 pousse le message → M78 affiche O22 ; succès d'envoi ≠ garantie d'affichage iOS.
 
+### FL09 — Première connexion à Google Agenda
+Paramètres → `M103` → Firebase ID token → Worker `M105` vérifie utilisateur/état → OAuth Google sur le seul agenda principal `M104` → callback avec `code/state` validé `M106` → grant chiffré O27 → statut O23 → première récupération `M109` → rapprochement contrôlé, **sans suppression automatique d'événements préexistants**.
+
+### FL10 — Modification bidirectionnelle d'un événement
+**Depuis la PWA :** `M31/M32` enregistre O02 + O24 pending → Firestore → `M108` puis `M110` vers Google → mise à jour version et lien, ou conflit O26. **Depuis Google Agenda :** `M109` récupère les changements via syncToken → `M111` mappe → `M112` rapproche → Firestore → mise à jour en temps réel ou prochaine ouverture dans la PWA. Suppressions propagées avec tombstones ; erreurs et conflits visibles.
+
+### FL11 — Synchronisation PWA fermée (livraison différée)
+Après validation/configuration gratuite de Cloudflare : Cron `M114` → récupération des changements Google + mutations en attente, avec vérifications versions/idempotence ; mise à jour Firestore. Si aucune infrastructure de fond activée, synchronisation **à l'ouverture et pendant utilisation uniquement**. Retards possibles, pas de réveil garanti.
+
+### FL12 — Déconnexion Google Agenda
+Paramètres → `M107` : arrêt de la synchronisation et révocation/suppression de O27 avec consentement. **Conserver** les événements locaux/Firestore par défaut, sans supprimer les événements Google. Reconnexion future par OAuth volontaire.
+
 ### FL07 — Sauvegarde indépendante
 M70 export JSON des données légères ; M73 export archive des médias personnels ; sauvegarde par l'utilisatrice dans Fichiers/iCloud Drive ; M71/M72 et M74 valident/restaurent sur un autre appareil. **Synchronisation automatique ≠ historique de sauvegardes.**
 
@@ -400,18 +494,18 @@ M70 export JSON des données légères ; M73 export archive des médias personne
 
 - **Dépôt public** : zéro secret (clé privée, compte de service, VAPID secret, mot de passe, données de l'utilisatrice). Les paramètres Firebase frontend non secrets peuvent y figurer ; sécuriser l'accès avec F39.
 - **Firestore** : autorisation UID stricte ; tests de refus croisés ; pas de règles universelles ouvertes ; index/requêtes/quotas évalués avant mise en production.
-- **Cloudflare** : pas de compte nécessaire avant la phase notifications ; à ce stade Worker planifié uniquement, aucun secret créé/déployé.
+- **Cloudflare** : pas de compte nécessaire maintenant ; Worker planifié pour notifications **et** synchronisation Google à distance. Aucun secret, callback ou ordonnanceur activé à ce stade.
 - **Code de l'application** : hébergé sur GitHub Pages ; Firebase Hosting non requis. Pas de processus Windows permanent.
 - **Médias** : pas de droits publics présumés sur les chansons Suno ; vérifier avant dépôt public. Fichiers personnels uniquement sur téléphone et archive volontaire.
 - **iOS** : Web Push seulement PWA installée et autorisée ; livraison et lecture arrière-plan à confirmer sur appareil réel ; pas de réveil natif garanti.
-- **Gratuité** : si un changement requiert Blaze, domaine payant, API payante, build iOS ou quota dépassé : **STOP + demande utilisateur** ; ne jamais activer de facturation.
+- **Gratuité** : si un changement requiert Blaze, domaine payant, API payante, vérification Google payante, build iOS ou quota dépassé : **STOP + demande utilisateur** ; ne jamais activer de facturation.
 - **Protection contre la perte** : mise à jour et export testés ; suppression d'un utilisateur ou restauration « replace » exige une confirmation UI ; service worker ne doit pas effacer la base.
 - **Respect vie privée** : données minimisées, aucun journal contenant titres de rendez-vous ou autres informations sensibles côté Worker.
 
 ## 8. Procédure stricte de maintenance documentaire
 
 1. Lire `AGENTS.md`, **ce registre complet**, `ROADMAP.md` et le code éventuellement présent.
-2. Identifier les références F/O/M/C/FL/D/T touchées. Réconcilier **planifié vs réellement présent** ; ne jamais inventer une implémentation.
+2. Identifier les références F/O/M/C/FL/D/T et les objectifs G de `ROADMAP.md` touchés. Réconcilier **planifié vs réellement présent** ; ne jamais inventer une implémentation.
 3. Si tout existe et la signature/dépendance ne change pas : modifier seulement dans le contrat, tester, noter l'état `IMPLEMENTED`.
 4. Sinon : **arrêter** et soumettre une demande d'approbation avec nouvelle référence, justification et impact (fichiers, données, fonctions, connexions, coût, droits).
 5. Après autorisation : **commit préalable de `docs/ARCHITECTURE.md`** ; seulement après, implémenter la modification dans un commit séparé. Adapter `ROADMAP.md` si le périmètre ou l'ordre change.
