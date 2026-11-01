@@ -37,7 +37,7 @@
 | D09 | Ressources de base versionnées, sans écrasement des ressources importées ; aucun secret ni donnée privée dans le dépôt public |
 | D10 | Framework UI **non fixé**. Contrats TypeScript logiques ci-dessous ; choisir une dépendance/framework supplémentaire requiert accord préalable |
 
-**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = code présent, testé et conforme ; `DEPRECATED` = suppression autorisée et historisée. **Tout le registre de la section 2 est `PLANNED` à la date ci-dessus.** Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
+**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F05 existent déjà (documentation)** ; **F06–F44 et les fonctions M01–M102 restent `PLANNED`** à la date ci-dessus. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
 
 **Source de vérité :** `AGENTS.md` pour le processus, **ce fichier** pour les contrats d'architecture, `ROADMAP.md` pour l'ordre des livraisons. En cas de conflit : STOP et demande utilisateur.
 
