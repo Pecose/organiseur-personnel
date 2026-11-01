@@ -488,7 +488,7 @@ Toutes les fonctions ci-dessous sont **PLANNED**, pas implémentées. F45 est la
 
 ```mermaid
 flowchart TD
-    U[Utilisatrice iPhone] --> UI[UI: Accueil/Agenda/Tâches/Musique/Décor/Paramètres]
+    U[Utilisatrice iPhone] --> UI[UI: Calendrier/Tâches/Jour/Habitudes/Listes]
     UI --> DAY[Page Jour date choisie]
     UI --> CAL[Calendrier semaine 6+1]
     UI --> TASKS[Onglet Tâches]
