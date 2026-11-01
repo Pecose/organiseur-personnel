@@ -6,7 +6,7 @@
 > **Utilisatrice cible :** une personne, sur iPhone.  
 > **Budget impératif :** **0 €** d'abonnement, d'hébergement et de compte Apple Developer.  
 > **Environnement de développement :** Windows.  
-> **Dernière mise à jour :** 1er novembre 2026.
+> **Dernière mise à jour :** 1er novembre 2026 (conception UX et modèle unifié validés ; aucun code d'application développé).
 
 ## Tableau de bord des objectifs (lecture humaine)
 
@@ -14,15 +14,20 @@
 
 | ID objectif | Résultat attendu | Architecture à consulter | Test / jalon | Statut |
 |---|---|---|---|---|
-| **G01** | Installation PWA iPhone, mises à jour et hors ligne | D01/D06/D09 ; F08–F09/F14/F35–F36 ; M01/M79–M83 ; C10/C15–C16 | T06, Phase 0–1 | À développer |
-| **G02** | Agenda et **Google Agenda synchronisés dans les deux sens** (créations, modifications, suppressions, récurrences) | D04/D11–D13 ; O02/O05/O23–O30 ; F21/F37/F45–F47 ; M28–M33/M103–M120 ; C20–C26 | T01/T02/T10–T14, Phase 3 bis | À développer |
-| **G03** | Gestion des tâches, listes, filtres et répétitions | O03–O05 ; F22 ; M34–M40/M91/M102 ; C01–C04 | T01/T02, Phase 2 | À développer |
-| **G04** | Authentification Firebase et synchronisation/restauration des données essentielles | D05/D08 ; O01/O15–O16 ; F27–F30/F34/F39 ; M16–M27/M70–M72/M89–M90 ; C02–C05/C17 | T04/T05/T09, Phase 3 | À développer (projet Firebase préparé) |
-| **G05** | Rappels et notifications, y compris appli fermée si réseau disponible | D07 ; O06/O14/O19/O22 ; F23/F33/F35/F37 ; M41–M44/M75–M78/M81/M84–M88/M100 ; C11–C14/C18–C19 | T07, Phase 4 | À développer |
-| **G06** | Musiques Suno locales, playlists, favoris et lecteur | O08–O10/O13/O18 ; F11–F12/F24–F25/F31–F32 ; M46–M63/M92–M94/M99 ; C06–C08 | T03/T08, Phase 5 | À développer |
-| **G07** | Galerie, imports d'images, décoration et thèmes saisonniers | O07/O10–O13 ; F13/F26/F31 ; M64–M69/M95–M98 ; C06–C07 | T03, Phase 6 | À développer |
-| **G08** | Exports, récupération après changement de téléphone, absence de perte lors des mises à jour | D08/D09 ; O16/O21 ; F34–F36 ; M70–M74/M82–M83 ; C09–C10/C16–C17 | T04/T06/T09, Phase 7 | À développer |
-| **G09** | Gratuité, sécurité et gouvernance documentaire | D02/D03/D10/D13 ; F00–F05/F39 ; AGENTS.md ; règles §0 de l'architecture | T05/T07/T10 ; Phase 8 | Gouvernance rédigée, implémentation à valider |
+| **G01** | PWA installable iPhone, fonctionnement hors ligne et mises à jour | D01/D06/D09 ; F08–F09/F14/F35–F36 ; M01/M79–M83 ; C10/C15–C16 | T06, Phase 0–1 | À développer |
+| **G02** | **Calendrier hebdomadaire** 6 jours visibles + dimanche dépliable, choix de date, connexion bidirectionnelle **Google Agenda** | D04/D11–D13/D21 ; O24–O31/O37 ; F21/F37/F45–F47 ; M103–M120/M127–M128/M150/M156 ; C20–C27/C33 | T10–T15, Phase 2/3 bis | À développer |
+| **G03** | **Tâches** non horaires/non cycliques, avec ou sans date, édition et report facultatif | D15/D18 ; O31–O33/O36 ; F22/F48/F51 ; M121–M125/M135–M138 ; C27–C30 | T02/T15/T17, Phase 2 | À développer |
+| **G04** | Firebase : compte, données essentielles, synchronisation et restauration | D05/D08 ; O01/O15–O16/O31–O36 ; F27–F30/F34/F39 ; M16–M27/M70–M72/M89–M90 ; C02–C05/C17 | T04/T05/T09, Phase 3 | À développer (Firebase préparé) |
+| **G05** | Rappels et notifications iPhone, avec limites Web Push documentées | D07 ; O06/O14/O19/O22/O31–O33 ; F23/F33/F35/F37 ; M41–M44/M75–M78/M81/M84–M88/M100 ; C11–C14/C18–C19 | T07/T16, Phase 4 | À développer |
+| **G06** | Musiques Suno, lecteur, playlists et favoris | O08–O10/O13/O18 ; F11–F12/F24–F25/F31–F32 ; M46–M63/M92–M94/M99 ; C06–C08 | T03/T08, Phase 5 | À développer |
+| **G07** | Galerie, imports d'images et thèmes saisonniers | O07/O10–O13 ; F13/F26/F31 ; M64–M69/M95–M98 ; C06–C07 | T03, Phase 6 | À développer |
+| **G08** | Export, changement d'iPhone et mises à jour sans perte de données | D08/D09 ; O16/O21 ; F34–F36 ; M70–M74/M82–M83 ; C09–C10/C16–C17 | T04/T06/T09, Phase 7 | À développer |
+| **G09** | Gouvernance, confidentialité, gratuité et traçabilité | D02/D03/D10/D13 ; F00–F05/F39 ; AGENTS.md ; règles §0 de l'architecture | T05/T07/T10 ; Phase 8 | Documentation approuvée ; tests à faire |
+| **G10** | **Jour central**, date choisie, une seule liste visuelle en **deux groupes : sans horaire, puis avec horaire chronologique** | D14–D16/D22 ; O20/O31–O33/O37 ; F19/F48/F51/F53 ; M124/M128–M131/M148–M149 ; C27–C28 | T15/T20, Phase 1/2 | À développer |
+| **G11** | **Habitudes** répétées selon jours/fréquences, avec ou sans heure, validation par occurrence | D15/D17 ; O05/O31–O33 ; F49 ; M126/M130/M132–M134/M139/M151 ; C28/C31 | T01/T16, Phase 2 | À développer |
+| **G12** | **Listes** de courses, bagages, etc., liées à plusieurs activités sans validation du parent | D20 ; O31/O34–O35 ; F50 ; M142–M146/M152/M159–M160 ; C29 | T18, Phase 2 | À développer |
+| **G13** | **Bilan mensuel** filtrable par 1, 2 ou 3 étoiles ; réalisations confirmées et présumées distinguées | D19 ; O31–O33/O38 ; F52/F56 ; M140/M147 ; C32 | T19, Phase 2 | À développer |
+| **G14** | **Ergonomie sobre** : couleurs apaisantes, arrondis, icône éditable à gauche, coche à droite, navigation simple | D14/D17/D22 ; F19–F20/F53 ; M149/M153 ; C27–C28 | T20, Phase 1/2 | À développer |
 
 **Légende :** `À développer` = spécifié, pas fonctionnel ; `En cours` = développement commencé et non validé ; `Validé` = testé dans l'environnement cible. Si un objectif n'a aucune correspondance technique, l'agent doit **STOP**, demander un accord explicite, actualiser **d'abord** l'architecture, puis ce tableau et enfin coder.
 
@@ -30,13 +35,14 @@
 
 Construire un organisateur personnel doux, personnalisable et agréable à utiliser, réunissant :
 
-- un **agenda intégré avec synchronisation bidirectionnelle à Google Agenda** après connexion volontaire (sans dépendance à Apple Calendar) ;
-- un **gestionnaire de tâches** (priorités, échéances, récurrences) ;
-- des **rappels et notifications**, y compris quand l'application est fermée, sous réserve des limites iOS et de la connexion réseau ;
+- un **calendrier hebdomadaire** (lundi–samedi, dimanche dépliable) avec synchronisation bidirectionnelle à Google Agenda après connexion volontaire (sans dépendance à Apple Calendar) ;
+- un **objet unique d'activité** qui devient une tâche, une habitude, ou un événement selon ses horaires et répétitions ;
+- des **rappels et notifications**, y compris quand l'application est fermée sous réserve des limites iOS ; une **validation auto proposée dès qu'un horaire est défini**, toujours réversible ;
 - une **bibliothèque de musiques personnelles Suno**, avec lecteur et playlists ;
 - une **bibliothèque d'images** et des thèmes changeant selon les saisons ;
 - un **stockage local**, une utilisation hors ligne et une **sauvegarde automatique de l'agenda et des tâches** ;
 - une **restauration sur un nouvel iPhone** après reconnexion au compte ;
+- une **page Jour** affichant date choisie, éléments sans horaire puis horaires, avec **report groupé facultatif des tâches oubliées la veille**, listes liées et bilan mensuel par étoiles ;
 - un système de **mise à jour** de l'application et de ses médias fournis par défaut depuis GitHub.
 
 ### Choix techniques validés
@@ -65,14 +71,32 @@ Construire un organisateur personnel doux, personnalisable et agréable à utili
 
 ## 2. Principes d'expérience utilisateur
 
-### Écrans principaux
+### Navigation principale : cinq onglets exactement
 
-1. **Accueil** : résumé du jour, prochain rendez-vous, tâches prioritaires, lecteur compact et décor saisonnier.
-2. **Agenda** : vues mois / semaine / jour, création et modification d'événements, horaires, répétitions, descriptions et rappels ; **Google Agenda lié dans les deux sens** après autorisation.
-3. **Tâches** : listes, cases à cocher, priorités, dates limites, récurrences, catégories et historique de tâches terminées.
-4. **Musique** : bibliothèque locale, recherche, favoris, playlists, lecture/pause/suivant/précédent, pochettes et import de fichiers.
-5. **Décoration** : fonds par saison, galerie, import Photos/Fichiers, thèmes et couleurs ; petit éditeur simple (recadrage, texte) dans une étape ultérieure.
-6. **Paramètres** : compte, **connecter/déconnecter Google Agenda et voir son état**, état de synchronisation, notifications, données locales, export/restauration, version de l'application.
+La barre principale contient **Calendrier | Tâches | Jour | Habitudes | Listes**, **Jour au centre** et ouvert par défaut à **la date actuelle**. Pas d'onglet « Événements » : les événements sont des **activités horaires** visibles dans le Calendrier et Jour. Pas de rubrique « À planifier » dans Jour.
+
+1. **Calendrier** : semaine compacte avec cases **lundi à samedi** ; **dimanche dépliable** par indication visible. Titres des éléments si l'espace le permet, sinon compteurs (« 2 événements, 3 habitudes »). Un jour touché ouvre la page **Jour** à cette date.
+2. **Tâches** : inventaire des activités non récurrentes et sans horaire, **datées ou non**. Création, modification, importance (1–3 étoiles), icône et liste associée, planification facultative.
+3. **Jour** : pour la date sélectionnée, **une seule liste cohérente avec deux groupes maximum** : **Sans horaire**, puis **Avec horaire**, trié chronologiquement. Tâches datées, événements horaires et occurrences des habitudes sont mélangés **sans séparateurs par type** ; les tâches sans aucune date restent dans Tâches. Bouton retour **Aujourd'hui**.
+4. **Habitudes** : toutes les règles récurrentes, quotidien/hebdomadaire avec jours précis/mensuel/annuel selon choix, heure facultative, date de début/fin éventuelle, historique des réalisations par occurrence. Une habitude du mercredi à 19 h figure aussi parmi les événements de ce mercredi.
+5. **Listes** : listes libres (courses, matériel, voyages…) et articles cochables, réutilisables et associables à une ou plusieurs activités ; consultables directement depuis l'activité concernée.
+
+**Accès secondaire** : Musique (lecteur Suno et playlists), Décoration (images et saisons), Paramètres (compte, Google Agenda, notifications, exports), Bilan mensuel. Ces fonctions subsistent mais **n'ajoutent pas d'onglets principaux**.
+
+### Comportement de l'objet unique
+
+Un seul objet `Activity` O31, portant titre, description, icône/image personnalisable, étoiles 1–3, liste liée, date facultative, horaire début/fin facultatif, répétition facultative, notification et règle de validation. Les vues Tâches/Habitudes/Événements sont des **filtres**, pas trois copies. Ajouter un horaire transforme l'affichage, **pas l'identifiant**.
+
+- **Icône à gauche** : appuyer ouvre tous les réglages de l'activité.
+- **Coche à droite** : validation manuelle ou correction ; une habitude est cochée par **occurrence**.
+- **Avec horaire** : la validation automatique est proposée **activée par défaut** ; l'utilisatrice peut la désactiver. Utiliser fin si elle existe, sinon l'heure prévue ; statut « présumé accompli » réversible, pas une preuve.
+- **Sans horaire** : validation manuelle. Si une **tâche datée d'hier** (non récurrente, non horaire) n'a pas été faite, une **seule proposition groupée** permet de la reporter à aujourd'hui, de la laisser hier ou de redemander plus tard. Aucun report silencieux, aucune copie, aucune fenêtre par tâche.
+- **Étoiles et bilan** : filtre de 1 à 3 étoiles, ordre **3→2→1 puis dates** et distinction des éléments validés automatiquement.
+- **Listes** : les articles peuvent être cochés séparément ; l'activité « Faire les courses » ne se valide pas automatiquement parce que toute sa liste est cochée.
+
+### Design et gestes
+
+**Très arrondi, couleurs apaisantes (vert sauge, crème, bleu poudré, lavande…), lisible et peu chargé.** La sélection de date et les actions doivent rester explicites. Défilement vertical naturel ; glissement horizontal éventuel si testé sur iPhone, sans imposer de geste à deux doigts. Garder suffisamment d'espace tactile autour des icônes et coches.
 
 ### Contenus dynamiques
 
@@ -88,7 +112,8 @@ Construire un organisateur personnel doux, personnalisable et agréable à utili
 
 | Donnée | Local sur iPhone | Firestore (auto) | Export / restauration |
 |---|---|---|---|
-| Événements, horaires, répétitions | Oui | **Oui** + liaison optionnelle Google Agenda | Oui |
+| **Activités uniques O31** (tâches datées ou non, habitudes, événements horaires) | Oui | **Oui** + liaison Google Agenda **sur événements horaires concernés uniquement** | Oui |
+| Réalisations par occurrence, décisions de report et listes libres | Oui | **Oui** | Oui |
 | Tâches, listes, statuts | Oui | **Oui** | Oui |
 | Préférences, thèmes choisis, favoris et playlists (métadonnées) | Oui | Oui, en volume léger | Oui |
 | Images et décorations importées | **Oui** | Non | **Oui, archive utilisateur** |
@@ -109,9 +134,11 @@ Construire un organisateur personnel doux, personnalisable et agréable à utili
 ### Modèle de données initial (à ajuster)
 
 ```text
-users/{uid}/events/{eventId}
-users/{uid}/tasks/{taskId}
-users/{uid}/lists/{listId}
+users/{uid}/activities/{activityId}             # O31 activité canonique
+users/{uid}/activityCompletions/{id}           # O33 historique par occurrence
+users/{uid}/checklists/{checklistId}           # O34 listes libres
+users/{uid}/checklists/{checklistId}/items/{id} # O35 articles
+users/{uid}/carryOverDecisions/{id}            # O36 report des tâches de la veille
 users/{uid}/playlists/{playlistId}
 users/{uid}/preferences/profile
 users/{uid}/reminders/{reminderId}
@@ -130,7 +157,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 - Pendant que la PWA est ouverte : rappels visibles dans l'interface, sons/indicateurs si l'utilisatrice l'autorise.
 - PWA installée sur l'écran d'accueil : demander l'autorisation de **Web Push** par une action explicite de l'utilisatrice.
 - Pour les événements à venir : un programme **Cloudflare Worker avec Cron Trigger** vérifie périodiquement les rappels à envoyer et sollicite l'envoi push, même si le PC de développement est éteint.
-- Gérer le fuseau horaire (`Europe/Paris` par défaut à confirmer), les changements d'heure, les rappels récurrents et l'absence de doublons.
+- Gérer le fuseau horaire (`Europe/Paris` par défaut à confirmer), les changements d'heure, les rappels récurrents et l'absence de doublons ; **un rappel lié à activityId et occurrenceKey**. 
 - Traiter les expirations/renouvellements d'abonnement push et les refus d'autorisation.
 - Dans les paramètres : bouton **Envoyer un rappel de test** et statut de disponibilité des notifications.
 
