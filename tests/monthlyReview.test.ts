@@ -50,10 +50,10 @@ for (const entry of entries) {
 }
 // Le bilan exclut un état en attente ou annulé ; le contrat ne porte
 // que les réalisations terminées ou seulement présumées.
-// @ts-expect-error S4 : pending n'est pas une réalisation du bilan
 const invalidCompletion: MonthlyAchievement = {
   activity: { ...base, id: "pending" },
   occurrence: { activityId: "pending", occurrenceKey: "pending@2026-10-05", localDate: "2026-10-05", recurring: false },
+  // @ts-expect-error S4 : pending n'est pas une réalisation du bilan
   completion: { id: "pending@2026-10-05", activityId: "pending", occurrenceKey: "pending@2026-10-05", status: "pending", updatedAt: "2026-10-05T12:00:00.000Z" },
 };
 void invalidCompletion;
