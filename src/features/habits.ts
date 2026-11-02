@@ -16,12 +16,10 @@ export function expandActivityOccurrences(activity: Activity, range: DateRange):
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   });
-  const local = (ms: number): { year: number; month: number; day: number; hour: number; minute: number; second: number } => {
-    const p = fmt.formatToParts(new Date(ms));
-    const n = (part: string): number => Number(p.find(x => x.type === part)?.value);
-    return { year: n("year"), month: n("month"), day: n("day"), hour: n("hour"), minute: n("minute"), second: n("second") };
-  };
-  const first = activity.startAt ? local(Date.parse(activity.startAt)) : undefined;
+  const first = activity.startAt
+    ? Object.fromEntries(fmt.formatToParts(new Date(activity.startAt))
+      .map(part => [part.type, Number(part.value)])) as Record<string, number>
+    : undefined;
   const anchor = activity.plannedOn || (first &&
     `${String(first.year).padStart(4, "0")}-${String(first.month).padStart(2, "0")}-${String(first.day).padStart(2, "0")}`);
   if (!anchor || !/^\d{4}-\d{2}-\d{2}$/.test(anchor) || !Number.isFinite(Date.parse(anchor + "T00:00:00Z"))) {
@@ -67,11 +65,13 @@ export function expandActivityOccurrences(activity: Activity, range: DateRange):
           new Date(activity.startAt).getUTCMilliseconds());
         const matches: number[] = [];
         for (const probe of [target - 36 * 3600000, target, target + 36 * 3600000]) {
-          const here = local(probe);
+          const here = Object.fromEntries(fmt.formatToParts(new Date(probe))
+            .map(part => [part.type, Number(part.value)])) as Record<string, number>;
           const offset = Date.UTC(here.year, here.month - 1, here.day,
             here.hour, here.minute, here.second) - Math.floor(probe / 1000) * 1000;
           const candidate = target - offset;
-          const test = local(candidate);
+          const test = Object.fromEntries(fmt.formatToParts(new Date(candidate))
+            .map(part => [part.type, Number(part.value)])) as Record<string, number>;
           if (test.year === yr && test.month === mo && test.day === day &&
               test.hour === first!.hour && test.minute === first!.minute && test.second === first!.second) {
             matches.push(candidate);
