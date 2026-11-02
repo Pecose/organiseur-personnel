@@ -3,6 +3,7 @@
  * M01 attend F15/F19 (routes et interfaces), prévus dans la strate S7.
  */
 import { initFirebase } from "./services/firebase";
+import { registerServiceWorker } from "./pwa/service-worker";
 import type { PublicFirebaseConfig } from "./domain/types";
 
 // Ces valeurs sont une configuration publique du projet Firebase Web,
@@ -25,4 +26,16 @@ if (configuration.apiKey && configuration.authDomain && configuration.projectId 
   }
 } else if (status) {
   status.textContent = "Firebase n'est pas encore configuré sur ce site. Aucune connexion n'a été tentée.";
+}
+
+/** Installer le cache PWA uniquement après compilation Vite, pas sur le serveur de dev. */
+if (import.meta.env.PROD) {
+  void registerServiceWorker().then(result => {
+    const target = document.querySelector<HTMLElement>("[data-pwa-status]");
+    if (target) {
+      target.textContent = result.ok
+        ? "Cache PWA enregistré. Disponibilité hors ligne à confirmer sur iPhone."
+        : "Cache PWA indisponible dans ce navigateur.";
+    }
+  });
 }
