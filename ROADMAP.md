@@ -274,7 +274,7 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 **Dépend de : rien dans ce projet.** Phase de contrat, zéro API appelée, zéro donnée envoyée.
 
 - [x] Définir dans **F17** les **15 types autonomes** du tableau, leurs champs obligatoires, valeurs optionnelles et invariants.
-- [x] Définir les utilitaires purs de date et fuseau dans **F18** : **M28/M29/M45/M67** ; une répétition quotidienne/hebdomadaire/mensuelle/annuelle est décrite sans fabriquer d'activité réelle.
+- [x] Définir les utilitaires purs de date et fuseau : **M28/M29/M45 dans F18**, **M67 dans F26**, conformément à l'architecture ; une répétition quotidienne/hebdomadaire/mensuelle/annuelle est décrite sans fabriquer d'activité réelle.
 - [x] Définir les contrats d'erreur/retour `Result`, le type `LocalDate`, les instants UTC et les règles de test sans choisir implicitement de bibliothèque.
 - [x] **Aucun** framework, gestionnaire de dépendances ni bibliothèque ajoutés à ce stade ; les fichiers créés correspondent aux chemins autorisés. Tout futur choix reste soumis à `AGENTS.md`.
 - [ ] **Finaliser T01** : 13 contrôles de comportement réussis en exécution directe ; compilation `tsc --strict` et exécution du fichier `tests/domain.test.ts` compilé **encore nécessaires** (voir le tableau ci-dessus).
