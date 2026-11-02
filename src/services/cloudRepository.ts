@@ -75,7 +75,7 @@ export function subscribeCloudRecords<T>(
       fromCache: snapshot.metadata.fromCache,
       hasPendingWrites: snapshot.metadata.hasPendingWrites,
     }),
-    () => cb([], { fromCache: true, hasPendingWrites: true }));
+    () => { /* Erreur de lecture : ne jamais transformer un échec en liste vide. */ });
 }
 
 /** M89 · Lecture ponctuelle, utilisable avec le cache du SDK si disponible. */
