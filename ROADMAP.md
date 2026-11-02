@@ -219,7 +219,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 |---|---|---|---|
 | **S0** | **VALIDÉE (tests locaux)** | **15/15 objets autonomes**, fonctions M28/M29/M45/M67, suite T01 ; correction de typage `weekday` ; tests locaux sur copie du code | `tsc --strict` puis `node` : **réussite** avec TypeScript 5.8.3 et Node 22.16.0 ; tests à rejouer lors du premier clonage opérationnel du dépôt |
 | **S1** | **VALIDÉE (tests locaux)** | **10/10 objets composés** O08/O11/O12/O14/O21/O25/O27/O28/O31/O35 dans F17 ; M124/M157 dans F48 ; tests S1 dans F54 | `tsc --strict` puis Node : **réussite sur copie locale**, classification tâche/habitude/événement, habitude horaire, 16 entrées invalides rejetées ; rejouer depuis clone GitHub en CI plus tard |
-| **S2–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | **S2 est la prochaine strate**, mais n'a pas été lancée |
+| **S2** | **VALIDÉE (tests locaux ciblés)** | **5/5 objets** O09/O23/O26/O32/O36 dans F17, M130 dans F49, M131 dans F51, tests T15/T16 de S2 dans F55 | Sous-ensemble S2 compilé via `tsc --strict` et exécuté sous Node local : récurrences Paris à 19 h, fin de mois, année bissextile, cas New York automne/printemps, groupes Jour ; **compilation sur clone GitHub complet toujours à reproduire** |
+| **S3–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | **S3 devient la prochaine strate**, non commencée |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -229,6 +230,17 @@ node .tmp-s0/tests/domain.test.js
 ```
 
 La sortie `.tmp-s0/` est un **artefact temporaire de validation**, jamais une source à versionner. **S0 est débloquée** : correction de typage intégrée à GitHub ; S1 peut débuter. Ne pas confondre cette compilation locale avec un workflow CI distant, pas encore prévu.
+
+**Commande de reproduction S0–S2 (sur un clone GitHub à jour) :**
+
+```bash
+tsc --strict --target ES2022 --module commonjs --lib ES2022,DOM --outDir .tmp-s2 src/domain/types.ts src/domain/dates.ts src/features/decor.ts src/features/activities.ts src/features/habits.ts src/features/day.ts tests/domain.test.ts tests/activities.test.ts tests/navigation.test.ts
+node .tmp-s2/tests/domain.test.js
+node .tmp-s2/tests/activities.test.js
+node .tmp-s2/tests/navigation.test.js
+```
+
+`.tmp-s2/` est un dossier de sortie temporaire non versionné. Les essais S2 sur copie locale ont été concluants (TS 5.8.3 / Node 22.16.0), mais **aucun workflow distant n'a exécuté cette commande**.
 
 ### Vue générale : graphe de progression
 
@@ -297,12 +309,12 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Prérequis : S0–S1 validées.**
 
-- [ ] Définir O32 occurrence d'activité et O36 décision de report, construits à partir d'O31.
-- [ ] Définir O09 playlist à partir d'O08 ; O23 connexion Google à partir d'O01/O25 ; O26 conflit Google à partir d'O31/O24.
-- [ ] Tester **M130** : occurrences récurrentes **bornées**, mercredi à 19 h en heure locale, jours spécifiques, fin de mois et fuseaux.
-- [ ] Tester **M131** : logique pure de regroupement **sans horaire puis horaire croissant**, sans séparation par type métier.
+- [x] Définir O32 occurrence d'activité et O36 décision de report, construits à partir d'O31.
+- [x] Définir O09 playlist à partir d'O08 ; O23 connexion Google à partir d'O01/O25 ; O26 conflit Google à partir d'O31/O24.
+- [x] Tester **M130** : occurrences récurrentes **bornées**, mercredi à 19 h en heure locale, jours spécifiques, fin de mois et fuseaux.
+- [x] Tester **M131** : logique pure de regroupement **sans horaire puis horaire croissant**, sans séparation par type métier.
 
-**Sortie S2 :** toutes les relations et occurrences sont déterministes, pas d'activité clonée au passage d'une date.
+**Sortie S2 :** cinq contrats typés et deux fonctions pures publiés. Tests locaux ciblés réussis, y compris sur les changements d'heure ; pas d'activité clonée. **Limite :** recompiler depuis un clone fidèle de GitHub et rejouer F40/F54/F55 avant d'utiliser ces contrats en production.
 
 ### S3 — États rattachés aux occurrences
 
