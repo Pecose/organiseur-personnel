@@ -8,6 +8,8 @@
 export type LocalDate = string; // YYYY-MM-DD, fuseau civil explicite dans le contrat appelant.
 export type ISOInstant = string; // ISO 8601 en UTC, ex. 2026-11-02T08:00:00.000Z.
 export type Season = "spring" | "summer" | "autumn" | "winter";
+/** F17 / M46 : adaptateur natif IndexedDB, sans bibliothèque ni nouveau store. */
+export type MediaDb = IDBDatabase;
 
 export interface AppError {
   code: string;
