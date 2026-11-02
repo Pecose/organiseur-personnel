@@ -40,10 +40,26 @@ export async function cacheAppShell(revision: string): Promise<Result<void>> {
   }
   try {
     const cache = await caches.open(cachePrefix + revision);
+    const homeUrl = new URL(appScope, location.origin).toString();
     await cache.addAll([
-      new URL(appScope, location.origin).toString(),
+      homeUrl,
       new URL(appScope + "manifest.webmanifest", location.origin).toString(),
     ]);
+    // Après compilation Vite, précharger aussi les JS/CSS du shell.
+    // Sinon le HTML pourrait être disponible hors ligne, mais pas son code.
+    const home = await cache.match(homeUrl);
+    if (!home) throw new Error("Shell indisponible.");
+    const html = await home.text();
+    const scriptsAndStyles: string[] = [];
+    for (const match of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
+      const resource = new URL(match[1], homeUrl);
+      if (resource.origin === location.origin
+        && resource.pathname.startsWith(appScope)
+        && /\\.(?:js|css)$/.test(resource.pathname)) {
+        scriptsAndStyles.push(resource.toString());
+      }
+    }
+    if (scriptsAndStyles.length) await cache.addAll([...new Set(scriptsAndStyles)]);
     return { ok: true, value: undefined };
   } catch {
     return { ok: false, error: {
