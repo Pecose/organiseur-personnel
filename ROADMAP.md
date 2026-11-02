@@ -6,7 +6,7 @@
 > **Utilisatrice cible :** une personne, sur iPhone.  
 > **Budget impératif :** **0 €** d'abonnement, d'hébergement et de compte Apple Developer.  
 > **Environnement de développement :** Windows.  
-> **Dernière mise à jour :** 1er novembre 2026 (conception UX et modèle unifié validés ; aucun code d'application développé).
+> **Dernière mise à jour :** 2 novembre 2026 (roadmap réordonnée par dépendances ; aucun code d'application développé).
 
 ## Tableau de bord des objectifs (lecture humaine)
 
@@ -14,20 +14,20 @@
 
 | ID objectif | Résultat attendu | Architecture à consulter | Test / jalon | Statut |
 |---|---|---|---|---|
-| **G01** | PWA installable iPhone, fonctionnement hors ligne et mises à jour | D01/D06/D09 ; F08–F09/F14/F35–F36 ; M01/M79–M83 ; C10/C15–C16 | T06, Phase 0–1 | À développer |
-| **G02** | **Calendrier hebdomadaire** 6 jours visibles + dimanche dépliable, choix de date, connexion bidirectionnelle **Google Agenda** | D04/D11–D13/D21 ; O24–O31/O37 ; F21/F37/F45–F47 ; M103–M120/M127–M128/M150/M156 ; C20–C27/C33 | T10–T15, Phase 2/3 bis | À développer |
-| **G03** | **Tâches** non horaires/non cycliques, avec ou sans date, édition et report facultatif | D15/D18 ; O31–O33/O36 ; F22/F48/F51 ; M121–M125/M135–M138 ; C27–C30 | T02/T15/T17, Phase 2 | À développer |
-| **G04** | Firebase : compte, données essentielles, synchronisation et restauration | D05/D08 ; O01/O15–O16/O31–O36 ; F27–F30/F34/F39 ; M16–M27/M70–M72/M89–M90 ; C02–C05/C17 | T04/T05/T09, Phase 3 | À développer (Firebase préparé) |
-| **G05** | Rappels et notifications iPhone, avec limites Web Push documentées | D07 ; O06/O14/O19/O22/O31–O33 ; F23/F33/F35/F37 ; M41–M44/M75–M78/M81/M84–M88/M100 ; C11–C14/C18–C19 | T07/T16, Phase 4 | À développer |
-| **G06** | Musiques Suno, lecteur, playlists et favoris | O08–O10/O13/O18 ; F11–F12/F24–F25/F31–F32 ; M46–M63/M92–M94/M99 ; C06–C08 | T03/T08, Phase 5 | À développer |
-| **G07** | Galerie, imports d'images et thèmes saisonniers | O07/O10–O13 ; F13/F26/F31 ; M64–M69/M95–M98 ; C06–C07 | T03, Phase 6 | À développer |
-| **G08** | Export, changement d'iPhone et mises à jour sans perte de données | D08/D09 ; O16/O21 ; F34–F36 ; M70–M74/M82–M83 ; C09–C10/C16–C17 | T04/T06/T09, Phase 7 | À développer |
-| **G09** | Gouvernance, confidentialité, gratuité et traçabilité | D02/D03/D10/D13 ; F00–F05/F39 ; AGENTS.md ; règles §0 de l'architecture | T05/T07/T10 ; Phase 8 | Documentation approuvée ; tests à faire |
-| **G10** | **Jour central**, date choisie, une seule liste visuelle en **deux groupes : sans horaire, puis avec horaire chronologique** | D14–D16/D22 ; O20/O31–O33/O37 ; F19/F48/F51/F53 ; M124/M128–M131/M148–M149 ; C27–C28 | T15/T20, Phase 1/2 | À développer |
-| **G11** | **Habitudes** répétées selon jours/fréquences, avec ou sans heure, validation par occurrence | D15/D17 ; O05/O31–O33 ; F49 ; M126/M130/M132–M134/M139/M151 ; C28/C31 | T01/T16, Phase 2 | À développer |
-| **G12** | **Listes** de courses, bagages, etc., liées à plusieurs activités sans validation du parent | D20 ; O31/O34–O35 ; F50 ; M142–M146/M152/M159–M160 ; C29 | T18, Phase 2 | À développer |
-| **G13** | **Bilan mensuel** filtrable par 1, 2 ou 3 étoiles ; réalisations confirmées et présumées distinguées | D19 ; O31–O33/O38 ; F52/F56 ; M140/M147 ; C32 | T19, Phase 2 | À développer |
-| **G14** | **Ergonomie sobre** : couleurs apaisantes, arrondis, icône éditable à gauche, coche à droite, navigation simple | D14/D17/D22 ; F19–F20/F53 ; M149/M153 ; C27–C28 | T20, Phase 1/2 | À développer |
+| **G01** | PWA installable iPhone, fonctionnement hors ligne et mises à jour | D01/D06/D09 ; F08–F09/F14/F35–F36 ; M01/M79–M83 ; C10/C15–C16 | Tests prévus ; **S5/S10** | À développer |
+| **G02** | **Calendrier hebdomadaire** 6 jours visibles + dimanche dépliable, choix de date, connexion bidirectionnelle **Google Agenda** | D04/D11–D13/D21 ; O24–O31/O37 ; F21/F37/F45–F47 ; M103–M120/M127–M128/M150/M156 ; C20–C27/C33 | Tests prévus ; **S7/S9A** | À développer |
+| **G03** | **Tâches** non horaires/non cycliques, avec ou sans date, édition et report facultatif | D15/D18 ; O31–O33/O36 ; F22/F48/F51 ; M121–M125/M135–M138 ; C27–C30 | Tests prévus ; **S6–S8** | À développer |
+| **G04** | Firebase : compte, données essentielles, synchronisation et restauration | D05/D08 ; O01/O15–O16/O31–O36 ; F27–F30/F34/F39 ; M16–M27/M70–M72/M89–M90 ; C02–C05/C17 | Tests prévus ; **S5/S10** | À développer (Firebase préparé) |
+| **G05** | Rappels et notifications iPhone, avec limites Web Push documentées | D07 ; O06/O14/O19/O22/O31–O33 ; F23/F33/F35/F37 ; M41–M44/M75–M78/M81/M84–M88/M100 ; C11–C14/C18–C19 | Tests prévus ; **S9B** | À développer |
+| **G06** | Musiques Suno, lecteur, playlists et favoris | O08–O10/O13/O18 ; F11–F12/F24–F25/F31–F32 ; M46–M63/M92–M94/M99 ; C06–C08 | Tests prévus ; **S6–S8/S10** | À développer |
+| **G07** | Galerie, imports d'images et thèmes saisonniers | O07/O10–O13 ; F13/F26/F31 ; M64–M69/M95–M98 ; C06–C07 | Tests prévus ; **S6–S8** | À développer |
+| **G08** | Export, changement d'iPhone et mises à jour sans perte de données | D08/D09 ; O16/O21 ; F34–F36 ; M70–M74/M82–M83 ; C09–C10/C16–C17 | Tests prévus ; **S10** | À développer |
+| **G09** | Gouvernance, confidentialité, gratuité et traçabilité | D02/D03/D10/D13 ; F00–F05/F39 ; AGENTS.md ; règles §0 de l'architecture | Tests prévus ; **S0/S5/S10** | Documentation approuvée ; tests à faire |
+| **G10** | **Jour central**, date choisie, une seule liste visuelle en **deux groupes : sans horaire, puis avec horaire chronologique** | D14–D16/D22 ; O20/O31–O33/O37 ; F19/F48/F51/F53 ; M124/M128–M131/M148–M149 ; C27–C28 | Tests prévus ; **S7** | À développer |
+| **G11** | **Habitudes** répétées selon jours/fréquences, avec ou sans heure, validation par occurrence | D15/D17 ; O05/O31–O33 ; F49 ; M126/M130/M132–M134/M139/M151 ; C28/C31 | Tests prévus ; **S2–S3/S6–S8** | À développer |
+| **G12** | **Listes** de courses, bagages, etc., liées à plusieurs activités sans validation du parent | D20 ; O31/O34–O35 ; F50 ; M142–M146/M152/M159–M160 ; C29 | Tests prévus ; **S1/S6–S7** | À développer |
+| **G13** | **Bilan mensuel** filtrable par 1, 2 ou 3 étoiles ; réalisations confirmées et présumées distinguées | D19 ; O31–O33/O38 ; F52/F56 ; M140/M147 ; C32 | Tests prévus ; **S4/S8** | À développer |
+| **G14** | **Ergonomie sobre** : couleurs apaisantes, arrondis, icône éditable à gauche, coche à droite, navigation simple | D14/D17/D22 ; F19–F20/F53 ; M149/M153 ; C27–C28 | Tests prévus ; **S7** | À développer |
 
 **Légende :** `À développer` = spécifié, pas fonctionnel ; `En cours` = développement commencé et non validé ; `Validé` = testé dans l'environnement cible. Si un objectif n'a aucune correspondance technique, l'agent doit **STOP**, demander un accord explicite, actualiser **d'abord** l'architecture, puis ce tableau et enfin coder.
 
@@ -205,166 +205,200 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 - Réserver les mises à jour multimédias volumineuses à un téléchargement explicite si nécessaire (réseau et stockage).
 - Pour changer de téléphone : Safari → URL GitHub Pages → partage → **Ajouter à l'écran d'accueil / Ouvrir comme app** → connexion Firebase → restauration des données cloud → réimport éventuel de la bibliothèque multimédia.
 
-## 7. Roadmap de livraison par étapes
+## 7. Roadmap par **strates de dépendances** (ordre de construction)
 
-> Les cases de développement ne sont pas cochées : **aucune implémentation de l'application n'est encore réalisée**. Seuls les préparatifs de compte/dépôt et les documents ont été établis.
+> **Règle d'exécution :** on ne commence pas par « faire un écran ». On commence par **les objets qui n'ont besoin d'aucun autre objet du projet**, puis les objets qui ne dépendent que de ceux déjà terminés. Après viennent les services, les opérations, les vues, les automatisations et les intégrations. Une strate est **bloquée** tant que ses prérequis, tests et références architecturales ne sont pas validés. Ce chapitre **remplace l'ancien ordre par fonctionnalités** sans supprimer leur périmètre.
+>
+> **Statut :** architecture **PLANIFIÉE**, application **non développée**. Les identifiants **O/F/M/C/T/D** sont ceux du [registre architectural](docs/ARCHITECTURE.md) ; **aucun nouveau contrat n'est introduit ici**. Seules les entités **O01, O05–O38 sauf O02–O04**, soit **35 objets actifs**, doivent être réalisées. **O02, O03 et O04 sont SUPERSEDED**, ne jamais les coder.
+>
+> Un « objet autonome » veut dire **autonome vis-à-vis des autres objets métier**. Déclarer le type `AuthUser` (O01) ne signifie pas que Firebase Authentication est opérationnel. De même, une interface type ne nécessite pas que Firestore, Cloudflare ou Safari soient déjà configurés.
 
-### Phase 0 — Validation des risques iPhone (priorité absolue)
+### Vue générale : graphe de progression
 
-- [x] Créer un **nouveau dépôt sous `Pecose`**, séparé d'Umbral (nom de travail : `organiseur-personnel`).
-- [ ] Initialiser PWA minimale (`index.html`, manifest, service worker, icônes, HTTPS via GitHub Pages).
-- [ ] L'installer sur l'iPhone à partir de Safari (sans `.ipa`, sans Mac distant).
-- [ ] Tester l'ouverture **hors ligne**, puis avec le PC Windows éteint.
-- [ ] Importer une musique Suno personnelle ; tester lecture, écran verrouillé, piste suivante et reprise.
-- [ ] Tester un push avec l'application fermée ; noter les restrictions et décider du niveau de fiabilité acceptable.
-- [ ] Vérifier l'espace de stockage disponible et les comportements après redémarrage du téléphone.
+```mermaid
+flowchart TD
+  S0["S0 · Contrats autonomes"] --> S1["S1 · Objets dépendant de S0"]
+  S1 --> S2["S2 · Objets dépendant de S0/S1"]
+  S2 --> S3["S3 · Occurrences, notifications et états composés"]
+  S3 --> S4["S4 · Réalisations et rapports terminaux"]
+  S4 --> S5["S5 · Persistance, identité, PWA et sécurité"]
+  S5 --> S6["S6 · Opérations atomiques"]
+  S6 --> S7["S7 · Composition des 5 vues"]
+  S7 --> S8["S8 · Automatisations et bilans"]
+  S8 --> S9["S9 · Intégrations externes"]
+  S9 --> S10["S10 · Sauvegardes, mise à jour et recette"]
+  S6 -.-> MEDIA["Branche musique/images et thèmes"]
+  MEDIA -.-> S10
+```
 
-**Critère de sortie :** installation et fonctionnement offline validés ; limitations audio et notifications connues, documentées et acceptées.
+Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de validation**. La branche médias est **indépendante** de l'agenda et peut être construite dès S6 ; elle ne doit pas attendre artificiellement Google Agenda ni les notifications. Les tests PWA/iPhone de faisabilité peuvent être anticipés en lecture/prototype contrôlé pour déceler tôt un risque, sans inverser l'ordre de production des objets.
 
-### Phase 1 — Structure de navigation et expérience iPhone (G10/G14)
+### Inventaire exhaustif des **strates d'objets**
 
-- [ ] Choisir/valider un environnement TypeScript et une interface légère, sans nouvelle dépendance non documentée.
-- [ ] Développer les **cinq onglets fixes** dans cet ordre : **Calendrier | Tâches | Jour | Habitudes | Listes** ; placer Jour au centre, affiché au premier lancement à la date réelle.
-- [ ] Accès secondaire pour musique, décoration, paramètres et bilan, sans remplacer les onglets.
-- [ ] Créer la page Jour **sans sections par type**, avec **seulement Sans horaire et Avec horaire**, ce dernier trié par heure croissante.
-- [ ] Positionner l'**icône/image à gauche** de chaque ligne (tap → fiche d'édition complète) et la **coche de validation à droite**.
-- [ ] Calibrer UI **très arrondie, tons apaisants, espaces suffisants et lisibilité**, utilisable d'une main sur iPhone.
-- [ ] Garder le défilement vertical du contenu ; navigation tactile explicite ; éventuel swipe testé, **jamais** geste deux doigts imposé.
-- [ ] Installer manifeste PWA, service worker, cache hors ligne et états réseau/synchronisation.
-- [ ] Tester navigation clavier/lecteur d'écran, petites tailles d'écran et zones tactiles de l'icône/coche.
+| Strate | Objets à définir et valider | Dépendances autorisées | Résultat attendu |
+|---|---|---|---|
+| **S0** | **O01** identité (contrat), **O05** règle de répétition, **O07** préférences, **O10** blob média, **O13** catalogue, **O15** statut sync, **O16** enveloppe sauvegarde, **O17** version, **O18** état lecteur, **O20** route, **O22** diagnostic notification, **O24** lien Google, **O29** changement Google, **O34** définition de liste, **O37** date sélectionnée | **Aucun autre objet actif** (15) | Types élémentaires stables, validations simples |
+| **S1** | **O08** piste, **O11** image, **O12** thème, **O14** abonnement push, **O21** manifeste média, **O25** curseur Google, **O27** grant OAuth chiffré, **O28** état OAuth, **O31** activité unique, **O35** article de liste | S0 seulement (10) | Objets composés sans dépendance circulaire |
+| **S2** | **O09** playlist, **O23** connexion Google, **O26** conflit Google, **O32** occurrence d'activité, **O36** décision de report | S0–S1 seulement (5) | Relations et répétitions décrites avec identifiants stables |
+| **S3** | **O06** rappel lié à une occurrence, **O30** rapport de synchro Google, **O33** réalisation d'occurrence | S0–S2 seulement (3) | Rappels, historiques et états indépendants par occurrence |
+| **S4** | **O19** reçu d'envoi, **O38** bilan mensuel calculé | S0–S3 seulement (2) | Modèle métier complet : **35/35 objets actifs** |
 
-**Critère de sortie :** navigation 5 onglets et composition de Jour validées sur un iPhone, sans surcharge visuelle.
+**Lecture stricte :** l'appartenance à S0–S4 concerne d'abord la **définition typée et les règles pures** (F17/F18), pas encore les écritures dans une base. Un identifiant de relation (`activityId`, `checklistId`, `uid`) est vérifié ensuite dans les opérations de la strate S6 ; il ne faut pas créer le serveur avant d'avoir stabilisé les formes des données. Les objets Google/Push sont **modélisés** ici, mais leur activation n'arrive qu'à S9.
 
-### Phase 2 — Modèle unique d'activité, jour, calendrier, habitudes, listes et bilan
+### Porte de validation commune (obligatoire après chaque strate)
 
-**Source de vérité :** [ARCHITECTURE.md](docs/ARCHITECTURE.md) : **O31 Activity**, O32 occurrences, O33 validations, O34–O35 listes, O36 reports, O37 date choisie, O38 bilan ; fonctions M121–M160. **Les anciennes entités Task/CalendarEvent/TaskList sont SUPERSEDED et ne doivent pas être implémentées.**
+- [ ] Le **registre d'architecture** contient chaque objet/fonction/fichier utilisé ; aucun nouvel ID implicite, aucune signature modifiée sans autorisation préalable.
+- [ ] Tous les **prérequis de la strate** sont effectivement terminés, pas seulement notés « prévus ».
+- [ ] Les types, règles métier, relations et migrations concernées sont vérifiés ; aucune dépendance circulaire.
+- [ ] Les tests ciblés de la strate passent ; erreurs et comportements limites documentés.
+- [ ] La roadmap indique **validé / en cours / bloqué**, avec preuve (test, commit, essai iPhone quand applicable) ; **seulement ensuite** commencer la suivante.
 
-#### Phase 2A — Activités et propriétés (G03/G10)
+### S0 — Objets totalement autonomes (aucun objet métier requis)
 
-- [ ] Créer et modifier **un seul objet Activity O31**, avec ID conservé malgré la planification ou la répétition.
-- [ ] Tâche = sans heure ni répétition ; habitude = répétition ; événement = horaire. Ces noms sont des **vues**, non des stores différents ; un élément peut être à la fois récurrent et horaire.
-- [ ] Fiche complète accessible par son icône gauche : titre, description, icône/image, étoiles 1–3, date, début/fin facultatifs, fuseau, cycle, notification, auto-validation, liste liée.
-- [ ] Tâches sans date conservées dans **Tâches**, et non injectées dans chaque Jour ; tâches datées sans heure visibles seulement à la date prévue.
-- [ ] Gérer les changements de date, heures de début/fin, fuseau, changement d'heure et calendrier local, sans créer d'objets doublons.
+**Dépend de : rien dans ce projet.** Phase de contrat, zéro API appelée, zéro donnée envoyée.
 
-#### Phase 2B — Jour et calendrier (G02/G10)
+- [ ] Définir dans **F17** les **15 types autonomes** du tableau, leurs champs obligatoires, valeurs optionnelles et invariants.
+- [ ] Définir les utilitaires purs de date et fuseau dans **F18** : **M28/M29/M45/M67** ; une répétition quotidienne/hebdomadaire/mensuelle/annuelle est décrite sans fabriquer d'activité réelle.
+- [ ] Définir les contrats d'erreur/retour `Result`, le type `LocalDate`, les instants UTC et les règles de test sans choisir implicitement de bibliothèque.
+- [ ] Faire valider toute décision de framework, gestionnaire de dépendances ou nouveau fichier **avant** installation, conformément à `AGENTS.md`.
+- [ ] Tester les validations de types, durées, dates locales et changement d'heure (T01), avec exemples sans Firebase.
 
-- [ ] **Jour** montre la date choisie depuis Calendrier ; bouton **Aujourd'hui** pour revenir à la date réelle.
-- [ ] Calendrier **par semaine**, **six cases du lundi au samedi**, **dimanche dépliable** avec commande visible.
-- [ ] Sur chaque case, montrer quelques libellés si la place le permet, sinon des compteurs d'événements et d'habitudes.
-- [ ] Toucher une case ouvre Jour sur la date sélectionnée.
-- [ ] Sur Jour, toutes les occurrences applicables à cette date : **sans horaire en premier**, puis **avec horaire ordonnées chronologiquement**, sans distinction visuelle obligatoire tâche/habitude/événement.
+**Sortie S0 :** chaque objet de base est autonome, les fonctions de date sont testables isolément et les noms/signatures correspondent au registre.
 
-#### Phase 2C — Habitudes, validations et reports (G03/G11)
+### S1 — Objets composés **uniquement de S0**
 
-- [ ] Habitudes quotidiennes, certains jours de la semaine, mensuelles ou annuelles (choix simple), avec début/fin de période éventuels.
-- [ ] Tester **habitude hebdomadaire à heure fixe** : « Théâtre mercredi 19 h », présente dans Habitudes et sur Jour chaque mercredi.
-- [ ] Valider **chaque occurrence** indépendamment ; conserver l'historique.
-- [ ] Quand un horaire est ajouté, **proposer la validation automatique activée par défaut**, et offrir un réglage explicite pour la désactiver.
-- [ ] Si fin définie, présumer après fin ; sinon après heure prévue. Conserver le statut **présumé automatiquement** distinct de confirmé manuellement.
-- [ ] Permettre d'annuler une validation automatique, et **ne pas la réappliquer au prochain rafraîchissement**.
-- [ ] Pour les tâches **datées d'hier**, **sans horaire**, **non récurrentes**, non effectuées : **une seule fenêtre groupée** proposant reporter aujourd'hui / conserver hier / remettre à plus tard.
-- [ ] Aucun report automatique, aucun doublon, aucune fenêtre intempestive répétée à chaque affichage.
+**Prérequis : S0 validée.** Les références sont des identifiants, **pas** des appels réseau.
 
-#### Phase 2D — Listes associées et récapitulatif mensuel (G12/G13)
+- [ ] Définir **O31 Activity**, avec date facultative, heure facultative, récurrence facultative, icône à gauche, étoiles 1–3 et liste associée, sans avoir à créer trois classes Tâche/Habitude/Événement.
+- [ ] Définir O08/O11/O12 (médias et thème), O14 (push), O21 (archive), O25/O27/O28 (Google sécurisé) et O35 (élément de liste).
+- [ ] Tester **M124** (classification : tâche sans heure ni répétition ; habitude répétée ; événement horaire) et **M157** (validation de l'activité) en calcul pur.
+- [ ] Vérifier que `Activity` conserve un **seul identifiant** malgré les changements de catégorie, et qu'aucun mot de passe/jeton n'est placé dans un modèle public.
 
-- [ ] Créer, renommer, classer et supprimer des **listes indépendantes**, avec articles à cocher (courses, valise, etc.).
-- [ ] Ouvrir une liste directement depuis l'activité liée ; conserver une liste si l'activité est supprimée ou déplanifiée.
-- [ ] La validation des articles **ne valide pas automatiquement l'activité**.
-- [ ] Attribuer de 1 à 3 étoiles (facultatif) à une activité.
-- [ ] Produire un **bilan de fin de mois** des activités réalisées, tri **3 étoiles, puis 2, puis 1**, puis chronologie ; filtre par étoiles ; les réalisations seulement présumées sont explicitement signalées.
-- [ ] Tester tous les scénarios O31–O38 et les contrats T15–T20.
+**Sortie S1 :** les objets composés sont corrects, sans requérir S2 ou Firestore.
 
-**Critère de sortie :** page Jour cohérente à toute date, tâches et habitudes non dupliquées, validations et report réversibles, listes accessibles, bilan correct. Toute validation finale reste soumise aux tests iPhone.
+### S2 — Objets dépendant des structures précédentes
 
-### Phase 3 — Compte, sauvegardes et reprise sur nouvel appareil
+**Prérequis : S0–S1 validées.**
 
-- [x] Créer un projet **Firebase Spark**, sans activer de facturation (configuration initiale confirmée par le propriétaire).
-- [ ] Firebase Authentication : connexion e-mail/mot de passe activée ; **restent** à implémenter dans l'application le parcours de connexion et la récupération d'accès.
-- [ ] Firestore : base créée ; **restent** à configurer les règles de sécurité par utilisateur et à tester les refus d'accès croisés.
-- [ ] Activer la persistance locale compatible Safari et la synchronisation automatique des **activités, validations par occurrence, listes et reports** ; règles Firestore par UID.
-- [ ] Gérer conflits/erreurs de synchronisation et états visibles.
-- [ ] Tester modification offline puis retour du réseau.
-- [ ] Tester déconnexion, effacement local et récupération des données cloud après reconnexion.
-- [ ] Ajouter export JSON daté + import/validation + restauration des données.
-- [ ] Vérifier les quotas gratuits et protéger le projet contre une activation involontaire de services payants.
+- [ ] Définir O32 occurrence d'activité et O36 décision de report, construits à partir d'O31.
+- [ ] Définir O09 playlist à partir d'O08 ; O23 connexion Google à partir d'O01/O25 ; O26 conflit Google à partir d'O31/O24.
+- [ ] Tester **M130** : occurrences récurrentes **bornées**, mercredi à 19 h en heure locale, jours spécifiques, fin de mois et fuseaux.
+- [ ] Tester **M131** : logique pure de regroupement **sans horaire puis horaire croissant**, sans séparation par type métier.
 
-**Critère de sortie :** activités O31, occurrences/completions O33, listes O34/O35 et décisions O36 récupérées sur un iPhone réinstallé, sans opération manuelle de sauvegarde à chaque modification.
+**Sortie S2 :** toutes les relations et occurrences sont déterministes, pas d'activité clonée au passage d'une date.
 
-### Phase 3 bis — Synchronisation bidirectionnelle Google Agenda (objectif G02)
+### S3 — États rattachés aux occurrences
 
-**Périmètre validé :** liaison volontaire au **Google Agenda principal** de l'utilisatrice ; Firebase Auth par e-mail reste inchangé. C'est une nouvelle fonctionnalité approuvée le 1er novembre 2026, **non encore implémentée**. Voir D11–D13, O23–O30, M103–M120 et C20–C26 dans [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Prérequis : S0–S2 validées.**
 
-- [ ] Vérifier la configuration gratuite de Google Calendar API, l'écran de consentement OAuth, les scopes minimaux et le fonctionnement durable des jetons (en mode Testing, des jetons peuvent expirer après 7 jours).
-- [ ] Ajouter « Connecter mon Google Agenda » et « Déconnecter », avec consentement explicite, état de connexion et gestion de révocation.
-- [ ] Mettre en place l'échange OAuth **côté Worker uniquement** : état anti-CSRF unique, vérification de l'identité Firebase, stockage chiffré des jetons, aucun secret dans GitHub Pages.
-- [ ] Synchroniser d'abord **lorsque la PWA est ouverte** : **événements horaires O31** vers Google et inversement, avec O24 (liaison stable), sans doublons ; ne pas exporter par défaut toutes les tâches ni toutes les habitudes locales.
-- [ ] Tester récurrences, exceptions, fuseaux horaires, événements annulés et conflits concurrents ; aucune suppression silencieuse au premier rapprochement.
-- [ ] Utiliser la synchronisation incrémentale `nextSyncToken`, pagination et reprise propre après invalidation `410 Gone`.
-- [ ] **Seconde étape différée** : ordonnanceur Cloudflare gratuit pour synchroniser même PWA fermée, sans garantir l'instantanéité ; ce compte n'a pas à être créé maintenant.
-- [ ] Vérifier l'absence de facture, la protection des données et le droit réel d'accéder durablement au calendrier avant de déclarer la phase terminée.
+- [ ] Définir O33 `ActivityCompletion` **par occurrence** : en attente, manuellement fait, automatiquement présumé, annulé.
+- [ ] Définir O06 rappel par `activityId + occurrenceKey` ; définir O30 rapport de synchronisation Google sans exposer de données privées.
+- [ ] Tester les règles pures de **M133** : une heure de fin l'emporte sur l'heure de début ; `autoComplete` peut être désactivé ; une annulation manuelle doit primer sur l'automatisme.
+- [ ] Vérifier que la validation du mercredi n'achève ni le mercredi suivant, ni toute une série.
 
-**Critère de sortie :** modifications dans les deux sens correctement rapprochées, erreurs et conflits visibles, sans perte ni doublons. Le fonctionnement PWA fermée exige le déploiement séparé de l'ordonnanceur.
+**Sortie S3 :** états et rappels se rattachent à une occurrence stable, sans erreur de récurrence.
 
+### S4 — Objets terminaux et rapports dérivés
 
-### Phase 4 — Rappels et notifications
+**Prérequis : S0–S3 validées.**
 
-- [ ] Concevoir les champs de rappel **liés à activityId + occurrenceKey** (date/heure, avance, répétition, zone horaire, statut).
-- [ ] Demander l'autorisation Web Push depuis la PWA installée.
-- [ ] Stocker et maintenir l'abonnement push de l'appareil de façon sécurisée.
-- [ ] Déployer un Cloudflare Worker + Cron Trigger sur l'offre gratuite et la gestion des secrets.
-- [ ] Interroger les rappels dus via un accès **serveur sécurisé** à la base ; ne jamais exposer de clé de service dans le navigateur.
-- [ ] Envoyer des notifications avec prévention des doublons et journaux d'échec minimaux.
-- [ ] Proposer un test de notification, choix du délai de rappel et désactivation.
-- [ ] Vérifier la livraison sur iPhone réel, écran verrouillé, mode Concentration, réseau absent, changement d'heure.
+- [ ] Définir O19 reçu de notification dépendant d'O06, et O38 bilan dérivé d'O31/O32/O33.
+- [ ] Préparer les règles pures de classement : activités **3 étoiles, puis 2, puis 1**, ordre chronologique à priorité égale, filtre étoile 1/2/3.
+- [ ] Distinguer dans les résultats **réalisation confirmée** et **validation seulement présumée** ; ne jamais faire de `MonthlyReview` une seconde source de vérité.
+- [ ] Repasser les **35 objets actifs** en revue et confirmer que les trois anciens O02–O04 sont exclus.
 
-**Critère de sortie :** rappels push satisfaisants en pratique ; limites et cas non garantis affichés clairement.
+**Sortie S4 :** modèle des données complet, contrats vérifiés, **aucun objet métier supplémentaire nécessaire** aux étapes suivantes sans nouvelle approbation.
 
-### Phase 5 — Bibliothèque musicale locale
+### S5 — Adapter les objets aux services et au téléphone
 
-- [ ] Définir stores IndexedDB pour fichiers audio, pochettes, métadonnées, playlists et favoris.
-- [ ] Import audio depuis l'iPhone et validations de taille/format ; messages d'erreur utiles.
-- [ ] Lecteur complet et barre de progression, playlists, favoris, recherche et tri.
-- [ ] Ajouter 2–3 morceaux de base autorisés à être redistribués.
-- [ ] Distinguer morceaux de base et fichiers importés par l'utilisatrice.
-- [ ] Gérer les pistes manquantes après réinstallation / restauration partielle.
-- [ ] Tests iOS de lecture en arrière-plan et de gestion de verrouillage.
+**Prérequis : S0–S4 validées.** Ici seulement arrivent les dépendances techniques externes.
 
-**Critère de sortie :** bibliothèque personnalisable utilisable hors ligne dans les limites iOS validées en phase 0.
+- [ ] Valider l'outil de compilation TypeScript et les fichiers **F06–F09/F14** ; préparer l'app shell, les icônes et le manifeste PWA pour Safari.
+- [ ] Ajouter **Firebase Auth** (M16–M20/M90) et **Firestore** (M21–M27/M89), le mode hors ligne Safari et les états O15 ; préparer **F39** et tester les **refus entre deux UID** (T05).
+- [ ] N'autoriser les écritures Firestore qu'après validation des règles d'accès, des collections O31–O36 et des champs réellement autorisés.
+- [ ] Préparer **IndexedDB F31** (M46), catalogue embarqué F32 (M50/M51), cache PWA et service worker F35 (M79/M80).
+- [ ] Premier prototype iPhone : installation Safari, fermeture/réouverture, **PC éteint**, réseau absent, limites de stockage ; tester tôt la lecture d'un fichier Suno sur écran verrouillé pour décider si la PWA reste adaptée, sans promettre la lecture ininterrompue.
+- [ ] Vérifier **0 €**, GitHub Pages `Pecose`, Firebase Spark et absence de secrets dans le dépôt.
 
-### Phase 6 — Images et décoration saisonnière
+**Sortie S5 :** des **adaptateurs sûrs et testés** existent pour stocker/lire les objets ; aucun CRUD métier ou écran final ne dépend de stubs trompeurs.
 
-- [ ] Bibliothèque d'images locales, import Photos/Fichiers, classement et suppression.
-- [ ] Ajouter 2–3 fonds de base ; fonds printemps/été/automne/hiver.
-- [ ] Choix manuel du thème et changement automatique selon les saisons.
-- [ ] Paramètres de couleur, widgets/ornements et disposition dans l'application.
-- [ ] Compression, aperçu, recadrage simple à l'import.
-- [ ] Petit éditeur de composition et ajout de texte (amélioration progressive).
+### S6 — Fonctions élémentaires sur **un seul objet à la fois**
 
-**Critère de sortie :** personnalisation libre sans intervention du développeur.
+**Prérequis : S5 et types S0–S4 validés.** Sous-ordre : **dépôt sécurisé → CRUD central → opérations spécialisées**.
 
-### Phase 7 — Export multimédia, mises à jour et robustesse
+- [ ] Activités : **M121–M126/M138–M142/M157**. Créer, lire, modifier, supprimer, classer, dater, répéter, étoiler, changer icône et associer une liste **sans changer l'ID**.
+- [ ] Listes : **M143–M146/M159–M160**. Définir une liste et ses articles, cases cochables, accès par ID, détachement sans effacer l'activité, pas de validation automatique du parent.
+- [ ] Réalisations : **M132/M134/M155/M158**. Créer/annuler une coche pour une seule occurrence ; persister le refus de recochage automatique. L'automatisation complète attend S8.
+- [ ] Préparer l'accès aux rappels **M41–M44** avec activité/occurrence comme propriétaires ; l'envoi réel attend S9.
+- [ ] **Branche indépendante médias** (si la branche est activée dès maintenant) : M47–M57, M64–M65 et M95 pour blobs, métadonnées, imports et listes ; tests IndexedDB, aucune image/MP3 personnelle stockée dans Firestore.
+- [ ] Tester CRUD offline et retour du réseau, sauvegarde par UID, absence de doublon et présence des mêmes relations après reconnexion (T02/T03/T05/T18).
 
-- [ ] Exporter/importer une archive de bibliothèque (images, fichiers audio, métadonnées) via Fichiers/iCloud Drive.
-- [ ] Documenter la procédure de changement d'iPhone en deux volets : **sync cloud des données** et **archive des médias**.
-- [ ] Vérifier l'import de bibliothèques volumineuses en tenant compte des limites mémoire/stockage d'iOS.
-- [ ] Versionner les données locales et écrire les migrations IndexedDB.
-- [ ] Détecter les nouvelles versions publiées sur GitHub Pages et proposer le rafraîchissement.
-- [ ] Vérifier que les mises à jour conservent toutes les données et ajoutent les médias par défaut sans doublon.
-- [ ] Tester offline/online, faible stockage, erreurs Firebase, déconnexion et réinstallation.
+**Sortie S6 :** chaque objet peut être manipulé correctement sans dépendre d'un écran complexe.
 
-**Critère de sortie :** application sûre à mettre à jour et données récupérables sur un nouveau téléphone.
+### S7 — Assembler les objets dans les **cinq vues**
 
-### Phase 8 — Livraison et entretien
+**Prérequis : S6 validée.** Les écrans lisent les services déjà testés, pas l'inverse.
 
-- [ ] Finaliser README, guide d'installation iPhone, politique de sauvegarde et limites des notifications.
-- [ ] Vérifier les droits de redistribution des musiques Suno et images intégrées à un dépôt public.
-- [ ] Vérifier qu'aucune donnée privée ou aucun secret ne figure dans le dépôt et dans GitHub Pages.
-- [ ] Publier une première version stable ; noter les retours de l'utilisatrice.
-- [ ] Suivre les quotas et les modifications des conditions gratuites GitHub/Firebase/Cloudflare.
-- [ ] Prévoir une procédure simple de retour à la version antérieure de l'interface sans perdre les données.
+- [ ] Router/état/UI F15/F16/F19/F20/F53 (M02–M15, M148–M153) : **Calendrier | Tâches | Jour | Habitudes | Listes**, avec Jour central et sélectionné au premier lancement.
+- [ ] **Jour** (M129/M131/M149) : date choisie O37, **sans horaire d'abord**, horaires croissants ensuite ; **aucun** troisième groupe « À planifier ».
+- [ ] **Calendrier** (M127/M128/M150/M156) : **lundi–samedi** visibles, **dimanche dépliable**, libellés ou compteurs ; toucher un jour affiche Jour à cette date ; raccourci Aujourd'hui.
+- [ ] **Tâches / Habitudes / Listes** (M07/M125/M126/M143/M151/M152) : trois filtres/vues des données déjà stockées, **pas trois stockages**.
+- [ ] En-tête, icônes personnalisées **à gauche** ouvrant la fiche complète, boutons de validation **à droite**, formulaire détaillé sans surcharge, navigation accessible à une main, styles arrondis et couleurs apaisantes (G10/G14).
+- [ ] **Branche médias/visuels indépendante :** écran Musique M08/M58–M63/M92–M94/M99 et écran Décoration M09/M66–M69/M96–M98, accessibles **hors** de la barre de cinq onglets.
+- [ ] Tester sur iPhone tactile/lecteur d'écran, sélection de dates et occurrences récurrentes (T08/T15/T18/T20).
 
-**Critère de sortie :** application installée, documentée, accessible et maintenable à 0 € tant que les quotas gratuits sont respectés.
+**Sortie S7 :** les **cinq pages sont navigables**, Jour affiche exactement les données du jour et reste minimaliste.
+
+### S8 — Fonctions qui combinent plusieurs objets / historiques
+
+**Prérequis : S7 validée.** Dérouler les sous-fonctions dans l'ordre, afin de ne pas introduire de cycle.
+
+- [ ] **Autovalidation** : M133 (décision) → M158 (écriture `auto_assumed`) → M154 (réconciliation au retour de l'app). Proposer l'option **activée** à l'ajout d'une heure ; désactivable ; fin avant début ; correction M134 persistante.
+- [ ] **Tâches oubliées** : M135 (candidates datées d'hier, sans heure et sans récurrence) → M136 (panneau groupé) → M137 (choix `move/keep/later`) ; conserver l'ID, ne pas répéter les fenêtres à chaque rechargement.
+- [ ] **Bilan mensuel** M147 : O38 calculé à partir de O31/O32/O33 ; 3→2→1 étoiles puis chronologie ; filtres et distinction entre validation présumée/confirmée.
+- [ ] Terminer **musique, thèmes, archivage local** indépendamment des rappels et Google si la branche est prête ; valider fichiers par défaut redistribuables et import des médias personnalisés.
+- [ ] Tests intégrés T16–T20 : récurrence horaire, réversibilité d'une coche, refus de report, liste liée, bilan mensuel, changement de date et navigation.
+
+**Sortie S8 :** toute l'expérience quotidienne est utilisable **sans Google Calendar ni Cloudflare**, en local puis avec Firebase.
+
+### S9 — Branches externes dépendantes du noyau
+
+**Prérequis communs : S5 (sécurité), S6 (CRUD) et S8 (règles métier)**. Ces deux branches peuvent être développées **en parallèle** entre elles, mais chacune a son propre jalon.
+
+**S9A — Google Agenda bidirectionnel (G02)**
+- [ ] Valider API Google Calendar, **consentement OAuth distinct de Firebase Auth**, scopes limités et conditions de jeton durable. Compte Google de l'utilisatrice connecté volontairement.
+- [ ] Mettre en œuvre **M103–M120** : flux OAuth serveur, `state` unique, grant O27 chiffré, curseur O25, liaison O24, conflits O26, reprise `410 Gone`, identifiants stables et suppression contrôlée.
+- [ ] **O31 horaire ↔ Google Agenda** en deux sens, sans exporter systématiquement les tâches non horaires ni toutes les habitudes ; exceptions et fuseaux testés.
+- [ ] Fonctionnement PWA ouverte d'abord ; puis, uniquement si le Worker gratuit est configuré et validé, **synchronisation distante périodique** quand elle est fermée. Pas de promesse de temps réel.
+- [ ] Tests **T10–T14**, sécurité des jetons et absence de doublons/conflits silencieux.
+
+**S9B — Notifications Web Push et rappels (G05)**
+- [ ] Configurer plus tard Cloudflare Workers/Cron **gratuit** et ses secrets pour F37/F38, en réutilisant les protections prévues, **aucun compte requis avant cette strate**.
+- [ ] Implémenter **M75–M78/M81/M84–M88/M100** : consentement de la PWA installée, abonnement O14, rappels O06, reçus O19, préventions de doublon, envois de test et renouvellement.
+- [ ] Tester iPhone fermé/verrouillé, réseau absent, modes Concentration, décalage possible, fuseau et répétitions (T07). **Push ≠ alarme système hors ligne**.
+
+**Sortie S9 :** chaque intégration distante n'est validée qu'après ses propres tests et garde-fous ; aucun coût activé sans nouveau consentement explicite.
+
+### S10 — Restauration, versionnement et recette finale
+
+**Prérequis : S8 validée et branches S9 livrées ou explicitement différées.**
+
+- [ ] Export JSON **M70–M72** des données synchronisées ; tester schémas, fusion/restauration et confirmation avant écrasement (T04).
+- [ ] Export/import multimédia **M73–M74** vers Fichiers/iCloud Drive ; tester de gros fichiers et cas où les MP3/images ne sont plus sur l'iPhone.
+- [ ] **M82–M83** : version GitHub Pages/PWA, mise à jour sans effacer IndexedDB ni Firestore, catalogue de base versionné et non dupliqué.
+- [ ] Refaire tous les scénarios de la **matrice de recette §8**, du PC Windows éteint jusqu'au changement d'iPhone ; tester offline → online, notifications, musique verrouillée et permissions.
+- [ ] Vérifier sécurité par UID, secrets non publiés, consentement Google, règles Firestore, quotas Spark/Cloudflare, **coût 0 €**.
+- [ ] Documenter installation Safari, sauvegarde média, changement d'iPhone et limites iOS. Cocher un objectif G01–G14 **seulement** avec preuve de tests, liens/commits et date.
+
+**Sortie S10 :** application livrable, données restaurables, limites connues ; aucune fonctionnalité déclarée terminée sans son test final.
+
+### Politique d'avancement pour les agents
+
+1. **Commencer par la première strate incomplète** dans la branche concernée, sans sauter directement à une interface ou une intégration qui dépend d'objets absents.
+2. Vérifier les **références du registre et les dépendances** de chaque sous-opération. En cas de contrat manquant/contradictoire : **STOP, proposer l'architecture, demander l'accord de l'utilisateur**, puis documenter/committer **avant** le code.
+3. **Ne pas imposer de dépendance artificielle** : après S5, la branche médias peut avancer sans Google Agenda ; les intégrations Google et Push sont indépendantes entre elles.
+4. Noter pour chaque strate : **état, prérequis validés, tests exécutés, problèmes restants et preuve de livraison**. Ne pas confondre **types définis**, **services opérationnels**, **interfaces affichées** et **fonctionnalité effectivement testée sur l'iPhone**.
+
 
 ## 8. Matrice de tests de recette
 
@@ -411,12 +445,12 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 **Important :** le « 0 € » est une **contrainte de conception**, pas une garantie contractuelle à perpétuité. Si une plateforme modifie ses tarifs ou retire une fonction gratuite, on cherchera une alternative gratuite avant toute dépense.
 
-## 10. Ordre réel de priorité
+## 10. Ordre de démarrage et discipline des dépendances
 
-1. **Tester sur l'iPhone** l'installation PWA, la musique écran verrouillé et une notification fermée.
-2. **Construire le quotidien** : cinq onglets, Jour à deux groupes, objet unique O31, calendrier, habitudes, liste libre, report et bilans (G02/G03/G10–G14).
-3. **Sécuriser les données** : offline, Firestore et restauration, puis Google Agenda bidirectionnel (G02/G04).
-4. **Personnaliser** : galerie, thèmes saisonniers et bibliothèque Suno locale.
-5. **Fiabiliser** : export multimédia, sauvegarde indépendante, mises à jour et scénarios de changement de téléphone.
+**Priorité absolue : S0**, puis **S1, S2, S3 et S4** pour construire et tester le graphe complet des **35 objets actifs**. **Aucun travail de code n'a commencé à ce jour.** Après validation des contrats : **S5** (persistence/auth/PWA), **S6** (CRUD), **S7** (les cinq onglets), **S8** (autovalidation, reports, bilans), **S9A/S9B** (Google Agenda et notifications), **S10** (sauvegardes et recette). La branche médias peut débuter à S6 en parallèle du cœur quotidien.
 
-> **Décisions restant à préciser :** nom final, nuances exactes de la palette douce, règles d'affichage des listes très longues et des tâches d'une date passée autre qu'hier, expérience utilisateur des rappels et limites de lecture audio iOS. Ces choix n'empêchent pas la roadmap ni la construction du noyau approuvé.
+**La progression est conditionnelle**, pas calendaire : si une dépendance manque ou si un test échoue, la strate suivante attend. Une difficulté de faisabilité iPhone (musique verrouillée ou Web Push) peut être testée tôt en prototype sans prétendre que les services métier aval sont développés.
+
+**Fonctionnement humain :** le tableau de bord G01–G14 en tête de roadmap indique la valeur attendue, mais **la section 7 dicte l'ordre concret de fabrication**. `docs/ARCHITECTURE.md` reste l'unique source pour les signatures et les dépendances exactes, et `AGENTS.md` impose l'autorisation explicite avant tout ajout hors architecture.
+
+> **Choix encore à arbitrer** : nom final de l'application, palette exacte, détail de la présentation des listes longues et des reports plus anciens qu'hier, tolérance aux limites de la musique/verrouillage et des notifications PWA. Aucune décision non prise ne doit être présentée comme implémentée.
