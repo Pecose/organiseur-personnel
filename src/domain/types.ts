@@ -1,0 +1,182 @@
+/**
+ * F17 · Types contractuels.
+ * S0 uniquement : objets autonomes O01/O05/O07/O10/O13/O15/O16/
+ * O17/O18/O20/O22/O24/O29/O34/O37 et types techniques déjà inscrits.
+ * Aucun accès au réseau, au système de fichiers ou à Firebase.
+ */
+
+export type LocalDate = string; // YYYY-MM-DD, fuseau civil explicite dans le contrat appelant.
+export type ISOInstant = string; // ISO 8601 en UTC, ex. 2026-11-02T08:00:00.000Z.
+export type Season = "spring" | "summer" | "autumn" | "winter";
+
+export interface AppError {
+  code: string;
+  message: string;
+}
+export type Result<T, E = AppError> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: E };
+
+export interface DateRange {
+  /** Borne inclusive, ISO 8601 UTC. */
+  from: ISOInstant;
+  /** Borne exclusive, ISO 8601 UTC. */
+  to: ISOInstant;
+}
+export interface Occurrence {
+  /** Clé stable : l'instant UTC d'origine de cette occurrence. */
+  key: string;
+  startsAt: ISOInstant;
+}
+
+/** O01 */
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+}
+
+/** O05 — règles ; l'expansion à heure locale est de la responsabilité de M130/S2. */
+export interface RecurrenceRule {
+  frequency: "daily" | "weekly" | "monthly" | "yearly";
+  /** Intervalle strictement positif (1 = chaque période). */
+  interval: number;
+  /** Fin incluse de la série, date civile ou instant ISO. */
+  until?: string;
+  /** Nombre maximal d'occurrences dans la série depuis son origine. */
+  count?: number;
+  /** Jours ISO : lundi=1, ..., dimanche=7. Significatif en fréquence weekly. */
+  weekdays?: readonly (1 | 2 | 3 | 4 | 5 | 6 | 7)[];
+}
+
+/** O07 */
+export interface ProfilePreferences {
+  themeId: string;
+  backgroundImageId?: string;
+  autoSeason: boolean;
+  locale: string;
+  timeZone: string;
+  notificationEnabled: boolean;
+  updatedAt: ISOInstant;
+}
+
+/** O10 — local IndexedDB uniquement, ne pas écrire le Blob dans Firestore. */
+export interface LocalMediaBlob {
+  id: string;
+  kind: "audio" | "image";
+  blob: Blob;
+  mimeType: string;
+  byteSize: number;
+  checksum: string;
+  importedAt: ISOInstant;
+}
+
+/** O13 — catalogue statique versionné et publiquement redistribuable. */
+export interface CatalogEntry {
+  id: string;
+  revision: string;
+  kind: "audio" | "image";
+  url: string;
+  title: string;
+  checksum: string;
+  redistributionAllowed: boolean;
+}
+
+/** O15 */
+export interface SyncStatus {
+  state: "local" | "pending" | "synced" | "error";
+  pendingCount: number;
+  lastServerAckAt?: ISOInstant;
+  message?: string;
+}
+
+/** O16 — le contenu est inconnu avant validation (M71, S10). */
+export interface BackupEnvelope {
+  schemaVersion: number;
+  exportedAt: ISOInstant;
+  dataType: string;
+  ownerUid?: string;
+  records: unknown[];
+  checksums?: readonly string[];
+}
+
+/** O17 */
+export interface AppVersion {
+  version: string;
+  cacheRevision: string;
+  catalogRevision: string;
+  releasedAt: ISOInstant;
+}
+
+/** O18 */
+export interface PlaybackState {
+  trackId?: string;
+  queueIds: string[];
+  position: number;
+  paused: boolean;
+  repeatMode: "normal" | "repeat-one" | "repeat-all";
+  shuffle: boolean;
+}
+
+/** O20 — les cinq premiers noms sont les onglets principaux, dans l'ordre D14. */
+export interface UiRoute {
+  name:
+    | "calendar"
+    | "tasks"
+    | "day"
+    | "habits"
+    | "lists"
+    | "music"
+    | "decor"
+    | "settings"
+    | "signin"
+    | "monthlyReview";
+  params?: Readonly<Record<string, string>>;
+}
+
+/** O22 */
+export interface NotificationTestResult {
+  supported: boolean;
+  permitted: boolean;
+  subscribed: boolean;
+  sent?: boolean;
+  message?: string;
+}
+
+/** O24 — liaison serveur/app entre O31 et Google, sans secret OAuth. */
+export interface GoogleEventLink {
+  calendarId: string;
+  googleEventId: string;
+  etag?: string;
+  remoteUpdatedAt?: ISOInstant;
+  pending: "none" | "upsert" | "delete";
+  source: "app" | "google";
+}
+
+/** O29 — données Google externes non validées (traitement prévu en S9). */
+export interface GoogleCalendarChange {
+  calendarId: string;
+  eventId: string;
+  etag?: string;
+  status: "confirmed" | "cancelled";
+  updatedAt: ISOInstant;
+  start?: unknown;
+  end?: unknown;
+  recurrence?: unknown;
+  payload: unknown;
+}
+
+/** O34 — la liste est autonome ; ses articles O35 sont construits en S1. */
+export interface Checklist {
+  id: string;
+  name: string;
+  iconId?: string;
+  archived?: boolean;
+  updatedAt: ISOInstant;
+}
+
+/** O37 — état mémoire de navigation, pas un document Firestore. */
+export interface DaySelection {
+  selectedDate: LocalDate;
+  today: LocalDate;
+  source: "startup" | "calendar" | "navigation";
+}
