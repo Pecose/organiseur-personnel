@@ -362,3 +362,40 @@ export interface ActivityCompletion {
   overriddenAt?: ISOInstant;
   updatedAt: ISOInstant;
 }
+
+/** S4 · Objets terminaux, dérivés des contrats S0–S3. */
+
+/**
+ * O19 · Reçu d'une tentative de rappel. L'anti-doublon effectif et l'envoi
+ * seront gérés côté Worker (S9B). Aucun jeton, adresse ni secret ici.
+ */
+export interface DispatchReceipt {
+  reminderId: string;
+  occurrenceKey: string;
+  attemptedAt: ISOInstant;
+  outcome: string;
+  retryAfter?: ISOInstant;
+}
+
+/**
+ * Type technique F17, déjà nommé dans l'architecture.
+ * Réutilise exclusivement les champs approuvés O31/O32/O33 :
+ * une réalisation par occurrence, confirmée manuellement ou présumée.
+ * Aucune duplication de l'activité en base de données.
+ */
+export type MonthlyAchievement = ActivityOccurrenceView & {
+  completion: ActivityCompletion & { status: "manual_done" | "auto_assumed" };
+};
+
+/**
+ * O38 · Projection calculée du bilan mensuel, jamais une collection Firestore.
+ * Le calcul M147 sera branché sur la persistance O31/O32/O33 en S8.
+ * Tri prévu : étoiles 3→2→1 (sans étoile en dernier), puis date croissante ;
+ * les auto_assumed restent reconnaissables et distincts des manual_done.
+ */
+export interface MonthlyReview {
+  month: string; // YYYY-MM
+  starFilter?: 1 | 2 | 3;
+  entries: MonthlyAchievement[];
+  assumedCount: number;
+}
