@@ -322,7 +322,7 @@ export interface CarryOverDecision {
  promptedAt: ISOInstant; decidedAt?: ISOInstant; updatedAt: ISOInstant;
 }
 /** Types de présentation F17, non persistés. */
-export interface ActivityOccurrenceView { activity: Activity; occurrence: ActivityOccurrence; }
+export interface ActivityOccurrenceView { activity: Activity; occurrence: ActivityOccurrence; completion?: ActivityCompletion; }
 export interface DayGroups { withoutTime: ActivityOccurrenceView[]; withTime: ActivityOccurrenceView[]; }
 
 /** S3 · États dépendant des objets O31/O32, sans effet de bord. */
