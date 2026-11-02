@@ -1,0 +1,231 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // F39 / S5 : seul l'utilisateur Firebase authentifié peut accéder
+    // à ses métadonnées. Aucune donnée privée ne doit être rendue publique.
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function hasOnly(data, keys) {
+      return data.keys().hasOnly(keys);
+    }
+
+    function required(data, keys) {
+      return data.keys().hasAll(keys);
+    }
+
+    function validActivity(data, uid, id) {
+      return required(data, ['id', 'uid', 'title', 'timeZone', 'autoComplete', 'updatedAt'])
+        && hasOnly(data, [
+          'id', 'uid', 'title', 'description', 'iconId', 'imageId', 'stars',
+          'plannedOn', 'startAt', 'endAt', 'timeZone', 'recurrence',
+          'autoComplete', 'checklistId', 'deletedAt', 'updatedAt', 'googleLink'
+        ])
+        && data.id == id && data.uid == uid
+        && data.title is string && data.title.size() > 0
+        && data.title.size() <= 500
+        && data.timeZone is string && data.timeZone.size() > 0
+        && data.autoComplete is bool
+        && data.updatedAt is string
+        && (data.get('stars', 0) in [0, 1, 2, 3])
+        && (data.get('recurrence', null) == null || data.recurrence is map)
+        && (data.get('googleLink', null) == null || data.googleLink is map);
+    }
+
+    function validCompletion(data, id) {
+      return required(data, ['id', 'activityId', 'occurrenceKey', 'status', 'updatedAt'])
+        && hasOnly(data, [
+          'id', 'activityId', 'occurrenceKey', 'status',
+          'completedAt', 'overriddenAt', 'updatedAt'
+        ])
+        && data.id == id
+        && data.activityId is string && data.activityId.size() > 0
+        && data.occurrenceKey is string && data.occurrenceKey.size() > 0
+        && data.status in [
+          'pending', 'manual_done', 'auto_assumed', 'manually_undone'
+        ]
+        && data.updatedAt is string;
+    }
+
+    function validChecklist(data, id) {
+      return required(data, ['id', 'name', 'updatedAt'])
+        && hasOnly(data, ['id', 'name', 'iconId', 'archived', 'updatedAt'])
+        && data.id == id
+        && data.name is string && data.name.size() > 0
+        && data.updatedAt is string;
+    }
+
+    function validChecklistItem(data, id) {
+      return required(data, ['id', 'checklistId', 'text', 'checked', 'position', 'updatedAt'])
+        && hasOnly(data, ['id', 'checklistId', 'text', 'checked', 'position', 'updatedAt'])
+        && data.id == id
+        && data.checklistId is string && data.checklistId.size() > 0
+        && data.text is string
+        && data.checked is bool
+        && data.position is number
+        && data.updatedAt is string;
+    }
+
+    function validCarryOver(data, id) {
+      return required(data, ['id', 'activityId', 'fromDate', 'toDate',
+                             'decision', 'promptedAt', 'updatedAt'])
+        && hasOnly(data, ['id', 'activityId', 'fromDate', 'toDate',
+                          'decision', 'promptedAt', 'decidedAt', 'updatedAt'])
+        && data.id == id
+        && data.activityId is string
+        && data.decision in ['move', 'keep', 'later']
+        && data.fromDate is string && data.toDate is string
+        && data.promptedAt is string && data.updatedAt is string;
+    }
+
+    function validReminder(data, id) {
+      return required(data, ['id', 'activityId', 'occurrenceKey', 'scheduledFor',
+                             'leadMinutes', 'timeZone', 'enabled', 'dispatchStatus'])
+        && hasOnly(data, ['id', 'activityId', 'occurrenceKey', 'scheduledFor',
+                          'leadMinutes', 'timeZone', 'enabled', 'dispatchStatus'])
+        && data.id == id
+        && data.activityId is string && data.occurrenceKey is string
+        && data.scheduledFor is string && data.timeZone is string
+        && data.enabled is bool && data.leadMinutes is int
+        && data.leadMinutes >= 0 && data.dispatchStatus is string;
+    }
+
+    match /users/{uid}/activities/{id} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && validActivity(request.resource.data, uid, id);
+      allow update: if owner(uid) && validActivity(request.resource.data, uid, id)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.id == resource.data.id;
+      // Suppression logique O31 (deletedAt) : éviter les effacements directs.
+      allow delete: if false;
+    }
+
+    match /users/{uid}/activityCompletions/{id} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && validCompletion(request.resource.data, id);
+      allow update: if owner(uid) && validCompletion(request.resource.data, id)
+        && request.resource.data.activityId == resource.data.activityId
+        && request.resource.data.occurrenceKey == resource.data.occurrenceKey;
+      // Conserver le veto manually_undone et l'historique d'une occurrence.
+      allow delete: if false;
+    }
+
+    match /users/{uid}/checklists/{id} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid) && validChecklist(request.resource.data, id);
+      allow delete: if owner(uid);
+    }
+
+    match /users/{uid}/checklistItems/{id} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid) && validChecklistItem(request.resource.data, id);
+      allow delete: if owner(uid);
+    }
+
+    match /users/{uid}/carryOverDecisions/{id} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid) && validCarryOver(request.resource.data, id);
+      allow delete: if false;
+    }
+
+    match /users/{uid}/reminders/{id} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid) && validReminder(request.resource.data, id);
+      allow delete: if owner(uid);
+    }
+
+    match /users/{uid}/playlists/{id} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid)
+        && required(request.resource.data, ['id', 'name', 'trackIds', 'updatedAt'])
+        && hasOnly(request.resource.data, ['id', 'name', 'trackIds', 'updatedAt'])
+        && request.resource.data.id == id
+        && request.resource.data.name is string
+        && request.resource.data.trackIds is list
+        && request.resource.data.updatedAt is string;
+      allow delete: if owner(uid);
+    }
+
+    match /users/{uid}/tracks/{id} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid)
+        && required(request.resource.data,
+          ['id', 'title', 'source', 'favorite', 'updatedAt'])
+        && hasOnly(request.resource.data, [
+          'id', 'title', 'artist', 'album', 'source', 'catalogId',
+          'mediaId', 'artworkId', 'duration', 'favorite', 'updatedAt'
+        ])
+        && request.resource.data.id == id
+        && request.resource.data.title is string
+        && request.resource.data.source in ['bundled', 'imported']
+        && request.resource.data.favorite is bool
+        && request.resource.data.updatedAt is string;
+      allow delete: if owner(uid);
+    }
+
+    match /users/{uid}/preferences/{id} {
+      allow get, list: if owner(uid) && id == 'profile';
+      allow create, update: if owner(uid) && id == 'profile'
+        && required(request.resource.data,
+          ['themeId', 'autoSeason', 'locale', 'timeZone',
+           'notificationEnabled', 'updatedAt'])
+        && hasOnly(request.resource.data, [
+          'themeId', 'backgroundImageId', 'autoSeason', 'locale',
+          'timeZone', 'notificationEnabled', 'updatedAt'
+        ])
+        && request.resource.data.themeId is string
+        && request.resource.data.autoSeason is bool
+        && request.resource.data.locale is string
+        && request.resource.data.timeZone is string
+        && request.resource.data.notificationEnabled is bool
+        && request.resource.data.updatedAt is string;
+      allow delete: if false;
+    }
+
+    match /users/{uid}/pushSubscriptions/{id} {
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid)
+        && required(request.resource.data,
+          ['id', 'endpoint', 'p256dh', 'auth', 'updatedAt'])
+        && hasOnly(request.resource.data, [
+          'id', 'endpoint', 'p256dh', 'auth',
+          'deviceLabel', 'expiresAt', 'updatedAt'
+        ])
+        && request.resource.data.id == id
+        && request.resource.data.endpoint is string
+        && request.resource.data.p256dh is string
+        && request.resource.data.auth is string
+        && request.resource.data.updatedAt is string;
+      allow delete: if owner(uid);
+    }
+
+    // Informations Google contrôlées exclusivement par le Worker sécurisé.
+    match /users/{uid}/googleCalendarConnection/{id} {
+      allow get: if owner(uid) && id == 'status';
+      allow list, create, update, delete: if false;
+    }
+    match /users/{uid}/googleCalendarConflicts/{id} {
+      allow get, list: if owner(uid);
+      allow create, update, delete: if false;
+    }
+    match /users/{uid}/googleCalendarSync/{id} {
+      allow read, write: if false;
+    }
+    match /users/{uid}/googleOAuthGrant/{id} {
+      allow read, write: if false;
+    }
+    match /users/{uid}/dispatchReceipts/{id} {
+      allow read, write: if false;
+    }
+    match /serverOAuthStates/{id} {
+      allow read, write: if false;
+    }
+
+    // Toute collection non explicitement connue reste inaccessible.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
