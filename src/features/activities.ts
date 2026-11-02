@@ -1,5 +1,5 @@
 /** F48 · S1 : classification et validation pures du seul objet métier Activity. */
-import type { Activity, Result } from "../domain/types";
+import type { Activity, ActivityOccurrenceView, Result } from "../domain/types";
 
 /** M124 : les vues se recoupent ; une habitude horaire est aussi un événement. */
 export function classifyActivity(activity: Activity): ("task" | "habit" | "event")[] {
@@ -98,4 +98,39 @@ export function validateActivity(input: unknown): Result<Activity> {
     }
   }
   return { ok: true, value: input as Activity };
+}
+
+/**
+ * M133 (S3) · Prédicat pur de validation automatique.
+ * Chaque décision concerne une occurrence, pas toute la série récurrente.
+ * Une coche manuelle, une présomption déjà inscrite ou une annulation explicite
+ * sont prioritaires sur l'heure passée. Le statut "pending" reste éligible.
+ *
+ * La persistance et le traitement au retour de l'application seront assurés
+ * ultérieurement par M158/M154, sans minuteur Web ni appel serveur ici.
+ */
+export function shouldAutoComplete(occ: ActivityOccurrenceView, now: string): boolean {
+  if (!occ.activity.autoComplete || occ.activity.id !== occ.occurrence.activityId) {
+    return false;
+  }
+  if (occ.completion) {
+    // Ne jamais utiliser la validation d'un autre mercredi ou d'une autre activité.
+    if (occ.completion.activityId !== occ.occurrence.activityId
+        || occ.completion.occurrenceKey !== occ.occurrence.occurrenceKey) {
+      return false;
+    }
+    // "manually_undone" interdit tout recochage, "manual_done" et
+    // "auto_assumed" signifient qu'il n'y a rien à refaire.
+    if (occ.completion.status !== "pending") return false;
+  }
+
+  // Une date seule ne représente pas un créneau horaire.
+  // La fin prime toujours si elle existe.
+  const scheduledAt = occ.occurrence.endsAt ?? occ.occurrence.startsAt;
+  if (scheduledAt === undefined) return false;
+
+  const deadlineMs = Date.parse(scheduledAt);
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(deadlineMs) || !Number.isFinite(nowMs)) return false;
+  return nowMs >= deadlineMs;
 }
