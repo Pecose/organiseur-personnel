@@ -324,3 +324,41 @@ export interface CarryOverDecision {
 /** Types de présentation F17, non persistés. */
 export interface ActivityOccurrenceView { activity: Activity; occurrence: ActivityOccurrence; }
 export interface DayGroups { withoutTime: ActivityOccurrenceView[]; withTime: ActivityOccurrenceView[]; }
+
+/** S3 · États dépendant des objets O31/O32, sans effet de bord. */
+
+/** O06 · Rappel pour une occurrence précise. L'envoi Web Push reste en S9B. */
+export interface Reminder {
+  id: string;
+  activityId: string;
+  occurrenceKey: string;
+  scheduledFor: ISOInstant;
+  leadMinutes: number;
+  timeZone: string;
+  enabled: boolean;
+  dispatchStatus: string;
+}
+
+/** O30 · Bilan technique minimisé d'une synchronisation Google, sans jetons. */
+export interface CalendarSyncRun {
+  uid: string;
+  calendarId: string;
+  startedAt: ISOInstant;
+  finishedAt?: ISOInstant;
+  pulled: number;
+  pushed: number;
+  conflicts: number;
+  status: "ok" | "partial" | "error";
+  details?: string;
+}
+
+/** O33 · La coche est propre à une occurrence. Un refus manuel persiste. */
+export interface ActivityCompletion {
+  id: string;
+  activityId: string;
+  occurrenceKey: string;
+  status: "pending" | "manual_done" | "auto_assumed" | "manually_undone";
+  completedAt?: ISOInstant;
+  overriddenAt?: ISOInstant;
+  updatedAt: ISOInstant;
+}
