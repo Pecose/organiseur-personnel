@@ -96,4 +96,25 @@ const decision: CarryOverDecision = {
 if (!playlist.trackIds.length || google.calendarId !== "primary" || conflict.status !== "open" || decision.decision !== "later") {
   throw new Error("S2/O09/O23/O26/O36 : contrats composites incorrects.");
 }
+
+/** Gestion explicite d'une heure ambiguë et d'une heure inexistante (DST). */
+const fall: Activity = {
+  ...baseline, id: "fall", timeZone: "America/New_York",
+  startAt: "2026-10-25T05:30:00.000Z",
+  recurrence: { frequency: "weekly", interval: 1, weekdays: [7] },
+};
+const fallHours = expandActivityOccurrences(fall, {
+  from: "2026-10-25T00:00:00Z", to: "2026-11-10T00:00:00Z",
+});
+if (fallHours.length !== 3 || fallHours[1].startsAt !== "2026-11-01T05:30:00.000Z") {
+  throw new Error("M130 : heure répétée à l'automne, première occurrence attendue.");
+}
+const spring: Activity = { ...fall, id: "spring", startAt: "2026-03-01T07:30:00.000Z" };
+const springHours = expandActivityOccurrences(spring, {
+  from: "2026-03-01T00:00:00Z", to: "2026-03-17T00:00:00Z",
+});
+if (springHours.length !== 2 || springHours.some(x => x.localDate === "2026-03-08")) {
+  throw new Error("M130 : heure locale inexistante au printemps non filtrée.");
+}
+
 console.log("S2 : 5 objets + M130/M131, récurrences locales et groupes Jour vérifiés.");
