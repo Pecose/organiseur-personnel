@@ -180,3 +180,121 @@ export interface DaySelection {
   today: LocalDate;
   source: "startup" | "calendar" | "navigation";
 }
+
+/** S1 · Objets composés uniquement d'éléments S0 (O08/O11/O12/O14/O21/O25/O27/O28/O31/O35). */
+
+/** O08 : seuls les champs descriptifs et les références sont synchronisables. */
+export interface TrackMetadata {
+  id: string;
+  title: string;
+  artist?: string;
+  album?: string;
+  source: "bundled" | "imported";
+  catalogId?: string;
+  mediaId?: string;
+  artworkId?: string;
+  duration?: number;
+  favorite: boolean;
+  updatedAt: ISOInstant;
+}
+
+/** O11 : les blobs d'images personnelles restent dans IndexedDB (O10). */
+export interface ImageMetadata {
+  id: string;
+  name: string;
+  source: "bundled" | "imported";
+  catalogId?: string;
+  mediaId?: string;
+  tags: string[];
+  updatedAt: ISOInstant;
+}
+
+/** O12 : définition déclarative des couleurs, sans dépendance UI. */
+export interface ThemeDefinition {
+  id: string;
+  name: string;
+  season?: Season;
+  colors: Readonly<Record<string, string>>;
+  backgroundImageId?: string;
+}
+
+/** O14 : données d'abonnement sensibles, stockage cloud protégé. */
+export interface PushSubscriptionRecord {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  deviceLabel?: string;
+  expiresAt?: ISOInstant;
+  updatedAt: ISOInstant;
+}
+
+/** O21 : manifeste d'export, pas une copie des fichiers médias. */
+export interface MediaArchiveManifest {
+  schemaVersion: number;
+  createdAt: ISOInstant;
+  mediaEntries: unknown[];
+  metadata: unknown;
+  checksums: string[];
+}
+
+/** O25 : token de synchronisation Google, serveur uniquement. */
+export interface GoogleSyncCursor {
+  uid: string;
+  calendarId: string;
+  nextSyncToken?: string;
+  lastFullSyncAt?: ISOInstant;
+  lastIncrementalSyncAt?: ISOInstant;
+}
+
+/** O27 : grant chiffré, jamais envoyé à la PWA ni committé dans GitHub. */
+export interface EncryptedGoogleOAuthGrant {
+  uid: string;
+  calendarId: string;
+  ciphertext: string;
+  keyVersion: string;
+  scopes: string[];
+  issuedAt: ISOInstant;
+  revokedAt?: ISOInstant;
+}
+
+/** O28 : état OAuth à usage unique et durée limitée, serveur uniquement. */
+export interface GoogleOAuthState {
+  stateId: string;
+  uid: string;
+  nonce: string;
+  redirectPath: string;
+  expiresAt: ISOInstant;
+  consumedAt?: ISOInstant;
+}
+
+/** O31 : une seule identité métier pour tâche, événement et habitude. */
+export interface Activity {
+  id: string;
+  uid: string;
+  title: string;
+  description?: string;
+  iconId?: string;
+  imageId?: string;
+  stars?: 1 | 2 | 3;
+  plannedOn?: LocalDate;
+  startAt?: ISOInstant;
+  endAt?: ISOInstant;
+  timeZone: string;
+  recurrence?: RecurrenceRule;
+  autoComplete: boolean;
+  checklistId?: string;
+  deletedAt?: ISOInstant;
+  updatedAt: ISOInstant;
+  googleLink?: GoogleEventLink;
+}
+
+/** O35 : une coche dans la liste ne coche pas automatiquement l'activité. */
+export interface ChecklistItem {
+  id: string;
+  checklistId: string;
+  text: string;
+  checked: boolean;
+  position: number;
+  updatedAt: ISOInstant;
+}
