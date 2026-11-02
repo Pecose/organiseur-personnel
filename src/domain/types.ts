@@ -1,3 +1,7 @@
+import type { FirebaseApp, FirebaseOptions } from "firebase/app";
+import type { Auth } from "firebase/auth";
+import type { Firestore, CollectionReference, DocumentData } from "firebase/firestore";
+
 /**
  * F17 · Types contractuels.
  * S0 uniquement : objets autonomes O01/O05/O07/O10/O13/O15/O16/
@@ -401,3 +405,30 @@ export interface MonthlyReview {
   entries: MonthlyAchievement[];
   assumedCount: number;
 }
+
+/**
+ * F17 / S5 : types techniques prévus §4.2, pas de nouveau modèle métier.
+ * La clé API d'une application Firebase Web est publique, les secrets de
+ * service / les jetons privés doivent rester hors de la PWA.
+ */
+export type PublicFirebaseConfig = FirebaseOptions;
+export interface FirebaseClients {
+  app: FirebaseApp;
+  auth: Auth;
+  /** Créée seulement après M25 et le consentement au cache persistant. */
+  db?: Firestore;
+}
+export type CollectionRef = CollectionReference<DocumentData, DocumentData>;
+export type CloudCollection =
+  | "activities" | "activityCompletions" | "checklists" | "checklistItems"
+  | "carryOverDecisions" | "reminders" | "playlists" | "tracks"
+  | "preferences" | "pushSubscriptions" | "dispatchReceipts";
+export interface SnapshotMeta {
+  fromCache: boolean;
+  hasPendingWrites: boolean;
+}
+export interface Connectivity {
+  online: boolean;
+}
+export type Unsubscribe = () => void;
+
