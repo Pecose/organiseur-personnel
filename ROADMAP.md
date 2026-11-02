@@ -220,8 +220,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S0** | **VALIDÉE (tests locaux)** | **15/15 objets autonomes**, fonctions M28/M29/M45/M67, suite T01 ; correction de typage `weekday` ; tests locaux sur copie du code | `tsc --strict` puis `node` : **réussite** avec TypeScript 5.8.3 et Node 22.16.0 ; tests à rejouer lors du premier clonage opérationnel du dépôt |
 | **S1** | **VALIDÉE (tests locaux)** | **10/10 objets composés** O08/O11/O12/O14/O21/O25/O27/O28/O31/O35 dans F17 ; M124/M157 dans F48 ; tests S1 dans F54 | `tsc --strict` puis Node : **réussite sur copie locale**, classification tâche/habitude/événement, habitude horaire, 16 entrées invalides rejetées ; rejouer depuis clone GitHub en CI plus tard |
 | **S2** | **VALIDÉE (tests locaux ciblés)** | **5/5 objets** O09/O23/O26/O32/O36 dans F17, M130 dans F49, M131 dans F51, tests T15/T16 de S2 dans F55 | Sous-ensemble S2 compilé via `tsc --strict` et exécuté sous Node local : récurrences Paris à 19 h, fin de mois, année bissextile, cas New York automne/printemps, groupes Jour ; **compilation sur clone GitHub complet toujours à reproduire** |
-| **S3** | **EN COURS, BLOQUÉE POUR M133** | O06 rappel, O30 rapport Google, O33 validation par occurrence dans F17 ; exemples de typage et relations dans F54 | `M133(occ,now)` ne reçoit pas l'état de validation O33 ; approbation nécessaire pour permettre le refus de recochage ; pas de compilation du dépôt complète exécutée ici |
-| **S4–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | S3 à finir avant S4 |
+| **S3** | **VALIDÉE SUR SON PÉRIMÈTRE LOGIQUE (tests ciblés locaux)** | O06/O30/O33 dans F17, propriété `completion?: ActivityCompletion` approuvée, M133 dans F48, tests ajoutés à F54 | **18 tests ciblés passés** avec `tsc --strict` + Node sur reproduction isolée du prédicat ; **compilation intégrale depuis GitHub à reproduire**. Les mutations/persistances M132/M134/M154/M158 appartiennent aux strates ultérieures |
+| **S4–S10** | NON DÉMARRÉES | Aucun code de ces strates | **S4 est la prochaine strate** |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -242,6 +242,8 @@ node .tmp-s2/tests/navigation.test.js
 ```
 
 `.tmp-s2/` est un dossier de sortie temporaire non versionné. Les essais S2 sur copie locale ont été concluants (TS 5.8.3 / Node 22.16.0), mais **aucun workflow distant n'a exécuté cette commande**.
+
+**S3, commande de validation sur clone GitHub :** la même compilation `tsc --strict` ci-dessus et les trois tests Node doivent être rejoués après mise à jour de F17/F48/F54 ; les tests S3 sont intégrés à `tests/activities.test.ts`. Les 18 vérifications isolées de M133 ne remplacent pas cette exécution globale.
 
 ### Vue générale : graphe de progression
 
@@ -323,12 +325,12 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 - [x] Définir O33 `ActivityCompletion` **par occurrence** : en attente, manuellement fait, automatiquement présumé, annulé.
 - [x] Définir O06 rappel par `activityId + occurrenceKey` ; définir O30 rapport de synchronisation Google sans exposer de données privées.
-- [ ] Tester les règles pures de **M133** : une heure de fin l'emporte sur l'heure de début ; `autoComplete` peut être désactivé ; une annulation manuelle doit primer sur l'automatisme.
-- [ ] Vérifier que la validation du mercredi n'achève ni le mercredi suivant, ni toute une série.
+- [x] Tester les règles pures de **M133** : une heure de fin l'emporte sur l'heure de début ; `autoComplete` peut être désactivé ; une annulation manuelle doit primer sur l'automatisme.
+- [x] Vérifier que la validation du mercredi n'achève ni le mercredi suivant, ni toute une série.
 
-**Blocage explicite (AGENTS.md) :** `ActivityOccurrenceView` ne contient pas d'état de réalisation O33. La signature enregistrée de **M133** est `shouldAutoComplete(occ:ActivityOccurrenceView,now:string):boolean` ; elle ne peut pas lire `manually_undone` en l'état tout en restant pure. **Demander l'approbation explicite de l'ajout `completion?: ActivityCompletion` dans le type technique de F17**, puis committer **docs/ARCHITECTURE.md avant le code**, ensuite implémenter et tester M133, et seulement alors valider S3.
+**Blocage levé avec accord de l'utilisateur (2026-11-02)** : la propriété facultative `completion?: ActivityCompletion` a d'abord été enregistrée dans l'architecture, commit `1d37aa9174bdd7ff2509d8b5354f01626f5fc65a`, **avant** la modification de F17 et la création du prédicat M133 dans F48. Les tests F54 vérifient la priorité de l'heure de fin, le démarrage sans fin, les statuts déjà cochés, le refus manuel qui bloque le recochage et l'indépendance de deux mercredis successifs.
 
-**Sortie S3 (pas encore atteinte) :** états et rappels se rattachent à une occurrence stable, y compris le veto manuel respecté par M133. Les tests actuels vérifient la structure et les clés, **pas encore** la règle métier complète.
+**Sortie S3 atteinte sur le périmètre objet/calcul pur :** tous les objets O06/O30/O33 existent et M133 respecte le veto manuel. **Tests ciblés locaux :** 18/18 réussis avec compilation stricte TypeScript 5.8.3 et Node 22.16.0 sur reproduction isolée du prédicat. **Réserve :** la compilation/relecture exhaustive des fichiers directement clonés de GitHub reste à exécuter. Le fonctionnement réel de la coche enregistrée dans Firestore dépend des fonctions planifiées M132/M134/M155/M158 et de S5/S6/S8 ; aucune interface ni notification n'est encore opérationnelle.
 
 ### S4 — Objets terminaux et rapports dérivés
 
