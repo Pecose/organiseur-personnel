@@ -218,8 +218,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | Strate | État | Réalisé sur GitHub | Validation manquante |
 |---|---|---|---|
 | **S0** | **VALIDÉE (tests locaux)** | **15/15 objets autonomes**, fonctions M28/M29/M45/M67, suite T01 ; correction de typage `weekday` ; tests locaux sur copie du code | `tsc --strict` puis `node` : **réussite** avec TypeScript 5.8.3 et Node 22.16.0 ; tests à rejouer lors du premier clonage opérationnel du dépôt |
-| **S1** | **EN COURS** | Contrats existants pour 10 objets O08/O11/O12/O14/O21/O25/O27/O28/O31/O35 et M124/M157 | Vérifier compilation stricte, cas valides/invalides et références S0 seulement |
-| **S2–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | Validation de S1 préalable |
+| **S1** | **VALIDÉE (tests locaux)** | **10/10 objets composés** O08/O11/O12/O14/O21/O25/O27/O28/O31/O35 dans F17 ; M124/M157 dans F48 ; tests S1 dans F54 | `tsc --strict` puis Node : **réussite sur copie locale**, classification tâche/habitude/événement, habitude horaire, 16 entrées invalides rejetées ; rejouer depuis clone GitHub en CI plus tard |
+| **S2–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | **S2 est la prochaine strate**, mais n'a pas été lancée |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -286,10 +286,10 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Prérequis : S0 validée.** Les références sont des identifiants, **pas** des appels réseau.
 
-- [ ] Définir **O31 Activity**, avec date facultative, heure facultative, récurrence facultative, icône à gauche, étoiles 1–3 et liste associée, sans avoir à créer trois classes Tâche/Habitude/Événement.
-- [ ] Définir O08/O11/O12 (médias et thème), O14 (push), O21 (archive), O25/O27/O28 (Google sécurisé) et O35 (élément de liste).
-- [ ] Tester **M124** (classification : tâche sans heure ni répétition ; habitude répétée ; événement horaire) et **M157** (validation de l'activité) en calcul pur.
-- [ ] Vérifier que `Activity` conserve un **seul identifiant** malgré les changements de catégorie, et qu'aucun mot de passe/jeton n'est placé dans un modèle public.
+- [x] Définir **O31 Activity**, avec date facultative, heure facultative, récurrence facultative, icône à gauche, étoiles 1–3 et liste associée, sans avoir à créer trois classes Tâche/Habitude/Événement.
+- [x] Définir O08/O11/O12 (médias et thème), O14 (push), O21 (archive), O25/O27/O28 (Google sécurisé) et O35 (élément de liste).
+- [x] Tester **M124** (classification : tâche sans heure ni répétition ; habitude répétée ; événement horaire) et **M157** (validation de l'activité) en calcul pur. Résultat : fonctions pures compilées sous TypeScript strict et tests Node locaux passés.
+- [x] Vérifier que `Activity` conserve un **seul identifiant** malgré les changements de catégorie, et qu'aucun mot de passe/jeton n'est placé dans un modèle public.
 
 **Sortie S1 :** les objets composés sont corrects, sans requérir S2 ou Firestore.
 
