@@ -70,12 +70,19 @@ export function subscribeCloudRecords<T>(
   uid: string, kind: CloudCollection,
   cb: (records: T[], metadata: SnapshotMeta) => void,
 ): Unsubscribe {
+  let lastKnownRecords: T[] = [];
   return onSnapshot(getUserCollection(uid, kind), { includeMetadataChanges: true },
-    snapshot => cb(snapshot.docs.map(item => item.data() as T), {
-      fromCache: snapshot.metadata.fromCache,
-      hasPendingWrites: snapshot.metadata.hasPendingWrites,
-    }),
-    () => { /* Erreur de lecture : ne jamais transformer un échec en liste vide. */ });
+    snapshot => {
+      lastKnownRecords = snapshot.docs.map(item => item.data() as T);
+      cb(lastKnownRecords, {
+        fromCache: snapshot.metadata.fromCache,
+        hasPendingWrites: snapshot.metadata.hasPendingWrites,
+      });
+    },
+    () => {
+      // Préserver la dernière vue, mais ne surtout pas prétendre à un ACK serveur.
+      cb(lastKnownRecords, { fromCache: true, hasPendingWrites: true });
+    });
 }
 
 /** M89 · Lecture ponctuelle, utilisable avec le cache du SDK si disponible. */
