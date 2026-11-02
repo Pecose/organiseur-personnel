@@ -1,0 +1,24 @@
+{
+  "name": "organiseur-personnel",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "PWA personnelle iPhone, socle technique S5",
+  "scripts": {
+    "dev": "vite --base=/organiseur-personnel/",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build --base=/organiseur-personnel/",
+    "preview": "vite preview --base=/organiseur-personnel/",
+    "test:core": "tsc --strict --target ES2022 --module commonjs --lib ES2022,DOM --outDir .tmp-tests src/domain/types.ts src/domain/dates.ts src/features/decor.ts src/features/activities.ts src/features/habits.ts src/features/day.ts tests/domain.test.ts tests/activities.test.ts tests/navigation.test.ts tests/monthlyReview.test.ts tests/storage.test.ts"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "firebase": "^13.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}
