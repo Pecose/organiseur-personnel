@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Registre contractuel intégral
 
 > **Projet :** `Pecose/organiseur-personnel` · **Date de référence :** 2026-11-01  
-> **Statut : ARCHITECTURE CIBLE (PLANIFIÉE)**. Le dépôt ne contient actuellement que la documentation. **Aucun chemin, module, type ou fonction ci-dessous ne doit être présenté comme déjà implémenté.**  
+> **Statut : ARCHITECTURE CIBLE EN COURS D'IMPLÉMENTATION**. Les strates S0, S1 et S2 sont publiées ; les autres éléments restent planifiés. **Ne jamais confondre un contrat ou un test local avec une fonctionnalité déjà déployée.**  
 > **Document de gouvernance :** [../AGENTS.md](../AGENTS.md) · **Périmètre fonctionnel :** [../ROADMAP.md](../ROADMAP.md).
 
 ## 0. Règle de changement obligatoire (BLOCAGE)
@@ -49,7 +49,7 @@
 | D21 | Calendrier **semaine** : six cases lundi–samedi et dimanche accessible par **dépliage visible** ; noms si la place le permet, sinon compteurs. Toucher un jour affiche cette date sur Jour ; bouton « Aujourd'hui » pour revenir |
 | D22 | Interface minimaliste : formes très arrondies, couleurs apaisantes, lecture claire ; gestes facultatifs et explicites, **aucun geste à deux doigts obligatoire** |
 
-**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme (et testé s'il s'agit de code) ; `DEPRECATED` = suppression autorisée et historisée. **F00–F02 et F04–F05 existent déjà (documentation)** ; **F03 est retiré** ; **État réel au 2026-11-02 :** S0 et S1 ont été implémentées dans les fichiers prévus : **F17** (25 types O01/O05/O07/O08/O10–O18/O20–O22/O24–O25/O27–O29/O31/O34–O35/O37, selon les identifiants détaillés plus bas), **F18** (M28/M29/M45), **F26 partiellement** (M67 seulement), **F48 partiellement** (M124/M157 seulement), **F40** (tests de S0) et **F54 partiellement** (tests de S1). Compilation TypeScript stricte et exécution Node effectuées sur une copie locale de vérification ; un contrôle CI sur un clone GitHub reste à mettre en place. **Tout le reste des F06–F56 et M01–M160 est `PLANNED`**, sauf les anciennes signatures M30–M40/M91/M101–M102 qui sont `SUPERSEDED` et interdites d'implémentation. Passer de `PLANNED` à `IMPLEMENTED` ne nécessite pas un nouvel accord si le contrat reste identique.
+**États :** `PLANNED` = spécifié mais absent du dépôt ; `IMPLEMENTED` = présent et conforme ; `DEPRECATED` = suppression autorisée et historisée. Les documents F00–F02 et F04–F05 existent, F03 est réservé. **État au 2026-11-02 :** S0/S1/S2 disposent maintenant de **30 objets actifs typés dans F17** : les 15 autonomes O01/O05/O07/O10/O13/O15–O18/O20/O22/O24/O29/O34/O37, les 10 composés O08/O11/O12/O14/O21/O25/O27/O28/O31/O35 et les 5 de S2 **O09/O23/O26/O32/O36**. M28/M29/M45 sont présents dans F18, M67 seul dans F26, M124/M157 seuls dans F48, **M130 seul dans F49, M131 seul dans F51**. Les tests de S0/S1 existent dans F40/F54 ; **les tests de S2 (occurrences et groupes Jour) sont présents dans F55**, sans déploiement d'interface. Compilation TypeScript stricte et tests de comportement exécutés sur **copies locales de vérification** ; une vérification sur un clone intégral GitHub reste à planifier. **Tous les autres objets, fichiers et fonctions sont PLANNED**, sauf les anciennes références O02–O04 et fonctions M30–M40/M91/M101–M102, marquées SUPERSEDED.
 
 **Source de vérité :** `AGENTS.md` pour le processus, **ce fichier** pour les contrats d'architecture, `ROADMAP.md` pour l'ordre des livraisons. En cas de conflit : STOP et demande utilisateur.
 
