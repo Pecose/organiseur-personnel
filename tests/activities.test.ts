@@ -1,7 +1,7 @@
 /** F54 / S1 : les dix objets composites et M124/M157, sans accès au réseau. */
 import { classifyActivity, validateActivity } from "../src/features/activities";
 import type {
-  Activity, ChecklistItem, EncryptedGoogleOAuthGrant, GoogleOAuthState,
+  Activity, ActivityCompletion, Reminder, CalendarSyncRun, ChecklistItem, EncryptedGoogleOAuthGrant, GoogleOAuthState,
   GoogleSyncCursor, ImageMetadata, MediaArchiveManifest, PushSubscriptionRecord,
   ThemeDefinition, TrackMetadata,
 } from "../src/domain/types";
@@ -54,3 +54,46 @@ for(const input of bad){if(validateActivity(input).ok)throw new Error("M157 : st
 const linked: Activity={...scheduled,googleLink:{calendarId:"primary",googleEventId:"google-1",pending:"upsert",source:"app"}};
 if(!validateActivity(linked).ok)throw new Error("M157 : lien Google correct rejeté.");
 console.log("S1 / T02 : 10 types composites, classification et validation pure vérifiés.");
+
+/** S3 · Contrats O06/O30/O33 : états par occurrence, sans envoi réel. */
+const currentOccurrence = "theatre@2026-11-04";
+const nextOccurrence = "theatre@2026-11-11";
+const pending: ActivityCompletion = {
+  id: currentOccurrence, activityId: "theatre", occurrenceKey: currentOccurrence,
+  status: "pending", updatedAt: now,
+};
+const manuallyCompleted: ActivityCompletion = {
+  ...pending, status: "manual_done", completedAt: now,
+};
+const autoAssumed: ActivityCompletion = {
+  ...pending, status: "auto_assumed", completedAt: now,
+};
+const undone: ActivityCompletion = {
+  ...pending, status: "manually_undone", overriddenAt: now,
+};
+const future: ActivityCompletion = {
+  id: nextOccurrence, activityId: "theatre", occurrenceKey: nextOccurrence,
+  status: "pending", updatedAt: now,
+};
+if (pending.occurrenceKey === future.occurrenceKey
+  || manuallyCompleted.occurrenceKey !== undone.occurrenceKey
+  || autoAssumed.status === undone.status
+  || future.status !== "pending") {
+  throw new Error("S3 / O33 : identités ou états des occurrences incohérents.");
+}
+const reminder: Reminder = {
+  id: "reminder-4", activityId: "theatre", occurrenceKey: currentOccurrence,
+  scheduledFor: "2026-11-04T18:00:00.000Z", leadMinutes: 10,
+  timeZone: "Europe/Paris", enabled: true, dispatchStatus: "pending",
+};
+if (reminder.occurrenceKey !== pending.occurrenceKey || reminder.activityId !== pending.activityId) {
+  throw new Error("S3 / O06 : rappel non lié à la bonne occurrence.");
+}
+const syncRun: CalendarSyncRun = {
+  uid: "user", calendarId: "primary", startedAt: now,
+  pulled: 0, pushed: 0, conflicts: 0, status: "ok",
+};
+if (syncRun.conflicts !== 0 || syncRun.uid !== "user") {
+  throw new Error("S3 / O30 : rapport technique incorrect.");
+}
+console.log("S3 / O06 O30 O33 : contrats typés et exemples d'occurrences vérifiés (M133 en attente).");
