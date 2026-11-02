@@ -1,0 +1,13 @@
+{
+  "name": "Organiseur personnel",
+  "short_name": "Organiseur",
+  "description": "Organiseur personnel avec calendrier, tâches, jour, habitudes et listes.",
+  "id": "/organiseur-personnel/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7F5F0",
+  "theme_color": "#A4BFAF",
+  "lang": "fr",
+  "dir": "ltr"
+}
