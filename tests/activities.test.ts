@@ -1,7 +1,8 @@
 /** F54 / S1 : les dix objets composites et M124/M157, sans accès au réseau. */
-import { classifyActivity, validateActivity } from "../src/features/activities";
+import { classifyActivity, validateActivity, shouldAutoComplete } from "../src/features/activities";
+import { expandActivityOccurrences } from "../src/features/habits";
 import type {
-  Activity, ActivityCompletion, Reminder, CalendarSyncRun, ChecklistItem, EncryptedGoogleOAuthGrant, GoogleOAuthState,
+  Activity, ActivityCompletion, ActivityOccurrenceView, Reminder, CalendarSyncRun, ChecklistItem, EncryptedGoogleOAuthGrant, GoogleOAuthState,
   GoogleSyncCursor, ImageMetadata, MediaArchiveManifest, PushSubscriptionRecord,
   ThemeDefinition, TrackMetadata,
 } from "../src/domain/types";
@@ -97,3 +98,114 @@ if (syncRun.conflicts !== 0 || syncRun.uid !== "user") {
   throw new Error("S3 / O30 : rapport technique incorrect.");
 }
 console.log("S3 / O06 O30 O33 : contrats typés et exemples d'occurrences vérifiés (M133 en attente).");
+
+/** S3 / M133 : récurrence par mercredi, fenêtre de début/fin et veto persistant. */
+const theatre: Activity = {
+  id: "theatre", uid: "user", title: "Cours de théâtre",
+  startAt: "2026-11-04T18:00:00.000Z", endAt: "2026-11-04T19:00:00.000Z",
+  timeZone: "Europe/Paris", autoComplete: true, updatedAt: now,
+  recurrence: { frequency: "weekly", interval: 1, weekdays: [3] },
+};
+const wednesdays = expandActivityOccurrences(theatre, {
+  from: "2026-11-04T00:00:00.000Z", to: "2026-11-12T00:00:00.000Z",
+});
+if (wednesdays.length !== 2
+    || wednesdays[0].occurrenceKey !== "theatre@2026-11-04"
+    || wednesdays[1].occurrenceKey !== "theatre@2026-11-11"
+    || wednesdays[1].endsAt !== "2026-11-11T19:00:00.000Z") {
+  throw new Error("S3 / M133 : occurrences hebdomadaires mal construites par M130.");
+}
+const firstWednesday: ActivityOccurrenceView = {
+  activity: theatre, occurrence: wednesdays[0],
+};
+const secondWednesday: ActivityOccurrenceView = {
+  activity: theatre, occurrence: wednesdays[1],
+};
+if (shouldAutoComplete(firstWednesday, "2026-11-04T18:59:59.999Z")) {
+  throw new Error("S3 / M133 : la validation ne doit pas se déclencher avant la fin.");
+}
+if (!shouldAutoComplete(firstWednesday, "2026-11-04T19:00:00.000Z")) {
+  throw new Error("S3 / M133 : la fin est prioritaire et inclusive.");
+}
+const completedWednesday: ActivityCompletion = {
+  id: "theatre@2026-11-04", activityId: "theatre",
+  occurrenceKey: "theatre@2026-11-04",
+  status: "auto_assumed", completedAt: "2026-11-04T19:00:00.000Z",
+  updatedAt: "2026-11-04T19:00:00.000Z",
+};
+const overrideWednesday: ActivityCompletion = {
+  ...completedWednesday, status: "manually_undone",
+  overriddenAt: "2026-11-04T19:00:01.000Z",
+};
+const manualWednesday: ActivityCompletion = {
+  ...completedWednesday, status: "manual_done",
+};
+const pendingWednesday: ActivityCompletion = {
+  ...completedWednesday, status: "pending",
+};
+for (const completion of [completedWednesday, overrideWednesday, manualWednesday]) {
+  if (shouldAutoComplete({ ...firstWednesday, completion }, "2026-11-12T10:00:00.000Z")) {
+    throw new Error("S3 / M133 : une coche déjà décidée ne doit pas se recréer.");
+  }
+}
+if (!shouldAutoComplete({ ...firstWednesday, completion: pendingWednesday },
+  "2026-11-04T19:00:00.000Z")) {
+  throw new Error("S3 / M133 : une occurrence en attente reste éligible.");
+}
+if (shouldAutoComplete({ ...firstWednesday, completion: {
+  ...pendingWednesday, occurrenceKey: "theatre@2026-11-11",
+}}, "2026-11-12T10:00:00.000Z")) {
+  throw new Error("S3 / M133 : une coche appartenant à une autre occurrence ne doit jamais être réutilisée.");
+}
+if (shouldAutoComplete({ ...firstWednesday, completion: {
+  ...pendingWednesday, activityId: "different",
+}}, "2026-11-12T10:00:00.000Z")) {
+  throw new Error("S3 / M133 : une coche appartenant à une autre activité ne doit jamais être réutilisée.");
+}
+if (shouldAutoComplete({ activity: { ...theatre, id: "different" },
+  occurrence: wednesdays[0] }, "2026-11-12T10:00:00.000Z")) {
+  throw new Error("S3 / M133 : la vue doit désigner la même activité que l'occurrence.");
+}
+if (shouldAutoComplete({ ...firstWednesday, activity: {
+  ...theatre, autoComplete: false,
+}}, "2026-11-12T10:00:00.000Z")) {
+  throw new Error("S3 / M133 : l'option désactivée doit être respectée.");
+}
+if (shouldAutoComplete(firstWednesday, "pas une date")) {
+  throw new Error("S3 / M133 : un instant d'évaluation invalide ne doit pas valider.");
+}
+if (shouldAutoComplete({ ...firstWednesday, occurrence: {
+  ...wednesdays[0], endsAt: "date impossible",
+}}, "2026-11-12T10:00:00.000Z")) {
+  throw new Error("S3 / M133 : un horaire de fin invalide ne doit pas être ignoré.");
+}
+if (shouldAutoComplete({
+  ...firstWednesday, occurrence: { ...wednesdays[0], startsAt: undefined, endsAt: undefined },
+}, "2026-11-12T10:00:00.000Z")) {
+  throw new Error("S3 / M133 : aucune autovalidation pour une activité sans heure.");
+}
+const startOnly: ActivityOccurrenceView = {
+  activity: { ...theatre, endAt: undefined },
+  occurrence: { ...wednesdays[0], endsAt: undefined },
+};
+if (!shouldAutoComplete(startOnly, "2026-11-04T18:00:00.000Z")
+    || shouldAutoComplete(startOnly, "2026-11-04T17:59:59.999Z")) {
+  throw new Error("S3 / M133 : sans heure de fin, valider à partir du début.");
+}
+const firstManuallyUndone: ActivityOccurrenceView = {
+  ...firstWednesday, completion: overrideWednesday,
+};
+const secondStillPending: ActivityOccurrenceView = {
+  ...secondWednesday, completion: {
+    ...pendingWednesday, id: "theatre@2026-11-11", occurrenceKey: "theatre@2026-11-11",
+  },
+};
+const beforeM133 = JSON.stringify([firstManuallyUndone, secondStillPending]);
+if (shouldAutoComplete(firstManuallyUndone, "2026-11-11T19:00:01.000Z")
+    || !shouldAutoComplete(secondStillPending, "2026-11-11T19:00:01.000Z")) {
+  throw new Error("S3 / M133 : annuler un mercredi ne doit pas bloquer le mercredi suivant.");
+}
+if (JSON.stringify([firstManuallyUndone, secondStillPending]) !== beforeM133) {
+  throw new Error("S3 / M133 : la fonction pure ne doit modifier aucune donnée.");
+}
+console.log("S3 / M133 : fin prioritaire, annulation persistante et indépendance des mercredis validées.");
