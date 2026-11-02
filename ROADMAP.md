@@ -213,7 +213,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 >
 > Un « objet autonome » veut dire **autonome vis-à-vis des autres objets métier**. Déclarer le type `AuthUser` (O01) ne signifie pas que Firebase Authentication est opérationnel. De même, une interface type ne nécessite pas que Firestore, Cloudflare ou Safari soient déjà configurés.
 
-### État réel d'exécution — 2 novembre 2026
+### État réel d'exécution — 3 novembre 2026
 
 | Strate | État | Réalisé sur GitHub | Validation manquante |
 |---|---|---|---|
@@ -222,7 +222,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S2** | **VALIDÉE (tests locaux ciblés)** | **5/5 objets** O09/O23/O26/O32/O36 dans F17, M130 dans F49, M131 dans F51, tests T15/T16 de S2 dans F55 | Sous-ensemble S2 compilé via `tsc --strict` et exécuté sous Node local : récurrences Paris à 19 h, fin de mois, année bissextile, cas New York automne/printemps, groupes Jour ; **compilation sur clone GitHub complet toujours à reproduire** |
 | **S3** | **VALIDÉE SUR SON PÉRIMÈTRE LOGIQUE (tests ciblés locaux)** | O06/O30/O33 dans F17, propriété `completion?: ActivityCompletion` approuvée, M133 dans F48, tests ajoutés à F54 | **18 tests ciblés passés** avec `tsc --strict` + Node sur reproduction isolée du prédicat ; **compilation intégrale depuis GitHub à reproduire**. Les mutations/persistances M132/M134/M154/M158 appartiennent aux strates ultérieures |
 | **S4** | **MODÈLES COMPLETS, VALIDATION PARTIELLE** | O19 et O38 dans F17, `MonthlyAchievement` basé sur O31/O32/O33, tests T19 publiés dans F56 ; **35/35 objets métier** | Contrat/tri vérifiés avec `tsc --strict` et Node sur copie autonome ; **F56 et toutes les suites du dépôt restent à exécuter sur clone**. M147/Firestore prévu en S8, aucun bilan opérationnel |
-| **S5** | **EN COURS : fondations statiques et stockage préparés** | F07 TypeScript strict ; F08/F09 entrée HTML et manifeste sans icônes ; F11 catalogue vide ; F17 type MediaDb ; F31 M46 IndexedDB ; F32 M50/M51 catalogue ; F39 règles propriétaires ; F41 tests simulés | **Blocage :** choix explicite des dépendances SDK Firebase / outil de compilation F06 (D10), configuration réelle Auth/Firestore, T05 émulateur, tests F41, PWA/cache/Safari iPhone et compilation complète du dépôt |
+| **S5** | **EN COURS : dépendances et services codés, non validés sur appareil** | Accord D10 et commit préalable ; F06 Vite/TS/Firebase ; F14 entrée ; F17 types SDK ; F27 M16 ; F28 M17–M20/M90 ; F29 M21–M24/M89 ; F30 M25–M27 ; F35 M79/M80 ; F42 scénarios T05 pour émulateurs ; F39 toujours non déployé | **Restant :** `npm install`, `npm run build`/tests réels, paramètres Firebase Web du projet, tests UID à l'émulateur, autorisation puis déploiement contrôlé des règles, icônes F10 et test réel iPhone Safari. Sans ces étapes S5 ne peut pas être déclarée validée |
 | **S6–S10** | NON DÉMARRÉES | Aucun code de ces strates | S5 doit satisfaire sa porte de validation avant S6 |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
@@ -353,10 +353,10 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Prérequis : S0–S4 validées.** Ici seulement arrivent les dépendances techniques externes.
 
-- [ ] Valider l'outil de compilation TypeScript et les fichiers **F06–F09/F14** ; préparer l'app shell, les icônes et le manifeste PWA pour Safari. **Partiel :** `tsconfig.json`, `index.html`, `manifest.webmanifest` créés ; **pas** de bundler choisi (D10/F06), ni d'icônes F10, ni de bootstrap F14.
-- [ ] Ajouter **Firebase Auth** (M16–M20/M90) et **Firestore** (M21–M27/M89), le mode hors ligne Safari et les états O15 ; préparer **F39** et tester les **refus entre deux UID** (T05). **Partiel :** F39 contient des règles ciblées non déployées. **Manque :** consentement au choix du SDK et du bundler, paramètres réels du projet, vérification Firebase Emulator de T05.
+- [ ] Valider l'outil de compilation TypeScript et les fichiers **F06–F09/F14** ; préparer l'app shell, les icônes et le manifeste PWA pour Safari. **Avancé :** Vite 8 + TypeScript 7 + Firebase 13 autorisés et déclarés en F06 ; F07/F08/F09 et F14 présents, mais pas de compilation vérifiée et pas d'icônes F10.
+- [ ] Ajouter **Firebase Auth** (M16–M20/M90) et **Firestore** (M21–M27/M89), le mode hors ligne Safari et les états O15 ; préparer **F39** et tester les **refus entre deux UID** (T05). **Avancé :** M16–M27/M89/M90 sont écrits ; F39 reste non déployé, F42 décrit les deux comptes émulés. **Manque :** paramètres Firebase réels, émulateur disponible, exécution et validation T05.
 - [ ] N'autoriser les écritures Firestore qu'après validation des règles d'accès, des collections O31–O36 et des champs réellement autorisés.
-- [ ] Préparer **IndexedDB F31** (M46), catalogue embarqué F32 (M50/M51), cache PWA et service worker F35 (M79/M80). **Partiel :** M46 et les quatre stores enregistrés ; F32 M50/M51 avec catalogue F11 vide ; F41 fournit des simulations **non exécutées** ; service worker F35/M79/M80 restant à réaliser après validation de l'outillage.
+- [ ] Préparer **IndexedDB F31** (M46), catalogue embarqué F32 (M50/M51), cache PWA et service worker F35 (M79/M80). **Avancé :** M46 et quatre stores locaux, catalogue F11/F32, F41 simulations non exécutées ; F35 M79/M80 code de cache public et compilation worker prévus dans F06. **Manque :** build, tests Chrome/Safari, cache offline en conditions réelles.
 - [ ] Premier prototype iPhone : installation Safari, fermeture/réouverture, **PC éteint**, réseau absent, limites de stockage ; tester tôt la lecture d'un fichier Suno sur écran verrouillé pour décider si la PWA reste adaptée, sans promettre la lecture ininterrompue.
 - [ ] Vérifier **0 €**, GitHub Pages `Pecose`, Firebase Spark et absence de secrets dans le dépôt.
 
@@ -364,7 +364,11 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Livraison effective du premier lot (2026-11-02) :** fichiers F07/F08/F09/F11/F17/F31/F32/F39/F41 committés ; aucun service externe activé, coût nul, aucune donnée personnelle collectée. `index.html` est **une page d'attente**, et le manifeste **sans icône ni service worker** n'est pas présenté comme PWA installable/compatible hors ligne. Les contrôles statiques JSON et les règles de refus par défaut sont vérifiés sur les fichiers du dépôt, **sans émulateur Firestore**.
 
-**Avant le prochain commit de dépendances :** obtenir l'accord explicite pour la version et le choix de `firebase` (SDK Web officiel) et d'un outillage de compilation/bundling comme Vite, conformément à D10 et F06. Aucun ajout de package non approuvé. Puis exécuter `tsc --noEmit` et les suites existantes sur un clone, installer la configuration publique Firebase réelle sans secret, tester les règles F39 au Firebase Emulator avec deux UID, avant tout déploiement. S5 doit rester **EN COURS** jusque-là.
+**Accord obtenu le 3 novembre 2026 et appliqué dans l'ordre requis :** commit d'architecture D10 `36a8cc37e16ae087be35e81b2b188abb165c3314` **avant** le code F06/F14/F17/F27–F30/F35/F42. Dépendances déclarées : `firebase ^13.1.0`, `vite ^8.3.5`, `typescript ^7.0.2`, sans autre dépendance ajoutée.
+
+**Prérequis concrets de fin S5 (NON EXÉCUTÉS ICI)** : sur un environnement Node 22.12+/24+ connecté à npm, `npm install`, `npm run typecheck`, `npm run build`, essais des suites TS T01/T02/T03/T15/T16/T19 ; démarrer Auth + Firestore Emulator avec les règles F39 et lancer le test F42 avec `FIREBASE_EMULATOR_TEST=1` ; vérifier les quatre paramètres publics réels de Firebase `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` ; valider refus croisés avant toute application des règles sur le véritable Firestore. Enfin, fournir des icônes PWA F10 autorisées, tester Safari sur iPhone, réouverture et réseau coupé, puis vérifier que le cache PWA n'efface pas les médias personnels.
+
+**Limitations de cette livraison :** les dépendances n'ont pas été téléchargées dans l'environnement d'exécution, car l'accès npm/DNS est indisponible ; aucun build, test émulateur ou iPhone n'a donc été exécuté. Aucun site publié, aucune règle déployée, aucune donnée réelle modifiée. La création d'un éventuel workflow GitHub Actions ou d'une configuration supplémentaire de l'émulateur doit suivre l'autorisation de l'architecture avant ajout ; **S5 reste EN COURS**, S6 non démarrée.
 
 ### S6 — Fonctions élémentaires sur **un seul objet à la fois**
 
