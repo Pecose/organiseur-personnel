@@ -298,3 +298,29 @@ export interface ChecklistItem {
   position: number;
   updatedAt: ISOInstant;
 }
+
+/** S2 : contrats dérivés des objets S0/S1. */
+export interface Playlist { id: string; name: string; trackIds: string[]; updatedAt: ISOInstant; }
+export interface GoogleCalendarConnection {
+ uid: string; calendarId: "primary"; googleAccountLabel?: string;
+ status: "disconnected" | "authorizing" | "active" | "reauthorization_required" | "error";
+ lastSyncAt?: ISOInstant; lastError?: string;
+}
+export interface CalendarSyncConflict {
+ id: string; uid: string; localEventId: string; googleEventId?: string;
+ kind: "update" | "delete" | "recurrence" | "mapping";
+ localVersion: string; googleVersion: string; detectedAt: ISOInstant;
+ status: "open" | "resolved";
+}
+export interface ActivityOccurrence {
+ activityId: string; occurrenceKey: string; localDate: LocalDate;
+ startsAt?: ISOInstant; endsAt?: ISOInstant; recurring: boolean;
+}
+export interface CarryOverDecision {
+ id: string; activityId: string; fromDate: LocalDate; toDate: LocalDate;
+ decision: "move" | "keep" | "later";
+ promptedAt: ISOInstant; decidedAt?: ISOInstant; updatedAt: ISOInstant;
+}
+/** Types de présentation F17, non persistés. */
+export interface ActivityOccurrenceView { activity: Activity; occurrence: ActivityOccurrence; }
+export interface DayGroups { withoutTime: ActivityOccurrenceView[]; withTime: ActivityOccurrenceView[]; }
