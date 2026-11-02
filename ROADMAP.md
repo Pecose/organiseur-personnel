@@ -217,17 +217,18 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 | Strate | État | Réalisé sur GitHub | Validation manquante |
 |---|---|---|---|
-| **S0** | **EN COURS — implémentation déposée** | **15/15 objets autonomes** définis dans F17 ; fonctions M28/M29/M45 dans F18 et M67 dans F26 ; tests T01 dans F40 ; **13 scénarios de comportement passés** par exécution directe de la logique sans dépendance | **Compilation TypeScript stricte et exécution du test compilé** à réaliser sur un clone du dépôt avec `tsc` et `node` ; donc **S0 non encore validée** |
-| **S1–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | Porte S0 obligatoire avant S1 |
+| **S0** | **VALIDÉE (tests locaux)** | **15/15 objets autonomes**, fonctions M28/M29/M45/M67, suite T01 ; correction de typage `weekday` ; tests locaux sur copie du code | `tsc --strict` puis `node` : **réussite** avec TypeScript 5.8.3 et Node 22.16.0 ; tests à rejouer lors du premier clonage opérationnel du dépôt |
+| **S1** | **EN COURS** | Contrats existants pour 10 objets O08/O11/O12/O14/O21/O25/O27/O28/O31/O35 et M124/M157 | Vérifier compilation stricte, cas valides/invalides et références S0 seulement |
+| **S2–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | Validation de S1 préalable |
 
-**Pour finir S0 (sans ajout de dépendance ou changement de fichier d'architecture) :** sur un environnement disposant déjà de TypeScript et Node, dans le dépôt, exécuter les commandes ci-dessous ; en cas d'erreur, réparer les contrats S0 déjà approuvés et relancer avant de cocher la strate.
+**Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
 ```bash
 tsc --strict --target ES2022 --module commonjs --lib ES2022,DOM --outDir .tmp-s0 src/domain/types.ts src/domain/dates.ts src/features/decor.ts tests/domain.test.ts
 node .tmp-s0/tests/domain.test.js
 ```
 
-La sortie `.tmp-s0/` est un **artefact temporaire de validation**, jamais une source à versionner. Après réussite, supprimer ce répertoire local et consigner le résultat/commit dans ce tableau ; **ne pas commencer S1 tant que ce contrôle n'est pas fait**.
+La sortie `.tmp-s0/` est un **artefact temporaire de validation**, jamais une source à versionner. **S0 est débloquée** : correction de typage intégrée à GitHub ; S1 peut débuter. Ne pas confondre cette compilation locale avec un workflow CI distant, pas encore prévu.
 
 ### Vue générale : graphe de progression
 
@@ -277,7 +278,7 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 - [x] Définir les utilitaires purs de date et fuseau : **M28/M29/M45 dans F18**, **M67 dans F26**, conformément à l'architecture ; une répétition quotidienne/hebdomadaire/mensuelle/annuelle est décrite sans fabriquer d'activité réelle.
 - [x] Définir les contrats d'erreur/retour `Result`, le type `LocalDate`, les instants UTC et les règles de test sans choisir implicitement de bibliothèque.
 - [x] **Aucun** framework, gestionnaire de dépendances ni bibliothèque ajoutés à ce stade ; les fichiers créés correspondent aux chemins autorisés. Tout futur choix reste soumis à `AGENTS.md`.
-- [ ] **Finaliser T01** : 13 contrôles de comportement réussis en exécution directe ; compilation `tsc --strict` et exécution du fichier `tests/domain.test.ts` compilé **encore nécessaires** (voir le tableau ci-dessus).
+- [x] **T01 validé localement** : TypeScript strict et exécution Node réussis, avec tests récurrences/DST/types ; refaire la même commande sur clone GitHub lors de la mise en place du projet.
 
 **Sortie S0 :** chaque objet de base est autonome, les fonctions de date sont testables isolément et les noms/signatures correspondent au registre.
 
