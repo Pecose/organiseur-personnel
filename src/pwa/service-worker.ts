@@ -55,7 +55,7 @@ export async function cacheAppShell(revision: string): Promise<Result<void>> {
       const resource = new URL(match[1], homeUrl);
       if (resource.origin === location.origin
         && resource.pathname.startsWith(appScope)
-        && /\\.(?:js|css)$/.test(resource.pathname)) {
+        && /\.(?:js|css)$/.test(resource.pathname)) {
         scriptsAndStyles.push(resource.toString());
       }
     }
