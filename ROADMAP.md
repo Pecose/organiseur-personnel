@@ -220,7 +220,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S0** | **VALIDÉE (tests locaux)** | **15/15 objets autonomes**, fonctions M28/M29/M45/M67, suite T01 ; correction de typage `weekday` ; tests locaux sur copie du code | `tsc --strict` puis `node` : **réussite** avec TypeScript 5.8.3 et Node 22.16.0 ; tests à rejouer lors du premier clonage opérationnel du dépôt |
 | **S1** | **VALIDÉE (tests locaux)** | **10/10 objets composés** O08/O11/O12/O14/O21/O25/O27/O28/O31/O35 dans F17 ; M124/M157 dans F48 ; tests S1 dans F54 | `tsc --strict` puis Node : **réussite sur copie locale**, classification tâche/habitude/événement, habitude horaire, 16 entrées invalides rejetées ; rejouer depuis clone GitHub en CI plus tard |
 | **S2** | **VALIDÉE (tests locaux ciblés)** | **5/5 objets** O09/O23/O26/O32/O36 dans F17, M130 dans F49, M131 dans F51, tests T15/T16 de S2 dans F55 | Sous-ensemble S2 compilé via `tsc --strict` et exécuté sous Node local : récurrences Paris à 19 h, fin de mois, année bissextile, cas New York automne/printemps, groupes Jour ; **compilation sur clone GitHub complet toujours à reproduire** |
-| **S3–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | **S3 devient la prochaine strate**, non commencée |
+| **S3** | **EN COURS, BLOQUÉE POUR M133** | O06 rappel, O30 rapport Google, O33 validation par occurrence dans F17 ; exemples de typage et relations dans F54 | `M133(occ,now)` ne reçoit pas l'état de validation O33 ; approbation nécessaire pour permettre le refus de recochage ; pas de compilation du dépôt complète exécutée ici |
+| **S4–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | S3 à finir avant S4 |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -320,12 +321,14 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Prérequis : S0–S2 validées.**
 
-- [ ] Définir O33 `ActivityCompletion` **par occurrence** : en attente, manuellement fait, automatiquement présumé, annulé.
-- [ ] Définir O06 rappel par `activityId + occurrenceKey` ; définir O30 rapport de synchronisation Google sans exposer de données privées.
+- [x] Définir O33 `ActivityCompletion` **par occurrence** : en attente, manuellement fait, automatiquement présumé, annulé.
+- [x] Définir O06 rappel par `activityId + occurrenceKey` ; définir O30 rapport de synchronisation Google sans exposer de données privées.
 - [ ] Tester les règles pures de **M133** : une heure de fin l'emporte sur l'heure de début ; `autoComplete` peut être désactivé ; une annulation manuelle doit primer sur l'automatisme.
 - [ ] Vérifier que la validation du mercredi n'achève ni le mercredi suivant, ni toute une série.
 
-**Sortie S3 :** états et rappels se rattachent à une occurrence stable, sans erreur de récurrence.
+**Blocage explicite (AGENTS.md) :** `ActivityOccurrenceView` ne contient pas d'état de réalisation O33. La signature enregistrée de **M133** est `shouldAutoComplete(occ:ActivityOccurrenceView,now:string):boolean` ; elle ne peut pas lire `manually_undone` en l'état tout en restant pure. **Demander l'approbation explicite de l'ajout `completion?: ActivityCompletion` dans le type technique de F17**, puis committer **docs/ARCHITECTURE.md avant le code**, ensuite implémenter et tester M133, et seulement alors valider S3.
+
+**Sortie S3 (pas encore atteinte) :** états et rappels se rattachent à une occurrence stable, y compris le veto manuel respecté par M133. Les tests actuels vérifient la structure et les clés, **pas encore** la règle métier complète.
 
 ### S4 — Objets terminaux et rapports dérivés
 
