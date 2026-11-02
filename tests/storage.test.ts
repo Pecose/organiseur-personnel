@@ -33,7 +33,7 @@ void (async () => {
     });
     const empty = await loadBundledCatalog();
     if (!empty.ok || empty.value.length !== 0
-        || fetchedUrl !== "https://example.test/organiseur-personnel/public/catalog/catalog.json") {
+        || fetchedUrl !== "https://example.test/organiseur-personnel/catalog/catalog.json") {
       throw new Error("M50 : lecture de catalogue vide ou URL Pages invalide.");
     }
     const unknown = resolveCatalogAsset("unknown");
@@ -44,14 +44,14 @@ void (async () => {
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
       value: async () => new Response(JSON.stringify([{
-        id: "music-1", revision: "1", kind: "audio", url: "./public/catalog/audio/base.mp3",
+        id: "music-1", revision: "1", kind: "audio", url: "./catalog/audio/base.mp3",
         title: "Média de test", checksum: "placeholder", redistributionAllowed: true,
       }]), {status: 200}),
     });
     const valid = await loadBundledCatalog();
     const asset = resolveCatalogAsset("music-1");
     if (!valid.ok || valid.value.length !== 1 || !asset.ok
-        || asset.value !== "https://example.test/organiseur-personnel/public/catalog/audio/base.mp3") {
+        || asset.value !== "https://example.test/organiseur-personnel/catalog/audio/base.mp3") {
       throw new Error("M50/M51 : résolution d'un média local autorisé incorrecte.");
     }
 
