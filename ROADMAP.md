@@ -213,6 +213,22 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 >
 > Un « objet autonome » veut dire **autonome vis-à-vis des autres objets métier**. Déclarer le type `AuthUser` (O01) ne signifie pas que Firebase Authentication est opérationnel. De même, une interface type ne nécessite pas que Firestore, Cloudflare ou Safari soient déjà configurés.
 
+### État réel d'exécution — 2 novembre 2026
+
+| Strate | État | Réalisé sur GitHub | Validation manquante |
+|---|---|---|---|
+| **S0** | **EN COURS — implémentation déposée** | **15/15 objets autonomes** définis dans F17 ; fonctions M28/M29/M45 dans F18 et M67 dans F26 ; tests T01 dans F40 ; **13 scénarios de comportement passés** par exécution directe de la logique sans dépendance | **Compilation TypeScript stricte et exécution du test compilé** à réaliser sur un clone du dépôt avec `tsc` et `node` ; donc **S0 non encore validée** |
+| **S1–S10** | NON DÉMARRÉES | Aucune implémentation de ces strates | Porte S0 obligatoire avant S1 |
+
+**Pour finir S0 (sans ajout de dépendance ou changement de fichier d'architecture) :** sur un environnement disposant déjà de TypeScript et Node, dans le dépôt, exécuter les commandes ci-dessous ; en cas d'erreur, réparer les contrats S0 déjà approuvés et relancer avant de cocher la strate.
+
+```bash
+tsc --strict --target ES2022 --module commonjs --lib ES2022,DOM --outDir .tmp-s0 src/domain/types.ts src/domain/dates.ts src/features/decor.ts tests/domain.test.ts
+node .tmp-s0/tests/domain.test.js
+```
+
+La sortie `.tmp-s0/` est un **artefact temporaire de validation**, jamais une source à versionner. Après réussite, supprimer ce répertoire local et consigner le résultat/commit dans ce tableau ; **ne pas commencer S1 tant que ce contrôle n'est pas fait**.
+
 ### Vue générale : graphe de progression
 
 ```mermaid
@@ -257,11 +273,11 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Dépend de : rien dans ce projet.** Phase de contrat, zéro API appelée, zéro donnée envoyée.
 
-- [ ] Définir dans **F17** les **15 types autonomes** du tableau, leurs champs obligatoires, valeurs optionnelles et invariants.
-- [ ] Définir les utilitaires purs de date et fuseau dans **F18** : **M28/M29/M45/M67** ; une répétition quotidienne/hebdomadaire/mensuelle/annuelle est décrite sans fabriquer d'activité réelle.
-- [ ] Définir les contrats d'erreur/retour `Result`, le type `LocalDate`, les instants UTC et les règles de test sans choisir implicitement de bibliothèque.
-- [ ] Faire valider toute décision de framework, gestionnaire de dépendances ou nouveau fichier **avant** installation, conformément à `AGENTS.md`.
-- [ ] Tester les validations de types, durées, dates locales et changement d'heure (T01), avec exemples sans Firebase.
+- [x] Définir dans **F17** les **15 types autonomes** du tableau, leurs champs obligatoires, valeurs optionnelles et invariants.
+- [x] Définir les utilitaires purs de date et fuseau dans **F18** : **M28/M29/M45/M67** ; une répétition quotidienne/hebdomadaire/mensuelle/annuelle est décrite sans fabriquer d'activité réelle.
+- [x] Définir les contrats d'erreur/retour `Result`, le type `LocalDate`, les instants UTC et les règles de test sans choisir implicitement de bibliothèque.
+- [x] **Aucun** framework, gestionnaire de dépendances ni bibliothèque ajoutés à ce stade ; les fichiers créés correspondent aux chemins autorisés. Tout futur choix reste soumis à `AGENTS.md`.
+- [ ] **Finaliser T01** : 13 contrôles de comportement réussis en exécution directe ; compilation `tsc --strict` et exécution du fichier `tests/domain.test.ts` compilé **encore nécessaires** (voir le tableau ci-dessus).
 
 **Sortie S0 :** chaque objet de base est autonome, les fonctions de date sont testables isolément et les noms/signatures correspondent au registre.
 
