@@ -125,7 +125,7 @@ export function expandOccurrences(rule: RecurrenceRule, base: string, range: Dat
   for (let offset = 0; offset <= days; offset += 1) {
     const at = baseMillis + offset * 86_400_000;
     const d = new Date(at);
-    const weekday = (d.getUTCDay() + 6) % 7 + 1;
+    const weekday = ((d.getUTCDay() + 6) % 7 + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
     let applies = false;
 
     if (rule.frequency === "daily") {
