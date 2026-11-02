@@ -113,7 +113,7 @@ export interface PlaybackState {
   queueIds: string[];
   position: number;
   paused: boolean;
-  repeatMode: "normal" | "repeat-one" | "repeat-all";
+  repeatMode: "normal" | "repeat"; // shuffle est suivi par le champ booléen séparé.
   shuffle: boolean;
 }
 
