@@ -11,7 +11,7 @@ export async function loadBundledCatalog(): Promise<Result<CatalogEntry[]>> {
     }};
   }
   try {
-    const url = new URL("./public/catalog/catalog.json", document.baseURI);
+    const url = new URL("./catalog/catalog.json", document.baseURI);
     if (url.origin !== location.origin) {
       return {ok: false, error: {code: "CATALOG_ORIGIN", message: "Origine du catalogue non autorisée."}};
     }
