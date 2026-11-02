@@ -222,7 +222,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S2** | **VALIDÉE (tests locaux ciblés)** | **5/5 objets** O09/O23/O26/O32/O36 dans F17, M130 dans F49, M131 dans F51, tests T15/T16 de S2 dans F55 | Sous-ensemble S2 compilé via `tsc --strict` et exécuté sous Node local : récurrences Paris à 19 h, fin de mois, année bissextile, cas New York automne/printemps, groupes Jour ; **compilation sur clone GitHub complet toujours à reproduire** |
 | **S3** | **VALIDÉE SUR SON PÉRIMÈTRE LOGIQUE (tests ciblés locaux)** | O06/O30/O33 dans F17, propriété `completion?: ActivityCompletion` approuvée, M133 dans F48, tests ajoutés à F54 | **18 tests ciblés passés** avec `tsc --strict` + Node sur reproduction isolée du prédicat ; **compilation intégrale depuis GitHub à reproduire**. Les mutations/persistances M132/M134/M154/M158 appartiennent aux strates ultérieures |
 | **S4** | **MODÈLES COMPLETS, VALIDATION PARTIELLE** | O19 et O38 dans F17, `MonthlyAchievement` basé sur O31/O32/O33, tests T19 publiés dans F56 ; **35/35 objets métier** | Contrat/tri vérifiés avec `tsc --strict` et Node sur copie autonome ; **F56 et toutes les suites du dépôt restent à exécuter sur clone**. M147/Firestore prévu en S8, aucun bilan opérationnel |
-| **S5–S10** | NON DÉMARRÉES | Aucun code des services, interfaces ou intégrations | **S5 est la prochaine strate**, sous réserve de validation de la suite complète |
+| **S5** | **EN COURS : fondations statiques et stockage préparés** | F07 TypeScript strict ; F08/F09 entrée HTML et manifeste sans icônes ; F11 catalogue vide ; F17 type MediaDb ; F31 M46 IndexedDB ; F32 M50/M51 catalogue ; F39 règles propriétaires ; F41 tests simulés | **Blocage :** choix explicite des dépendances SDK Firebase / outil de compilation F06 (D10), configuration réelle Auth/Firestore, T05 émulateur, tests F41, PWA/cache/Safari iPhone et compilation complète du dépôt |
+| **S6–S10** | NON DÉMARRÉES | Aucun code de ces strates | S5 doit satisfaire sa porte de validation avant S6 |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -352,14 +353,18 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Prérequis : S0–S4 validées.** Ici seulement arrivent les dépendances techniques externes.
 
-- [ ] Valider l'outil de compilation TypeScript et les fichiers **F06–F09/F14** ; préparer l'app shell, les icônes et le manifeste PWA pour Safari.
-- [ ] Ajouter **Firebase Auth** (M16–M20/M90) et **Firestore** (M21–M27/M89), le mode hors ligne Safari et les états O15 ; préparer **F39** et tester les **refus entre deux UID** (T05).
+- [ ] Valider l'outil de compilation TypeScript et les fichiers **F06–F09/F14** ; préparer l'app shell, les icônes et le manifeste PWA pour Safari. **Partiel :** `tsconfig.json`, `index.html`, `manifest.webmanifest` créés ; **pas** de bundler choisi (D10/F06), ni d'icônes F10, ni de bootstrap F14.
+- [ ] Ajouter **Firebase Auth** (M16–M20/M90) et **Firestore** (M21–M27/M89), le mode hors ligne Safari et les états O15 ; préparer **F39** et tester les **refus entre deux UID** (T05). **Partiel :** F39 contient des règles ciblées non déployées. **Manque :** consentement au choix du SDK et du bundler, paramètres réels du projet, vérification Firebase Emulator de T05.
 - [ ] N'autoriser les écritures Firestore qu'après validation des règles d'accès, des collections O31–O36 et des champs réellement autorisés.
-- [ ] Préparer **IndexedDB F31** (M46), catalogue embarqué F32 (M50/M51), cache PWA et service worker F35 (M79/M80).
+- [ ] Préparer **IndexedDB F31** (M46), catalogue embarqué F32 (M50/M51), cache PWA et service worker F35 (M79/M80). **Partiel :** M46 et les quatre stores enregistrés ; F32 M50/M51 avec catalogue F11 vide ; F41 fournit des simulations **non exécutées** ; service worker F35/M79/M80 restant à réaliser après validation de l'outillage.
 - [ ] Premier prototype iPhone : installation Safari, fermeture/réouverture, **PC éteint**, réseau absent, limites de stockage ; tester tôt la lecture d'un fichier Suno sur écran verrouillé pour décider si la PWA reste adaptée, sans promettre la lecture ininterrompue.
 - [ ] Vérifier **0 €**, GitHub Pages `Pecose`, Firebase Spark et absence de secrets dans le dépôt.
 
-**Sortie S5 :** des **adaptateurs sûrs et testés** existent pour stocker/lire les objets ; aucun CRUD métier ou écran final ne dépend de stubs trompeurs.
+**Sortie S5 (NON ATTEINTE) :** des adaptateurs sûrs et testés doivent exister pour stocker/lire les objets ; aucun CRUD métier ou écran final ne doit dépendre de stubs trompeurs.
+
+**Livraison effective du premier lot (2026-11-02) :** fichiers F07/F08/F09/F11/F17/F31/F32/F39/F41 committés ; aucun service externe activé, coût nul, aucune donnée personnelle collectée. `index.html` est **une page d'attente**, et le manifeste **sans icône ni service worker** n'est pas présenté comme PWA installable/compatible hors ligne. Les contrôles statiques JSON et les règles de refus par défaut sont vérifiés sur les fichiers du dépôt, **sans émulateur Firestore**.
+
+**Avant le prochain commit de dépendances :** obtenir l'accord explicite pour la version et le choix de `firebase` (SDK Web officiel) et d'un outillage de compilation/bundling comme Vite, conformément à D10 et F06. Aucun ajout de package non approuvé. Puis exécuter `tsc --noEmit` et les suites existantes sur un clone, installer la configuration publique Firebase réelle sans secret, tester les règles F39 au Firebase Emulator avec deux UID, avant tout déploiement. S5 doit rester **EN COURS** jusque-là.
 
 ### S6 — Fonctions élémentaires sur **un seul objet à la fois**
 
