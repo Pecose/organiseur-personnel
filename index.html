@@ -18,6 +18,7 @@
     p { line-height: 1.55; }
     small { color: #69796f; }
   </style>
+  <script type="module" src="/src/main.ts"></script>
 </head>
 <body>
   <main>
@@ -26,7 +27,8 @@
       <p>Le socle de l'application est en cours de construction.</p>
       <p>Les cinq pages prévues sont <strong>Calendrier, Tâches, Jour, Habitudes et Listes</strong>.
          Aucune connexion ni saisie personnelle n'est disponible ici pour l'instant.</p>
-      <small>Page de préparation, sans collecte de données ni connexion réseau applicative.</small>
+      <small>Page de préparation : aucun formulaire ni donnée personnelle n'est encore disponible.</small>
+      <p data-firebase-status role="status" aria-live="polite">Chargement de la configuration locale…</p>
     </article>
   </main>
 </body>
