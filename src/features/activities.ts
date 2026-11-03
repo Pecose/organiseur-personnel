@@ -1,7 +1,7 @@
 /** F48 · S1 : classification et validation pures du seul objet métier Activity. */
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, getFirestore, runTransaction } from "firebase/firestore";
 import { getUserCollection, putCloudRecord } from "../services/cloudRepository";
 import { expandActivityOccurrences } from "./habits";
 import type { Activity, ActivityCompletion, ActivityDraft, ActivityOccurrenceView, ActivitySchedule, RecurrenceRule, Result } from "../domain/types";
@@ -405,78 +405,122 @@ export async function getOccurrenceCompletion(
   }
 }
 
-/** M132 · Changement manuel de la seule occurrence visée. */
+/** M132 · Coche manuelle transactionnelle de la seule occurrence visée. */
 export async function setOccurrenceCompletion(
   key: string, mode: "manual_done" | "pending",
 ): Promise<Result<ActivityCompletion>> {
+  const sep = key.lastIndexOf("@");
+  const activityId = key.slice(0, sep);
+  const day = key.slice(sep + 1);
+  if (!["manual_done", "pending"].includes(mode) || sep < 1
+    || !activityId || activityId.includes("/") || key.includes("/")
+    || !/^\d{4}-\d{2}-\d{2}$/.test(day)
+    || !Number.isFinite(Date.parse(day + "T00:00:00Z"))
+    || new Date(day + "T00:00:00Z").toISOString().slice(0, 10) !== day) {
+    return {ok: false, error: {
+      code: "INVALID_OCCURRENCE", message: "Occurrence ou action manuelle invalide.",
+    }};
+  }
   try {
-    const user = getAuth(getApp("organiseur-personnel")).currentUser;
-    const at = key.lastIndexOf("@");
-    const activityId = key.slice(0, at);
-    const localDate = key.slice(at + 1);
-    if (!user || at <= 0 || !activityId || activityId.includes("/") || key.includes("/")
-      || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)
-      || Number.isNaN(Date.parse(localDate + "T00:00:00Z"))) return {
-      ok: false, error: {
-        code: "INVALID_OCCURRENCE", message: "Clé d'occurrence invalide.",
-      },
-    };
-    const activitySnapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), activityId));
-    if (!activitySnapshot.exists() || (activitySnapshot.data() as Activity).deletedAt) {
-      return { ok: false, error: {
-        code: "ACTIVITY_NOT_FOUND", message: "Activité inexistante ou archivée.",
-      }};
-    }
-    const previous = await getOccurrenceCompletion(key);
-    if (!previous.ok) return previous;
-    if (mode === "pending" && previous.value && previous.value.status !== "pending") {
-      return { ok: false, error: {
-        code: "USE_MANUAL_UNDO",
-        message: "Pour annuler une validation existante, utiliser l'annulation manuelle.",
-      }};
-    }
-    const now = new Date().toISOString();
-    const completion: ActivityCompletion = {
-      id: key, activityId, occurrenceKey: key,
-      status: mode, updatedAt: now,
-      ...(mode === "manual_done" ? { completedAt: now } : {}),
-    };
-    const saved = await putCloudRecord(user.uid, "activityCompletions", key, completion);
-    return saved.ok ? { ok: true, value: completion } : saved;
+    const app = getApp("organiseur-personnel");
+    const user = getAuth(app).currentUser;
+    if (!user) return {ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Connexion requise pour valider l'occurrence.",
+    }};
+    const activityRef = doc(getUserCollection(user.uid, "activities"), activityId);
+    const completionRef = doc(getUserCollection(user.uid, "activityCompletions"), key);
+    return await runTransaction(getFirestore(app), async tx => {
+      const [record, existing] = await Promise.all([
+        tx.get(activityRef), tx.get(completionRef),
+      ]);
+      if (!record.exists() || (record.data() as Activity).deletedAt) return {
+        ok: false, error: {
+          code: "ACTIVITY_NOT_FOUND", message: "Activité absente ou archivée.",
+        },
+      } as Result<ActivityCompletion>;
+      const parent = record.data() as Activity;
+      const center = Date.parse(day + "T00:00:00Z");
+      const matches = expandActivityOccurrences(parent, {
+        from: new Date(center - 2 * 86_400_000).toISOString(),
+        to: new Date(center + 3 * 86_400_000).toISOString(),
+      });
+      if (!matches.some(item => item.occurrenceKey === key)) return {
+        ok: false, error: {
+          code: "OCCURRENCE_NOT_FOUND", message: "Cette occurrence n'existe plus.",
+        },
+      } as Result<ActivityCompletion>;
+      const before = existing.exists() ? existing.data() as ActivityCompletion : null;
+      if (before?.status === "manual_done" && mode === "manual_done") {
+        return {ok: true, value: before} as Result<ActivityCompletion>;
+      }
+      if (mode === "pending" && before && before.status !== "pending") return {
+        ok: false, error: {
+          code: "USE_MANUAL_UNDO", message: "Utilise l'annulation manuelle pour retirer la coche.",
+        },
+      } as Result<ActivityCompletion>;
+      const now = new Date().toISOString();
+      const completion: ActivityCompletion = {
+        id: key, activityId, occurrenceKey: key,
+        status: mode, updatedAt: now,
+        ...(mode === "manual_done" ? {completedAt: now} : {}),
+      };
+      tx.set(completionRef, completion);
+      return {ok: true, value: completion} as Result<ActivityCompletion>;
+    });
   } catch {
-    return { ok: false, error: {
-      code: "COMPLETION_WRITE_FAILED", message: "Validation indisponible.",
+    return {ok: false, error: {
+      code: "COMPLETION_TRANSACTION_FAILED",
+      message: "Coche non confirmée. Une connexion est nécessaire.",
     }};
   }
 }
 
-/** M134 · Veto manuel persistant contre le recochage automatique M133. */
+/** M134 · Veto atomique : l'autovalidation concurrente ne peut plus le remplacer. */
 export async function undoOccurrenceCompletion(
   key: string,
 ): Promise<Result<ActivityCompletion>> {
+  if (!key || !key.includes("@") || key.includes("/")) return {
+    ok: false, error: {
+      code: "INVALID_OCCURRENCE", message: "Clé d'occurrence invalide.",
+    },
+  };
   try {
-    const user = getAuth(getApp("organiseur-personnel")).currentUser;
-    if (!user || !key || key.includes("/")) return { ok: false, error: {
-      code: "INVALID_OCCURRENCE", message: "Session ou occurrence invalide.",
+    const app = getApp("organiseur-personnel");
+    const user = getAuth(app).currentUser;
+    if (!user) return {ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Connexion requise pour retirer une coche.",
     }};
-    const before = await getOccurrenceCompletion(key);
-    if (!before.ok) return before;
-    if (!before.value) return { ok: false, error: {
-      code: "COMPLETION_NOT_FOUND", message: "Aucune validation à annuler.",
-    }};
-    const now = new Date().toISOString();
-    const completion: ActivityCompletion = {
-      ...before.value,
-      status: "manually_undone",
-      overriddenAt: now,
-      updatedAt: now,
-    };
-    delete completion.completedAt;
-    const written = await putCloudRecord(user.uid, "activityCompletions", key, completion);
-    return written.ok ? { ok: true, value: completion } : written;
+    const reference = doc(getUserCollection(user.uid, "activityCompletions"), key);
+    return await runTransaction(getFirestore(app), async tx => {
+      const snapshot = await tx.get(reference);
+      if (!snapshot.exists()) return {ok: false, error: {
+        code: "COMPLETION_NOT_FOUND", message: "Aucune coche à annuler.",
+      }} as Result<ActivityCompletion>;
+      const before = snapshot.data() as ActivityCompletion;
+      if (before.occurrenceKey !== key || before.id !== key
+        || before.activityId !== key.slice(0, key.lastIndexOf("@"))) {
+        return {ok: false, error: {
+          code: "COMPLETION_MISMATCH", message: "La coche ne correspond pas à l'occurrence.",
+        }} as Result<ActivityCompletion>;
+      }
+      if (before.status === "manually_undone") return {
+        ok: true, value: before,
+      } as Result<ActivityCompletion>;
+      const now = new Date().toISOString();
+      const completion: ActivityCompletion = {
+        ...before,
+        status: "manually_undone",
+        overriddenAt: now,
+        updatedAt: now,
+      };
+      delete completion.completedAt;
+      tx.set(reference, completion);
+      return {ok: true, value: completion} as Result<ActivityCompletion>;
+    });
   } catch {
-    return { ok: false, error: {
-      code: "COMPLETION_UNDO_FAILED", message: "Annulation indisponible.",
+    return {ok: false, error: {
+      code: "COMPLETION_UNDO_FAILED",
+      message: "Annulation non enregistrée. Réessaie en ligne.",
     }};
   }
 }
