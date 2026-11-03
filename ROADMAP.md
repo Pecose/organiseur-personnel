@@ -1,16 +1,16 @@
 # Roadmap — Application personnelle iPhone (PWA)
 
-> **Statut :** cahier des charges validé pour le démarrage du projet.  
+> **Statut :** implémentation des strates S0–S8 avancée, **non testée et non déployée** ; S9/S10 planifiées.  
 > **GitHub cible :** compte **`Pecose`**, **jamais** l'organisation `T-C-Umbral`.  
 > **Dépôt créé :** `Pecose/organiseur-personnel` (public, branche `main`).  
 > **Utilisatrice cible :** une personne, sur iPhone.  
 > **Budget impératif :** **0 €** d'abonnement, d'hébergement et de compte Apple Developer.  
 > **Environnement de développement :** Windows.  
-> **Dernière mise à jour :** 2 novembre 2026 (roadmap réordonnée par dépendances ; aucun code d'application développé).
+> **Dernière mise à jour :** 3 novembre 2026 (S8/D24 codée ; recette globale D23 différée).
 
 ## Tableau de bord des objectifs (lecture humaine)
 
-**Ce tableau est le suivi des objectifs officiel.** Il sert à comparer ce que nous voulons obtenir avec les contrats techniques de [l'architecture](docs/ARCHITECTURE.md). **Validation du périmètre ≠ fonction déjà développée** : toutes les fonctions logicielles ci-dessous restent `PLANNED`. L'agent doit actualiser cette correspondance à chaque évolution approuvée.
+**Ce tableau est le suivi des objectifs officiel.** Il sert à comparer ce que nous voulons obtenir avec les contrats techniques de [l'architecture](docs/ARCHITECTURE.md). **Validation du périmètre ≠ fonctionnalité validée** : les strates S0–S8 comportent désormais du code **non testé**. S9–S10 restent planifiées. L'agent doit actualiser cette correspondance à chaque évolution approuvée.
 
 | ID objectif | Résultat attendu | Architecture à consulter | Test / jalon | Statut |
 |---|---|---|---|---|
@@ -225,7 +225,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S5** | **EN COURS : dépendances et services codés, non validés sur appareil** | Accord D10 et commit préalable ; F06 Vite/TS/Firebase ; F14 entrée ; F17 types SDK ; F27 M16 ; F28 M17–M20/M90 ; F29 M21–M24/M89 ; F30 M25–M27 ; F35 M79/M80 ; F42 scénarios T05 pour émulateurs ; F39 toujours non déployé | **Restant :** `npm install`, `npm run build`/tests réels, paramètres Firebase Web du projet, tests UID à l'émulateur, autorisation puis déploiement contrôlé des règles, icônes F10 et test réel iPhone Safari. Sans ces étapes S5 ne peut pas être déclarée validée |
 | **S6** | **LARGEMENT CODÉE, NON TESTÉE (D23)** | M121–M126/M132–M134/M138–M146/M155/M157–M160 (M133 et M157 antérieurs) ; M41–M44 ; M47/M48 ; M52–M57 ; M64/M65/M95. Activités, listes archivables, coches, rappels locaux, import musique/image et métadonnées | Restent M49/M69 (suppression média et contrôle des références), sécurisation concurrence M158, recette de toutes les fonctions. **Aucun test ni déploiement** |
 | **S7** | **CINQ VUES CODÉES, NON TESTÉES (D23)** | F14 M01 ; F15 M02–M04 ; F16 M13–M15/M148 ; F17 CalendarDaySummary ; F19 M05–M11/M149–M152 ; F20 M12 ; F21 M127/M128/M156 ; F51 M129 ; F53 M153 ; F08 habillage mobile pastel | Lecture et édition des données réelles, iPhone/VoiceOver, build Vite, cache des chunks différés et corrections finales restent **à tester en recette** ; Musique/Décoration encore basiques, Bilan S8 absent |
-| **S8–S10** | NON DÉMARRÉES | Aucun code de ces strates | S8 peut avancer sur les dépendances déjà codées ; recette finale globale D23 |
+| **S8** | **CONTRATS D24 CODÉS, NON TESTÉS** | M135–M137, M132/M134/M154/M158 transactionnels, fenêtre groupée Jour et bilan M147/F15 | Recette complète différée D23, aucune utilisation de Firebase réel |
+| **S9–S10** | NON DÉMARRÉES | Connecteurs externes et déploiement non activés | Aucun service payant, priorité aux fonctions autorisées puis recette finale |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
