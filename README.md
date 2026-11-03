@@ -10,7 +10,15 @@ Application personnelle iPhone **PWA**, en cours de conception. Installation via
 
 > **Règle bloquante :** tout élément absent ou incompatible avec le registre d'architecture doit être soumis à l'utilisateur. Après accord explicite, la documentation d'architecture doit être mise à jour et committée **avant** le code. Pas d'ajout implicite.
 
-**État au 3 novembre 2026 :** les 35 objets S0–S4 sont typés ; **S5 est en cours**. Vite/TypeScript, Firebase SDK modulaire (Auth/Firestore), une page d'attente, un manifeste et un service worker de cache public sont en place **dans le code**, mais aucun écran métier, aucune installation iPhone validée et aucun déploiement Firebase ne sont revendiqués. Les règles Firestore existent **sans avoir été activées ni validées dans l'émulateur**. Google Agenda et notifications distantes restent planifiés.
+**État au 3 novembre 2026 :** les 35 objets S0–S4 sont typés ; S5 et S6 sont partiellement codées ; **S7 possède ses cinq écrans principaux en TypeScript natif** (Calendrier, Tâches, Jour, Habitudes, Listes), l'éditeur d'activité et les vues secondaires de base. **Code non testé et non déployé**, conformément à la décision D23 qui regroupe toutes les validations à la recette finale. Le build, Safari iPhone, VoiceOver, les règles Firestore et la synchronisation hors ligne **ne sont pas validés**. Aucun projet Firebase réel, règle serveur ou service payant n'a été activé. La lecture audio complète, les décors avancés, le bilan mensuel, la synchronisation Google Agenda et les notifications distantes restent à développer et/ou tester.
+
+## Organisation de l'interface (S7)
+
+L'application a désormais cinq onglets fixes, accessibles à une main : **Calendrier · Tâches · Jour · Habitudes · Listes**. Jour est l'accueil et présente uniquement **sans horaire** puis **avec horaire**. La semaine du calendrier affiche lundi à samedi (3×2) et un dimanche dépliable. L'icône gauche ouvre une fiche unique ; la validation à droite porte sur l'occurrence du jour.
+
+Sans configuration Firebase réelle, le shell montre uniquement des états vides et une invitation à se connecter, **jamais des données de démonstration présentées comme personnelles**. Les interfaces Musique, Décoration et Paramètres sont secondaires et encore incomplètes. La route Bilan mensuel attend la strate S8. La validation d'une tâche **sans date** nécessite une décision d'architecture complémentaire, puisqu'une coche O33 demande une occurrence datée.
+
+Les tests et la compilation sont **expressément remis à la recette finale D23** : les commandes ci-dessous décrivent comment les effectuer alors, et non des validations déjà réussies.
 
 ## Construire le projet (Node 22.12+ ou 24+)
 
