@@ -432,3 +432,22 @@ export interface Connectivity {
 }
 export type Unsubscribe = () => void;
 
+
+/** Types techniques F17 / S6 explicitement prévus dans le registre §4.9. */
+export type ActivityDraft = Omit<Activity,
+  "id" | "uid" | "updatedAt" | "deletedAt" | "googleLink" | "autoComplete"> & {
+  id?: string;
+  autoComplete?: boolean;
+};
+export type ActivitySchedule = Pick<Activity,
+  "plannedOn" | "startAt" | "endAt" | "timeZone"> & {
+  autoComplete?: boolean;
+};
+export type ChecklistDraft = Pick<Checklist, "name" | "iconId"> & {
+  id?: string;
+  archived?: boolean;
+};
+export type ChecklistItemDraft = Pick<ChecklistItem,
+  "checklistId" | "text" | "checked" | "position"> & {
+  id?: string;
+};
