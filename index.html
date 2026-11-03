@@ -168,6 +168,35 @@
       justify-content:space-around; gap:3px; flex-wrap:wrap; }
     .weekday-field legend { color:#7a8d7e; font-size:12px; }
     .weekday-field label { display:inline-flex; align-items:center; flex-direction:row; gap:3px; }
+    /* S7 : médias secondaires en cartes tactiles, jamais dans les cinq onglets. */
+    .media-import { display:grid; grid-template-columns:minmax(0,1fr) auto;
+      align-items:end; gap:12px; background:#fffdf9; padding:15px;
+      border:1px solid var(--line); border-radius:18px; }
+    .media-import label { min-width:0; display:grid; gap:7px; font-size:13px;
+      color:var(--sage-dark); font-weight:650; }
+    .media-import input[type=file] { display:block; width:100%; min-width:0; max-width:100%;
+      padding:9px; font-size:12px; background:#f9faf6;
+      border:1px solid #dae5dc; border-radius:11px; }
+    .player-controls { display:flex; align-items:center; justify-content:flex-start;
+      flex-wrap:wrap; gap:8px; padding:14px; border-radius:17px;
+      border:1px solid #dfe9df; background:linear-gradient(120deg,#eff5ec,#faf0eb); }
+    .player-controls > button { min-width:46px; min-height:46px; font-size:20px; }
+    .player-controls label { display:grid; gap:3px; font-size:12px; font-weight:650;
+      color:var(--sage-dark); min-width:128px; flex:1; }
+    .player-controls select { width:100%; min-height:43px; font-size:13px; border-radius:11px;
+      border:1px solid var(--line); background:var(--paper); padding:6px; }
+    .image-gallery { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px; align-items:start; }
+    .image-tile { margin:0; min-width:0; padding:8px; background:var(--paper);
+      border-radius:18px; border:1px solid var(--line); overflow:hidden; }
+    .image-tile img { display:block; width:100%; aspect-ratio:4/3; object-fit:cover;
+      border-radius:12px; background:linear-gradient(135deg,#dfebe2,#f7e8e4); }
+    .image-tile figcaption { overflow-wrap:anywhere; padding:10px 4px 3px;
+      font-size:12px; line-height:1.4; color:#566b5f; }
+    @media (max-width:480px) {
+      .media-import { grid-template-columns:1fr; }
+      .media-import button { width:100%; }
+    }
     @media (min-width:720px) {
       .app-shell { margin:14px auto; min-height:calc(100svh - 28px); border-radius:25px; overflow:clip; }
       .app-top { border-radius:25px 25px 0 0; }
