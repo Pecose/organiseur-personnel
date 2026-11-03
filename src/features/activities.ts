@@ -159,6 +159,13 @@ export async function createActivity(input: ActivityDraft): Promise<Result<Activ
     if (!valid.ok) return valid;
     const clean = Object.fromEntries(Object.entries(valid.value)
       .filter(([_name, value]) => value !== undefined)) as Activity;
+    // Même ID fourni par l'appelant : ne jamais écraser une activité existante.
+    if (input.id) {
+      const existing = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
+      if (existing.exists()) return { ok: false, error: {
+        code: "ACTIVITY_ALREADY_EXISTS", message: "Cet identifiant d'activité existe déjà.",
+      }};
+    }
     const saved = await putCloudRecord(user.uid, "activities", id, clean);
     if (!saved.ok) return saved;
     return { ok: true, value: clean };
