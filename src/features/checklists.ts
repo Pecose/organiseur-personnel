@@ -5,8 +5,9 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { fetchCloudRecords, getUserCollection, putCloudRecord } from "../services/cloudRepository";
+import { attachChecklist } from "./activities";
 import type {
-  Checklist, ChecklistDraft, ChecklistItem, ChecklistItemDraft, Result,
+  Activity, Checklist, ChecklistDraft, ChecklistItem, ChecklistItemDraft, Result,
 } from "../domain/types";
 
 /** M143 · Toutes les listes non archivées du compte connecté. */
@@ -161,6 +162,50 @@ export async function getChecklistDetails(id: string): Promise<Result<{
   } catch {
     return { ok: false, error: {
       code: "CHECKLIST_READ_FAILED", message: "Lecture de liste indisponible.",
+    }};
+  }
+}
+
+/** M145 · Supprimer de la vue une liste après consentement explicite.
+ * L'archivage est non destructif : les articles restent récupérables,
+ * et les activités liées conservent leurs propres historiques.
+ * En cas d'échec partiel, relancer le traitement est sans danger.
+ */
+export async function deleteChecklist(id: string): Promise<Result<void>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !id || id.includes("/")) return {ok: false, error: {
+      code: "INVALID_CHECKLIST", message: "Identifiant ou session invalide.",
+    }};
+    const snapshot = await getDoc(doc(getUserCollection(user.uid, "checklists"), id));
+    if (!snapshot.exists()) return {ok: false, error: {
+      code: "CHECKLIST_NOT_FOUND", message: "Liste introuvable.",
+    }};
+    const existing = snapshot.data() as Checklist;
+    if (existing.archived) return {ok: true, value: undefined};
+    if (typeof window === "undefined" || typeof window.confirm !== "function"
+        || !window.confirm(
+          "Retirer cette liste de l'organiseur ? Les activités qui y sont liées seront détachées. " +
+          "Les articles seront conservés dans les données archivées.",
+        )) return {ok: false, error: {
+      code: "CANCELLED", message: "Aucune liste supprimée sans confirmation.",
+    }};
+
+    const activities = await fetchCloudRecords<Activity>(user.uid, "activities");
+    if (!activities.ok) return activities;
+    for (const item of activities.value) {
+      if (item.checklistId === id) {
+        const removedLink = await attachChecklist(item.id, null);
+        if (!removedLink.ok) return removedLink;
+      }
+    }
+    const archived = await saveChecklist({
+      id, name: existing.name, iconId: existing.iconId, archived: true,
+    });
+    return archived.ok ? {ok: true, value: undefined} : archived;
+  } catch {
+    return {ok: false, error: {
+      code: "CHECKLIST_DELETE_FAILED", message: "Impossible d'archiver la liste.",
     }};
   }
 }
