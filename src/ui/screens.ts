@@ -729,28 +729,81 @@ export function renderMusic(): void {
   }).catch(() => { if (list.isConnected) list.textContent = "Bibliothèque indisponible."; });
 }
 
-/** M09 · Décoration secondaire, sans exposition d'images locales à Firestore. */
+/** M09 · Galerie et import privé, sans rendre publics les fichiers locaux. */
 export function renderDecor(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">UNE TOUCHE PERSONNELLE</p>
-    <h2>Mes décors</h2><p class="muted">Tes images personnelles restent sur ton téléphone.</p>
-    <button type="button" class="soft-button" data-back>← Revenir à Jour</button></section>
-    <section class="day-section"><h3>Galerie</h3><div id="decor-list" class="entry-list"></div></section>`;
+  root.innerHTML =
+    "<section class='page-intro'><p class='eyebrow'>UNE TOUCHE PERSONNELLE</p>" +
+    "<h2>Mes décors</h2><p class='muted'>Les images importées restent sur ce téléphone.</p>" +
+    "<button type='button' class='soft-button' data-back>← Revenir à Jour</button></section>" +
+    "<section class='day-section'><h3>Importer une image</h3>" +
+    "<form id='image-import' class='media-import'><label>Image de ton appareil" +
+    "<input type='file' name='file' accept='image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif' required></label>" +
+    "<button type='submit' class='primary-button compact'>Importer</button></form>" +
+    "<p id='image-feedback' class='muted' role='status' aria-live='polite'></p></section>" +
+    "<section class='day-section'><h3>Ma galerie</h3>" +
+    "<div id='decor-list' class='image-gallery'></div></section>";
   root.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => navigate({name:"day"});
+  const feedback = root.querySelector<HTMLElement>("#image-feedback")!;
   const target = root.querySelector<HTMLElement>("#decor-list")!;
+  const form = root.querySelector<HTMLFormElement>("#image-import")!;
+  form.onsubmit = event => {
+    event.preventDefault();
+    const file = (form.elements.namedItem("file") as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
+    submit.disabled = true;
+    feedback.textContent = "Import local de l'image…";
+    void importImage(file).then(result => {
+      submit.disabled = false;
+      if (result.ok) renderDecor();
+      else feedback.textContent = result.error.message;
+    }).catch(() => {
+      submit.disabled = false;
+      feedback.textContent = "Import impossible sur cet appareil.";
+    });
+  };
+  target.textContent = "Chargement de la galerie…";
   void listImages().then(result => {
     if (!root.isConnected || getAppState().route.name !== "decor") return;
     target.replaceChildren();
     if (!result.ok) { target.textContent = result.error.message; return; }
     if (!result.value.length) { target.textContent = "Aucune image importée pour l'instant."; return; }
     for (const image of result.value) {
-      const entry = document.createElement("p");
-      entry.className = "activity-row";
-      entry.textContent = "✿  " + image.name;
-      target.append(entry);
+      const tile = document.createElement("figure");
+      tile.className = "image-tile";
+      const preview = document.createElement("img");
+      preview.loading = "lazy";
+      preview.alt = image.name;
+      preview.decoding = "async";
+      const caption = document.createElement("figcaption");
+      caption.textContent = image.name;
+      tile.append(preview, caption);
+      target.append(tile);
+      if (image.source === "imported" && image.mediaId) {
+        void readMedia(image.mediaId).then(binary => {
+          if (!tile.isConnected) return;
+          if (!binary.ok) {
+            caption.textContent = image.name + " · fichier local manquant";
+            return;
+          }
+          const url = URL.createObjectURL(binary.value);
+          preview.onload = () => URL.revokeObjectURL(url);
+          preview.onerror = () => {
+            URL.revokeObjectURL(url);
+            caption.textContent = image.name + " · aperçu indisponible";
+          };
+          preview.src = url;
+        }).catch(() => {
+          if (tile.isConnected) caption.textContent = image.name + " · aperçu indisponible";
+        });
+      } else if (image.source === "bundled" && image.catalogId) {
+        const linked = resolveCatalogAsset(image.catalogId);
+        if (linked.ok) preview.src = linked.value;
+      }
     }
-  });
+  }).catch(() => { if (target.isConnected) target.textContent = "Galerie indisponible."; });
 }
 
 /** M10 · Compte, session et consentement au cache persistant. */
