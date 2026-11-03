@@ -64,10 +64,30 @@ export async function bootstrapApp(): Promise<Result<void>> {
           setAppState({sync});
           renderCommonStatus(sync);
         });
+        // FL15 : une seule réconciliation bornée au retour de session.
+        // Aucun minuteur de fond et aucune écriture en absence de session.
+        void import("./features/activities").then(async actions => {
+          const result = await actions.reconcileDueAutoCompletions(new Date().toISOString());
+          if (result.ok && result.value > 0 && getAppState().route.name === "day") {
+            renderRoute(getAppState().route);
+          }
+        }).catch(() => { /* La connexion ne permet pas de confirmer la réconciliation. */ });
       }
       renderRoute(getAppState().route);
     });
   }
+
+  // Sur iPhone, l'onglet peut redevenir visible longtemps après le dernier rendu.
+  // On réévalue seulement à ce moment, sans prétendre disposer d'une alarme native.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !getAppState().user) return;
+    void import("./features/activities").then(async actions => {
+      const result = await actions.reconcileDueAutoCompletions(new Date().toISOString());
+      if (result.ok && result.value > 0 && getAppState().route.name === "day") {
+        renderRoute(getAppState().route);
+      }
+    }).catch(() => { /* Pas d'ACK serveur annoncé en cas d'échec. */ });
+  });
 
   // Le SDK et le cache PWA sont deux couches distinctes : les fichiers personnels
   // ne sont jamais placés dans le cache public du service worker.
