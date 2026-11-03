@@ -48,3 +48,22 @@ export function watchAppState(listener: (s: AppState) => void): Unsubscribe {
   listeners.add(listener);
   return () => { listeners.delete(listener); };
 }
+
+/** M148 · Date sélectionnée, source et raccourci vers Aujourd'hui. */
+export function setSelectedDay(
+  date: string, source: DaySelection["source"],
+): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  const checked = new Date(date + "T00:00:00Z");
+  if (Number.isNaN(checked.getTime()) || checked.toISOString().slice(0, 10) !== date) return;
+  const current = getAppState();
+  setAppState({
+    daySelection: {
+      selectedDate: date,
+      today: new Date().toLocaleDateString("sv-SE", {
+        timeZone: current.preferences.timeZone,
+      }),
+      source,
+    },
+  });
+}
