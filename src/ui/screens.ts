@@ -11,7 +11,7 @@ import { listTasks } from "../features/tasks";
 import { listHabits } from "../features/habits";
 import { groupDayEntries, getDayEntries } from "../features/day";
 import {
-  setOccurrenceCompletion, undoOccurrenceCompletion,
+  getOccurrenceCompletion, setOccurrenceCompletion, undoOccurrenceCompletion,
 } from "../features/activities";
 import {
   listChecklists, getChecklistDetails, saveChecklist,
@@ -368,19 +368,38 @@ export function renderTasks(): void {
       if (!task.plannedOn) {
         check.disabled = true;
         check.title = "Ajoute une date pour valider une occurrence.";
+        check.setAttribute("aria-label", "Ajoute une date pour terminer " + task.title);
       } else {
-        check.title = "Marquer cette occurrence terminée";
+        const key = task.id + "@" + task.plannedOn;
+        check.setAttribute("aria-label", "Terminer " + task.title);
         check.onclick = () => {
+          const checked = check.dataset.completed === "true";
           check.disabled = true;
-          void setOccurrenceCompletion(task.id + "@" + task.plannedOn, "manual_done")
-            .then(result => {
+          void (checked
+            ? undoOccurrenceCompletion(key)
+            : setOccurrenceCompletion(key, "manual_done")).then(result => {
               check.disabled = false;
               if (result.ok) {
-                check.textContent = "✓";
-                check.classList.add("is-checked");
-              } else check.title = result.error.message;
+                check.dataset.completed = checked ? "false" : "true";
+                check.textContent = checked ? "○" : "✓";
+                check.classList.toggle("is-checked", !checked);
+                check.setAttribute("aria-label",
+                  (checked ? "Terminer " : "Annuler la validation de ") + task.title);
+              } else {
+                check.title = result.error.message;
+              }
             });
         };
+        void getOccurrenceCompletion(key).then(result => {
+          if (!result.ok || !check.isConnected) return;
+          const checked = result.value?.status === "manual_done"
+            || result.value?.status === "auto_assumed";
+          check.dataset.completed = checked ? "true" : "false";
+          check.textContent = checked ? "✓" : "○";
+          check.classList.toggle("is-checked", checked);
+          check.setAttribute("aria-label",
+            (checked ? "Annuler la validation de " : "Terminer ") + task.title);
+        });
       }
       card.append(icon, details, check);
       list.append(card);
@@ -417,7 +436,10 @@ export function renderHabits(): void {
       const title = document.createElement("strong");
       title.textContent = habit.title;
       const meta = document.createElement("small");
-      meta.textContent = (habit.recurrence?.frequency || "Répétition")
+      meta.textContent = ({
+        daily: "Chaque jour", weekly: "Chaque semaine",
+        monthly: "Chaque mois", yearly: "Chaque année",
+      } as Record<string, string>)[habit.recurrence?.frequency || ""]
         + (habit.startAt ? " · Avec horaire" : " · Sans horaire");
       text.append(title, meta);
       const arrow = document.createElement("span");
