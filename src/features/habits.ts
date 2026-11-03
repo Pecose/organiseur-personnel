@@ -2,7 +2,8 @@
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { fetchCloudRecords } from "../services/cloudRepository";
-import { classifyActivity } from "./activities";
+// M126 applique directement la même définition de catégorie que M124,
+// pour éviter une dépendance circulaire F48 ↔ F49.
 import type { Activity, ActivityOccurrence, DateRange, Result } from "../domain/types";
 import { expandOccurrences, normalizeInstant } from "../domain/dates";
 
@@ -107,7 +108,7 @@ export async function listHabits(): Promise<Result<Activity[]>> {
     const result = await fetchCloudRecords<Activity>(user.uid, "activities");
     if (!result.ok) return result;
     return { ok: true, value: result.value.filter(activity =>
-      !activity.deletedAt && classifyActivity(activity).includes("habit")) };
+      !activity.deletedAt && Boolean(activity.recurrence)) };
   } catch {
     return { ok: false, error: {
       code: "HABITS_UNAVAILABLE", message: "Liste des habitudes indisponible.",
