@@ -20,7 +20,7 @@ import {
 import { listTracks } from "../features/music";
 import { listImages } from "../features/decor";
 import { signIn, signOut, sendPasswordReset, registerAccount } from "../services/auth";
-import { configurePersistence, observeSyncStatus } from "../services/sync";
+import { configurePersistence } from "../services/sync";
 import { openActivityEditor } from "./dayComponents";
 import { formatZonedTime } from "../domain/dates";
 import type { ActivityOccurrenceView, LocalDate } from "../domain/types";
