@@ -76,6 +76,7 @@ export function openActivityEditor(activityId: string): void {
   const close = () => overlay.remove();
   dialog.querySelector<HTMLButtonElement>("[data-close]")!.onclick = close;
   overlay.onclick = event => { if (event.target === overlay) close(); };
+  overlay.onkeydown = event => { if (event.key === "Escape") close(); };
   const field = (name: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
     form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
   const feedback = dialog.querySelector<HTMLElement>(".form-error")!;
@@ -187,6 +188,10 @@ export function openActivityEditor(activityId: string): void {
           frequency: frequency as RecurrenceRule["frequency"],
           interval,
           ...(frequency === "weekly" && weekdays.length ? {weekdays} : {}),
+          ...(activity?.recurrence?.frequency === frequency && activity.recurrence.count
+            ? {count: activity.recurrence.count} : {}),
+          ...(activity?.recurrence?.frequency === frequency && activity.recurrence.until
+            ? {until: activity.recurrence.until} : {}),
         };
       }
       const stars = Number(field("stars").value);
@@ -211,6 +216,8 @@ export function openActivityEditor(activityId: string): void {
           id: activity.id,
           uid: activity.uid,
           updatedAt: activity.updatedAt,
+          ...(field("description").value.trim() ? {} : {description: undefined}),
+          ...(field("icon").value.trim() ? {} : {iconId: undefined}),
           ...(plannedOn ? {} : {plannedOn: undefined}),
           ...(startAt ? {} : {startAt: undefined}),
           ...(endAt ? {} : {endAt: undefined}),
