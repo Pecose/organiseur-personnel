@@ -3,34 +3,191 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#A4BFAF">
+  <meta name="theme-color" content="#a8beb0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Organiseur personnel : calendrier, tâches, jour, habitudes et listes.">
   <link rel="manifest" href="./manifest.webmanifest">
-  <title>Organiseur personnel</title>
+  <title>Mon petit organiseur</title>
   <style>
-    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { margin: 0; background: #f7f5f0; color: #34463d; }
-    main { min-height: 100svh; box-sizing: border-box; display: grid; place-items: center; padding: 24px; }
-    article { max-width: 34rem; padding: 30px; background: #fffdf9; border: 1px solid #e5e9e0; border-radius: 24px; box-shadow: 0 12px 40px #42564c12; }
-    h1 { margin-top: 0; font-size: 1.55rem; }
-    p { line-height: 1.55; }
-    small { color: #69796f; }
+    :root {
+      color-scheme: light;
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif;
+      background: #f6f4ef; color: #34453e;
+      --sage:#9ab8aa; --sage-dark:#496d60; --paper:#fffcf8;
+      --line:#e2e9e1; --muted:#718178; --peach:#f6dfd3;
+      --lavender:#ede6f2; --radius:22px;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100svh; background:
+      radial-gradient(ellipse at 12% 5%,#fbe7db 0%,transparent 42%),
+      radial-gradient(ellipse at 92% 15%,#e6eee6 0%,transparent 45%),
+      #f7f5f0; }
+    button,input,select,textarea { font:inherit; }
+    button { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {
+      outline:3px solid #72998a; outline-offset:3px;
+    }
+    .app-shell { max-width:800px; min-height:100svh; margin:auto;
+      background:rgba(255,253,249,.65); display:flex; flex-direction:column;
+      box-shadow:0 8px 50px #54675b0b; padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
+    .app-top { display:flex; justify-content:space-between; align-items:center; gap:15px;
+      padding:calc(15px + env(safe-area-inset-top)) 20px 12px;
+      position:sticky; top:0; background:#faf9f5ec; backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px); z-index:10; border-bottom:1px solid #e9ece5; }
+    .identity { display:flex; flex-direction:column; gap:4px; }
+    .overline { font-size:10px; letter-spacing:.16em; font-weight:800; color:#869a8d; }
+    .app-title { font-size:20px; letter-spacing:-.04em; font-weight:700; margin:0; color:#3b584d; }
+    .header-tools { display:flex; gap:7px; }
+    .icon-button { width:40px; height:40px; display:inline-grid; place-items:center;
+      color:#4f6b5e; font-size:20px; background:#f1f4eb;
+      border:1px solid #e1e8db; border-radius:15px; }
+    .icon-button:hover { background:#e8eee5; }
+    .sync-state { margin:12px 20px 0; border-radius:12px; padding:8px 12px;
+      background:#f0f2ed; color:#687970; font-size:11px; text-align:center; }
+    .sync-synced { background:#e3efe3; color:#476952; }
+    .sync-pending { background:#fbefdb; color:#896e46; }
+    .sync-error { background:#f8e6e1; color:#966454; }
+    .content-area { width:100%; flex:1; padding:16px 20px 36px; }
+    .page-intro { border-radius:26px; padding:22px 22px 21px;
+      background:linear-gradient(115deg,#e8eee5 4%,#f9f3eb 61%,#f4deda 140%);
+      border:1px solid #e7eae0; box-shadow:0 6px 20px #8794860b; }
+    .eyebrow { font-size:10px; letter-spacing:.17em; color:#85978b;
+      font-weight:800; margin:0 0 8px; }
+    .page-intro h2 { text-transform:capitalize; margin:0 0 6px; letter-spacing:-.035em;
+      font-size:clamp(24px,6vw,31px); line-height:1.14; color:#375347; }
+    .muted { color:var(--muted); font-size:13px; line-height:1.5; margin:8px 0; }
+    .header-actions { margin-top:17px; display:flex; flex-wrap:wrap; align-items:center; gap:9px; }
+    .primary-button { display:inline-flex; align-items:center; justify-content:center; gap:5px;
+      border:0; padding:13px 18px; background:#577d6b; color:white;
+      border-radius:15px; font-weight:700; box-shadow:0 4px 12px #59786630; }
+    .primary-button:hover { background:#456d5b; }
+    .primary-button.compact { padding:10px 15px; font-size:13px; }
+    .soft-button { display:inline-flex; align-items:center; justify-content:center;
+      padding:10px 13px; background:#fffdf9; color:#587064;
+      border:1px solid #dce5dc; border-radius:13px; font-size:13px; font-weight:600; }
+    .soft-button:hover { background:#f2f6f0; }
+    .text-button { border:0; background:none; color:#6b8271; padding:10px;
+      font-size:13px; text-decoration:underline; text-underline-offset:3px; }
+    .destructive { color:#a45b56; }
+    .day-section { margin-top:25px; }
+    .section-heading { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+    .section-heading h3,.day-section h3 { font-size:15px; margin:0 0 10px;
+      letter-spacing:-.01em; color:#425f51; }
+    .section-heading h3 { margin:0; }
+    .subtle-tag { color:#92a094; font-size:11px; }
+    .entry-list { display:flex; flex-direction:column; gap:9px; }
+    .empty-copy { border:1px dashed #dce5dc; background:#fcfbf8; border-radius:17px;
+      padding:20px 17px; color:#899489; font-size:13px; line-height:1.5; margin:0; }
+    .activity-row { display:flex; gap:12px; align-items:center; margin:0; min-height:70px;
+      background:var(--paper); padding:12px; border:1px solid #e7eae4; border-radius:18px;
+      box-shadow:0 3px 12px #637c660c; }
+    .activity-icon { flex:none; display:grid; place-items:center;
+      width:45px; height:45px; border-radius:15px; border:1px solid #e7e3df;
+      background:var(--lavender); color:#786f8b; font-size:21px; }
+    .activity-details { min-width:0; display:flex; flex-direction:column; gap:5px; flex:1; }
+    .activity-details strong { color:#3f5849; font-size:14px; overflow-wrap:anywhere; font-weight:650; }
+    .activity-meta { color:#8a998c; font-size:11px; }
+    .check-control { display:grid; place-items:center; flex:none; width:42px; height:42px;
+      border:2px solid #cad9cc; border-radius:50%; background:#f8faf5;
+      color:#8ba392; font-size:24px; line-height:1; }
+    .check-control.is-checked { background:#dcebdc; border-color:#94b49b;
+      color:#467d61; font-size:19px; }
+    .bottom-tabs { position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+      width:min(800px,100%); display:grid; grid-template-columns:repeat(5,minmax(0,1fr));
+      gap:2px; padding:8px 10px calc(9px + env(safe-area-inset-bottom));
+      background:#fffcf9f5; box-shadow:0 -7px 25px #83958720;
+      border-top:1px solid #e4e8df; -webkit-backdrop-filter:blur(20px);
+      backdrop-filter:blur(20px); z-index:20; }
+    .tab-item { display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:4px; padding:7px 1px; border:0; border-radius:17px; color:#94a197; background:none;
+      min-width:0; min-height:57px; }
+    .tab-item.active { background:#e5eee6; color:#4e7961; font-weight:750; }
+    .tab-center .tab-symbol { font-size:24px; background:#e8e3dc;
+      border-radius:50%; width:38px; height:38px; display:grid; place-items:center; margin-top:-10px; }
+    .tab-center.active .tab-symbol { background:#b5d0bd; }
+    .tab-symbol { font-size:22px; line-height:1; }
+    .tab-label { font-size:10px; white-space:nowrap; letter-spacing:-.03em; }
+    .week-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:24px; }
+    .calendar-day { display:flex; flex-direction:column; align-items:flex-start;
+      min-height:132px; padding:17px; border:1px solid #e6e9e1; background:#fffcf8;
+      color:#536c5b; border-radius:20px; box-shadow:0 3px 15px #70857410; }
+    .calendar-day strong { font-size:35px; line-height:1.15; margin:8px 0 12px;
+      font-weight:600; letter-spacing:-.04em; }
+    .calendar-day.selected { background:#e1eee3; border-color:#9dbcaa; }
+    .calendar-day.is-today strong { color:#4a9368; }
+    .calendar-weekday { letter-spacing:.1em; font-size:10px; color:#9dab9d; font-weight:800; }
+    .calendar-counter { color:#93a195; font-size:11px; }
+    .sunday-toggle { margin:17px 0 8px; width:100%; }
+    .sunday-panel .calendar-day { width:100%; min-height:108px; }
+    .sunday-panel.is-collapsed { display:none; }
+    .calendar-footnote { margin:16px 0 0; text-align:center; }
+    .habit-card { display:flex; align-items:center; width:100%; text-align:left; gap:14px;
+      border:1px solid #e4eae2; border-radius:20px; background:#fffdfa; padding:15px;
+      color:#52735e; }
+    .habit-picto { width:50px; height:50px; display:grid; place-items:center;
+      background:#f4dfd5; border-radius:16px; font-size:24px; }
+    .habit-text { flex:1; display:flex; flex-direction:column; gap:5px; }
+    .habit-text strong { color:#405e4d; font-size:14px; }
+    .habit-text small { color:#91a092; }
+    .inline-form { display:flex; align-items:center; gap:9px; margin-top:15px; }
+    .inline-form input { min-width:0; flex:1; }
+    .inline-form button { flex:none; }
+    input,select,textarea { width:100%; background:#fffefb; color:#354d41;
+      border:1px solid #dce4db; border-radius:12px; padding:12px; font-size:15px; }
+    .checklist-card { background:#fffdfa; border:1px solid #e8eae3; border-radius:17px;
+      padding:3px 13px; }
+    .checklist-open { display:block; width:100%; text-align:left; border:0; padding:16px 3px;
+      font-weight:700; color:#476b59; background:none; }
+    .checklist-open[aria-expanded=true] { border-bottom:1px solid #eef0e8; }
+    .checklist-detail:not(:empty) { padding:12px 0 16px; }
+    .checklist-item { display:flex; align-items:center; gap:12px; padding:10px 4px; color:#59705f; }
+    .checklist-item input,.inline-choice input,.weekday-field input { width:auto; accent-color:#6f9d80; }
+    .checklist-item span { flex:1; font-size:14px; }
+    .settings-list { display:flex; flex-direction:column; gap:12px; }
+    .auth-panel { background:#fffefa; margin-top:20px; padding:20px; border-radius:20px;
+      border:1px solid #e8eae2; }
+    .auth-panel form,.editor-sheet form { display:flex; flex-direction:column; gap:13px; }
+    .auth-panel label,.editor-sheet label { display:flex; flex-direction:column; gap:6px;
+      color:#5f7468; font-size:13px; font-weight:600; }
+    .auth-actions { display:flex; justify-content:space-between; flex-wrap:wrap; }
+    .form-error { min-height:17px; color:#a0524b; font-size:12px; line-height:1.5; }
+    .editor-backdrop { position:fixed; inset:0; z-index:100; display:flex; align-items:flex-end;
+      justify-content:center; background:#1c312b8c; }
+    .editor-sheet { background:#fffcf8; border-radius:27px 27px 0 0;
+      padding:12px 20px calc(27px + env(safe-area-inset-bottom)); width:min(800px,100%);
+      max-height:94svh; overflow:auto; box-shadow:0 -10px 35px #21352740; }
+    .sheet-handle { width:42px; height:5px; border-radius:99px;
+      background:#d4ddd1; margin:2px auto 16px; }
+    .sheet-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .sheet-header h2 { margin:0; font-size:21px; color:#3d5b4c; }
+    .editor-sheet .form-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .editor-sheet .inline-choice { flex-direction:row; align-items:center; font-weight:500; }
+    .weekday-field { border:1px solid #e1e6dc; border-radius:14px; padding:10px; display:flex;
+      justify-content:space-around; gap:3px; flex-wrap:wrap; }
+    .weekday-field legend { color:#7a8d7e; font-size:12px; }
+    .weekday-field label { display:inline-flex; align-items:center; flex-direction:row; gap:3px; }
+    @media (min-width:720px) {
+      .app-shell { margin:14px auto; min-height:calc(100svh - 28px); border-radius:25px; overflow:clip; }
+      .app-top { border-radius:25px 25px 0 0; }
+      .content-area { padding:21px 35px 60px; }
+      .bottom-tabs { border-radius:18px 18px 0 0; }
+    }
+    @media (max-width:380px) {
+      .content-area { padding:14px 13px 24px; }
+      .app-top { padding-left:13px; padding-right:13px; }
+      .calendar-day { min-height:118px; padding:12px; }
+      .tab-label { font-size:9px; }
+      .editor-sheet { padding-left:14px; padding-right:14px; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; animation:none!important; } }
   </style>
   <script type="module" src="/src/main.ts"></script>
 </head>
 <body>
-  <main>
-    <article aria-labelledby="heading">
-      <h1 id="heading">Organiseur personnel</h1>
-      <p>Le socle de l'application est en cours de construction.</p>
-      <p>Les cinq pages prévues sont <strong>Calendrier, Tâches, Jour, Habitudes et Listes</strong>.
-         Aucune connexion ni saisie personnelle n'est disponible ici pour l'instant.</p>
-      <small>Page de préparation : aucun formulaire ni donnée personnelle n'est encore disponible.</small>
-      <p data-firebase-status role="status" aria-live="polite">Chargement de la configuration locale…</p>
-      <p data-pwa-status role="status" aria-live="polite">Vérification du cache PWA…</p>
-    </article>
-  </main>
+  <div id="app">
+    <main class="app-shell"><p class="empty-copy">Préparation de l'organiseur…</p></main>
+  </div>
 </body>
 </html>
