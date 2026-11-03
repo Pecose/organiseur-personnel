@@ -9,7 +9,7 @@ import { setSelectedDay } from "../app/state";
 import { getCalendarWeek, selectCalendarDate } from "../features/agenda";
 import { listTasks } from "../features/tasks";
 import { listHabits } from "../features/habits";
-import { groupDayEntries, getDayEntries } from "../features/day";
+import { groupDayEntries, getDayEntries, getCarryOverPrompt, applyCarryOver } from "../features/day";
 import {
   getOccurrenceCompletion, setOccurrenceCompletion, undoOccurrenceCompletion,
 } from "../features/activities";
@@ -814,6 +814,7 @@ export function renderSettings(): void {
   root.innerHTML = `<section class="page-intro"><p class="eyebrow">MON PETIT ESPACE</p>
     <h2>Paramètres</h2><p class="muted" id="account-label"></p></section>
     <section class="day-section settings-list">
+    <button type="button" class="soft-button" id="settings-monthly">Voir mon bilan mensuel</button>
     <button type="button" class="soft-button" id="settings-cache">Activer le mode hors ligne sur appareil de confiance</button>
     <button type="button" class="soft-button" id="settings-signout">Se déconnecter</button>
     <button type="button" class="soft-button" id="settings-login">Connexion</button>
@@ -825,6 +826,7 @@ export function renderSettings(): void {
   const logout = root.querySelector<HTMLButtonElement>("#settings-signout")!;
   cache.disabled = !state.user;
   logout.disabled = !state.user;
+  root.querySelector<HTMLButtonElement>("#settings-monthly")!.onclick = () => navigate({name:"monthlyReview"});
   root.querySelector<HTMLButtonElement>("#settings-login")!.onclick = () => navigate({name:"signin"});
   const feedback = root.querySelector<HTMLElement>("#settings-status")!;
   cache.onclick = () => {
