@@ -1,5 +1,9 @@
 /** F49 · M130 : occurrences bornées dans le fuseau civil de l'activité. */
-import type { Activity, ActivityOccurrence, DateRange } from "../domain/types";
+import { getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { fetchCloudRecords } from "../services/cloudRepository";
+import { classifyActivity } from "./activities";
+import type { Activity, ActivityOccurrence, DateRange, Result } from "../domain/types";
 import { expandOccurrences, normalizeInstant } from "../domain/dates";
 
 export function expandActivityOccurrences(activity: Activity, range: DateRange): ActivityOccurrence[] {
@@ -91,4 +95,22 @@ export function expandActivityOccurrences(activity: Activity, range: DateRange):
     }
   }
   return result;
+}
+
+/** M126 · Liste les règles de récurrence, y compris celles avec heure. */
+export async function listHabits(): Promise<Result<Activity[]>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user) return { ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Connecte-toi pour consulter les habitudes.",
+    }};
+    const result = await fetchCloudRecords<Activity>(user.uid, "activities");
+    if (!result.ok) return result;
+    return { ok: true, value: result.value.filter(activity =>
+      !activity.deletedAt && classifyActivity(activity).includes("habit")) };
+  } catch {
+    return { ok: false, error: {
+      code: "HABITS_UNAVAILABLE", message: "Liste des habitudes indisponible.",
+    }};
+  }
 }
