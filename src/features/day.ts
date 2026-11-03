@@ -169,19 +169,30 @@ export async function applyCarryOver(choices: CarryOverChoice[]): Promise<Result
       code: "AUTH_REQUIRED", message: "Connexion requise avant report.",
     }};
     const activities = getUserCollection(user.uid, "activities");
+    const completions = getUserCollection(user.uid, "activityCompletions");
     const decisions = getUserCollection(user.uid, "carryOverDecisions");
     const result = await runTransaction(getFirestore(app), async tx => {
       // Toutes les lectures sont terminées avant la moindre écriture.
       const docs = await Promise.all(choices.map(async choice => {
         const activityRef = doc(activities, choice.activityId);
+        const completionRef = doc(completions, choice.activityId + "@" + choice.fromDate);
         const decisionRef = doc(decisions, choice.activityId + "@" + choice.fromDate);
-        const [activity, decision] = await Promise.all([
-          tx.get(activityRef), tx.get(decisionRef),
+        const [activity, completion, decision] = await Promise.all([
+          tx.get(activityRef), tx.get(completionRef), tx.get(decisionRef),
         ]);
-        return {choice, activity, decision, activityRef, decisionRef};
+        return {choice, activity, completion, decision, activityRef, decisionRef};
       }));
       for (const entry of docs) {
-        const {choice, activity, decision} = entry;
+        const {choice, activity, completion, decision} = entry;
+        if (completion.exists()) {
+          const status = completion.data() as ActivityCompletion;
+          if (status.status === "manual_done" || status.status === "auto_assumed") {
+            return {ok: false, error: {
+              code: "TASK_ALREADY_DONE",
+              message: "Cette tâche vient d'être validée et ne doit plus être reportée.",
+            }} as Result<void>;
+          }
+        }
         if (!activity.exists()) return {ok: false, error: {
           code: "ACTIVITY_NOT_FOUND", message: "Une tâche n'existe plus.",
         }} as Result<void>;
