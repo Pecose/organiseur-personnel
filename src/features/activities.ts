@@ -3,6 +3,7 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { getUserCollection, putCloudRecord } from "../services/cloudRepository";
+import { expandActivityOccurrences } from "./habits";
 import type { Activity, ActivityCompletion, ActivityDraft, ActivityOccurrenceView, ActivitySchedule, RecurrenceRule, Result } from "../domain/types";
 
 /** M124 : les vues se recoupent ; une habitude horaire est aussi un événement. */
@@ -476,6 +477,73 @@ export async function undoOccurrenceCompletion(
   } catch {
     return { ok: false, error: {
       code: "COMPLETION_UNDO_FAILED", message: "Annulation indisponible.",
+    }};
+  }
+}
+
+/** M158 · Persister une présomption seulement si M133 l'autorise.
+ * Une annulation manuelle de cette occurrence bloque le recochage.
+ * ATTENTION : sans transaction conditionnelle multi-appareils, une course entre
+ * M134 et M158 reste possible. Recette finale obligatoire avant déploiement.
+ */
+export async function markAutoCompletion(
+  key: string, at: string,
+): Promise<Result<ActivityCompletion>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    const sep = key.lastIndexOf("@");
+    const id = key.slice(0, sep);
+    const day = key.slice(sep + 1);
+    if (!user || sep < 1 || !id || id.includes("/") || key.includes("/")
+      || !/^\d{4}-\d{2}-\d{2}$/.test(day)
+      || Number.isNaN(Date.parse(day + "T00:00:00Z"))
+      || new Date(day + "T00:00:00Z").toISOString().slice(0, 10) !== day
+      || !Number.isFinite(Date.parse(at))) {
+      return { ok: false, error: {
+        code: "INVALID_OCCURRENCE", message: "Occurrence ou date de vérification invalide.",
+      }};
+    }
+    const act = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
+    if (!act.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const activity = act.data() as Activity;
+    if (activity.deletedAt || !activity.autoComplete) {
+      return { ok: false, error: {
+        code: "AUTO_COMPLETION_DISABLED", message: "Validation automatique désactivée.",
+      }};
+    }
+    const midnight = Date.parse(day + "T00:00:00Z");
+    const occurrences = expandActivityOccurrences(activity, {
+      from: new Date(midnight - 2 * 86_400_000).toISOString(),
+      to: new Date(midnight + 3 * 86_400_000).toISOString(),
+    });
+    const occurrence = occurrences.find(item => item.occurrenceKey === key);
+    if (!occurrence) return { ok: false, error: {
+      code: "OCCURRENCE_NOT_FOUND", message: "Cette occurrence n'existe plus.",
+    }};
+    const previous = await getOccurrenceCompletion(key);
+    if (!previous.ok) return previous;
+    if (!shouldAutoComplete({activity, occurrence, completion: previous.value ?? undefined}, at)) {
+      return { ok: false, error: {
+        code: "AUTO_COMPLETION_NOT_DUE",
+        message: "L'échéance n'est pas atteinte ou une décision manuelle l'interdit.",
+      }};
+    }
+    const now = new Date().toISOString();
+    const completion: ActivityCompletion = {
+      id: key,
+      activityId: id,
+      occurrenceKey: key,
+      status: "auto_assumed",
+      completedAt: at,
+      updatedAt: now,
+    };
+    const stored = await putCloudRecord(user.uid, "activityCompletions", key, completion);
+    return stored.ok ? {ok: true, value: completion} : stored;
+  } catch {
+    return {ok: false, error: {
+      code: "AUTO_COMPLETION_FAILED", message: "Présomption non enregistrée.",
     }};
   }
 }
