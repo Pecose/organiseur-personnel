@@ -120,6 +120,113 @@ export function renderDay(date: LocalDate): void {
     return;
   }
 
+  // FL16 : une invitation discrète, jamais une fenêtre réaffichée sans action.
+  // Un seul panneau groupé est ouvert après un clic explicite.
+  const realToday = new Date().toLocaleDateString("sv-SE", {
+    timeZone: getAppState().preferences.timeZone,
+  });
+  if (date === realToday) {
+    void getCarryOverPrompt(date).then(result => {
+      if (!root.isConnected || getAppState().route.name !== "day"
+        || getAppState().daySelection.selectedDate !== date
+        || !result.ok || !result.value.candidates.length) return;
+      const notice = document.createElement("aside");
+      notice.className = "carry-notice";
+      const message = document.createElement("p");
+      message.textContent = result.value.candidates.length
+        + " tâche(s) de la veille à revoir. Rien ne sera déplacé sans ton accord.";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "soft-button";
+      button.textContent = "Examiner les reports";
+      notice.append(message, button);
+      root.insertBefore(notice, root.querySelector(".day-section"));
+      button.onclick = () => {
+        if (document.querySelector(".carry-backdrop")) return;
+        const backdrop = document.createElement("div");
+        backdrop.className = "editor-backdrop carry-backdrop";
+        const panel = document.createElement("section");
+        panel.className = "editor-sheet";
+        panel.setAttribute("role", "dialog");
+        panel.setAttribute("aria-modal", "true");
+        panel.setAttribute("aria-label", "Reporter les tâches oubliées");
+        const heading = document.createElement("h2");
+        heading.textContent = "Et les tâches d'hier ?";
+        const explanation = document.createElement("p");
+        explanation.className = "muted";
+        explanation.textContent = "Pour chaque tâche, choisis une action. "
+          + "Rien ne bougera avant ta confirmation.";
+        const form = document.createElement("form");
+        form.className = "carry-form";
+        const selectors: {activityId: string; select: HTMLSelectElement}[] = [];
+        for (const candidate of result.value.candidates) {
+          const row = document.createElement("label");
+          row.className = "carry-choice";
+          const title = document.createElement("strong");
+          title.textContent = candidate.title;
+          const select = document.createElement("select");
+          for (const [value, label] of [
+            ["later", "Me le redemander plus tard"],
+            ["move", "Reporter à aujourd'hui"],
+            ["keep", "Laisser à hier"],
+          ] as const) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            select.append(option);
+          }
+          row.append(title, select);
+          selectors.push({activityId: candidate.id, select});
+          form.append(row);
+        }
+        const feedback = document.createElement("p");
+        feedback.className = "form-error";
+        feedback.setAttribute("role", "alert");
+        const controls = document.createElement("div");
+        controls.className = "header-actions";
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "soft-button";
+        cancel.textContent = "Fermer sans changement";
+        const confirm = document.createElement("button");
+        confirm.type = "submit";
+        confirm.className = "primary-button compact";
+        confirm.textContent = "Confirmer les choix";
+        controls.append(cancel, confirm);
+        form.append(feedback, controls);
+        panel.append(heading, explanation, form);
+        backdrop.append(panel);
+        document.body.append(backdrop);
+        cancel.onclick = () => backdrop.remove();
+        backdrop.onclick = event => {
+          if (event.target === backdrop) backdrop.remove();
+        };
+        form.onsubmit = event => {
+          event.preventDefault();
+          confirm.disabled = true;
+          feedback.textContent = "Enregistrement groupé en cours…";
+          const choices = selectors.map(({activityId, select}) => ({
+            activityId,
+            fromDate: result.value.fromDate,
+            toDate: result.value.toDate,
+            decision: select.value as "move" | "keep" | "later",
+          }));
+          void applyCarryOver(choices).then(saved => {
+            confirm.disabled = false;
+            if (!saved.ok) {feedback.textContent = saved.error.message; return;}
+            backdrop.remove();
+            renderDay(date);
+          }).catch(() => {
+            confirm.disabled = false;
+            feedback.textContent = "Impossible de confirmer les reports. Réessaie en ligne.";
+          });
+        };
+      };
+    }).catch(() => {
+      // Un échec de la suggestion n'altère pas la journée ni les tâches.
+    });
+  }
+
   void getDayEntries(date).then(result => {
     if (!root.isConnected || getAppState().route.name !== "day"
       || getAppState().daySelection.selectedDate !== date) return;
