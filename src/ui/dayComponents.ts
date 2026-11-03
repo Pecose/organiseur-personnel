@@ -117,7 +117,19 @@ export function openActivityEditor(activityId: string): void {
         return;
       }
     } else {
-      field("plannedOn").value = getAppState().daySelection.selectedDate;
+      const screen = getAppState().route.name;
+      if (screen !== "tasks") {
+        field("plannedOn").value = getAppState().daySelection.selectedDate;
+      }
+      if (screen === "habits") {
+        field("recurrence").value = "weekly";
+        const day = new Date(getAppState().daySelection.selectedDate + "T00:00:00Z");
+        const isoWeekday = ((day.getUTCDay() + 6) % 7 + 1).toString();
+        const selected = form.querySelector<HTMLInputElement>(
+          'input[name="weekday"][value="' + isoWeekday + '"]',
+        );
+        if (selected) selected.checked = true;
+      }
     }
     const lists = await listChecklists();
     if (lists.ok && overlay.isConnected) {
