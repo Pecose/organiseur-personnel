@@ -403,15 +403,15 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 ### S8 — Fonctions qui combinent plusieurs objets / historiques
 
-**Prérequis : S7 validée.** Dérouler les sous-fonctions dans l'ordre, afin de ne pas introduire de cycle.
+**Prérequis de code (D23) :** fonctions S5–S7 nécessaires déjà écrites, mais non testées. S8 peut être codée sans attendre les tests, qui restent groupés à la recette finale ; aucune activation Firebase réelle ni fonction sensible sans garde-fous approuvés.
 
-- [ ] **Autovalidation** : M133 (décision) → M158 (écriture `auto_assumed`) → M154 (réconciliation au retour de l'app). Proposer l'option **activée** à l'ajout d'une heure ; désactivable ; fin avant début ; correction M134 persistante.
-- [ ] **Tâches oubliées** : M135 (candidates datées d'hier, sans heure et sans récurrence) → M136 (panneau groupé) → M137 (choix `move/keep/later`) ; conserver l'ID, ne pas répéter les fenêtres à chaque rechargement.
-- [ ] **Bilan mensuel** M147 : O38 calculé à partir de O31/O32/O33 ; 3→2→1 étoiles puis chronologie ; filtres et distinction entre validation présumée/confirmée.
+- [ ] **Autovalidation bloquée pour concurrence (non testée)** : M133 et M158 existent, M154 non codée. M158 doit d'abord garantir que l'annulation manuelle M134 n'est **jamais** écrasée par une écriture sur un autre appareil ; autorisation préalable de la stratégie atomique nécessaire. Option horaire présente dans l'éditeur.
+- [ ] **Tâches oubliées, partiel (non testé)** : M135 codée dans F22, uniquement tâches inachevées d'hier sans heure/récurrence. M136/M137 non codées : `CarryOverPrompt` et `CarryOverChoice` cités en F17 mais leurs champs ne sont pas définis précisément au registre ; aucune fenêtre ou écriture O36 improvisée.
+- [x] **M147 codée, non testée** : O38 projeté depuis O31/O32/O33 dans F52, tri par étoiles 3→2→1 puis sans étoile, chronologie, filtres et nombre `auto_assumed`. La route `monthlyReview` existe en F15 mais reste à relier à l'affichage après validation des contrats.
 - [ ] Terminer **musique, thèmes, archivage local** indépendamment des rappels et Google si la branche est prête ; valider fichiers par défaut redistribuables et import des médias personnalisés.
 - [ ] Tests intégrés T16–T20 : récurrence horaire, réversibilité d'une coche, refus de report, liste liée, bilan mensuel, changement de date et navigation.
 
-**Sortie S8 :** toute l'expérience quotidienne est utilisable **sans Google Calendar ni Cloudflare**, en local puis avec Firebase.
+**État S8 : CODAGE PARTIEL NON TESTÉ / NON DÉPLOYÉ.** M135 et M147 sont publiées sur GitHub. Les modèles de fenêtre M136/M137 exigent un schéma précis `CarryOverPrompt`/`CarryOverChoice` enregistré dans l'architecture ; M154 doit attendre un mécanisme d'écriture atomique anti-recochage entre appareils. Les autres branches et la recette restent à réaliser. **Ne pas affirmer que l'expérience est utilisable ni que la sécurité Firebase est validée**. Coût 0 €, aucune facturation ni aucun déploiement.
 
 ### S9 — Branches externes dépendantes du noyau
 
