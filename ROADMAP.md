@@ -224,7 +224,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S4** | **MODÈLES COMPLETS, VALIDATION PARTIELLE** | O19 et O38 dans F17, `MonthlyAchievement` basé sur O31/O32/O33, tests T19 publiés dans F56 ; **35/35 objets métier** | Contrat/tri vérifiés avec `tsc --strict` et Node sur copie autonome ; **F56 et toutes les suites du dépôt restent à exécuter sur clone**. M147/Firestore prévu en S8, aucun bilan opérationnel |
 | **S5** | **EN COURS : dépendances et services codés, non validés sur appareil** | Accord D10 et commit préalable ; F06 Vite/TS/Firebase ; F14 entrée ; F17 types SDK ; F27 M16 ; F28 M17–M20/M90 ; F29 M21–M24/M89 ; F30 M25–M27 ; F35 M79/M80 ; F42 scénarios T05 pour émulateurs ; F39 toujours non déployé | **Restant :** `npm install`, `npm run build`/tests réels, paramètres Firebase Web du projet, tests UID à l'émulateur, autorisation puis déploiement contrôlé des règles, icônes F10 et test réel iPhone Safari. Sans ces étapes S5 ne peut pas être déclarée validée |
 | **S6** | **LARGEMENT CODÉE, NON TESTÉE (D23)** | M121–M126/M132–M134/M138–M146/M155/M157–M160 (M133 et M157 antérieurs) ; M41–M44 ; M47/M48 ; M52–M57 ; M64/M65/M95. Activités, listes archivables, coches, rappels locaux, import musique/image et métadonnées | Restent M49/M69 (suppression média et contrôle des références), sécurisation concurrence M158, recette de toutes les fonctions. **Aucun test ni déploiement** |
-| **S7–S10** | NON DÉMARRÉES | Aucun code de ces strates | Respecter l'ordre des dépendances codées, tests regroupés à la fin |
+| **S7** | **CINQ VUES CODÉES, NON TESTÉES (D23)** | F14 M01 ; F15 M02–M04 ; F16 M13–M15/M148 ; F17 CalendarDaySummary ; F19 M05–M11/M149–M152 ; F20 M12 ; F21 M127/M128/M156 ; F51 M129 ; F53 M153 ; F08 habillage mobile pastel | Lecture et édition des données réelles, iPhone/VoiceOver, build Vite, cache des chunks différés et corrections finales restent **à tester en recette** ; Musique/Décoration encore basiques, Bilan S8 absent |
+| **S8–S10** | NON DÉMARRÉES | Aucun code de ces strates | S8 peut avancer sur les dépendances déjà codées ; recette finale globale D23 |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -388,17 +389,17 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 ### S7 — Assembler les objets dans les **cinq vues**
 
-**Prérequis : S6 validée.** Les écrans lisent les services déjà testés, pas l'inverse.
+**Prérequis de code (D23) :** les modèles S0–S4 et les fonctions S5/S6 nécessaires sont écrits, mais **non validés**. Les vues S7 peuvent être développées, leurs tests et ceux de S5/S6 sont réservés à la recette finale. Aucun déploiement Firebase ni accès à des données privées n'est autorisé avant cette recette.
 
-- [ ] Router/état/UI F15/F16/F19/F20/F53 (M02–M15, M148–M153) : **Calendrier | Tâches | Jour | Habitudes | Listes**, avec Jour central et sélectionné au premier lancement.
-- [ ] **Jour** (M129/M131/M149) : date choisie O37, **sans horaire d'abord**, horaires croissants ensuite ; **aucun** troisième groupe « À planifier ».
-- [ ] **Calendrier** (M127/M128/M150/M156) : **lundi–samedi** visibles, **dimanche dépliable**, libellés ou compteurs ; toucher un jour affiche Jour à cette date ; raccourci Aujourd'hui.
-- [ ] **Tâches / Habitudes / Listes** (M07/M125/M126/M143/M151/M152) : trois filtres/vues des données déjà stockées, **pas trois stockages**.
-- [ ] En-tête, icônes personnalisées **à gauche** ouvrant la fiche complète, boutons de validation **à droite**, formulaire détaillé sans surcharge, navigation accessible à une main, styles arrondis et couleurs apaisantes (G10/G14).
-- [ ] **Branche médias/visuels indépendante :** écran Musique M08/M58–M63/M92–M94/M99 et écran Décoration M09/M66–M69/M96–M98, accessibles **hors** de la barre de cinq onglets.
-- [ ] Tester sur iPhone tactile/lecteur d'écran, sélection de dates et occurrences récurrentes (T08/T15/T18/T20).
+- [x] **Code écrit, non testé** : F14/F15/F16/F19/F20/F53, M01–M15 et M148–M153. Cinq onglets fixes **Calendrier | Tâches | Jour | Habitudes | Listes** ; Jour central à l'ouverture, écrans secondaires hors onglets.
+- [x] **Code écrit, non testé** : Jour M129/M131/M149 sélectionne O37, montre exactement deux sections **sans horaire puis horaires croissants**. Les tâches sans date restent dans Tâches, sans troisième groupe.
+- [x] **Code écrit, non testé** : calendrier M127/M128/M150/M156 en grille **lundi–samedi 3×2**, dimanche dépliable, compteurs et dates cliquables ; accès Aujourd'hui. La semaine lit les activités en une passe pour ménager les quotas.
+- [x] **Code écrit, non testé** : Tâches M07/M125, Habitudes M126/M151 et Listes M143/M152, en réutilisant O31/O34/O35 et aucun stockage supplémentaire. Coches d'articles indépendantes de l'activité.
+- [x] **Code écrit, non testé** : en-tête et barre fixe à une main, icône gauche → M153, coche droite → M132/M134, formulaire unifié, styles pastel arrondis F08, zones sûres iPhone et textes accessibles de base. Vérification tactile/lecteur d'écran différée.
+- [ ] **Branchage secondaire partiel** : écrans Musique M08 et Décoration M09 accessibles hors onglets, affichent les catalogues autorisés ; lecteur complet M58–M63, édition décor M96–M98, import guidé et réglages M66–M69/M92–M94/M99 attendent leurs dépendances enregistrées (S7/S8). Aucun lecteur fictif.
+- [ ] **Tests différés D23** : compilation réelle, iPhone tactile/VoiceOver, récurrences, date sélectionnée, sécurité Firebase, offline, routes et formulaires (T08/T15/T18/T20) lors de la recette finale.
 
-**Sortie S7 :** les **cinq pages sont navigables**, Jour affiche exactement les données du jour et reste minimaliste.
+**État S7 : CINQ VUES CODÉES, NON TESTÉES ET NON DÉPLOYÉES.** Interface présente dans F08/F14/F15/F16/F19–F21/F51/F53 ; Jour respecte ses deux groupes, le calendrier 6+1 et les cinq onglets D14. **Bloquants non cachés :** aucun Firebase réel, comportement iPhone inconnu, sous-écrans média non terminés, tâche non datée non cochable car l'occurrence O32 possède une date, bilan mensuel S8 absent. Les tests sont reportés à la toute fin par décision D23 ; on ne déclare pas S7 validée avant la recette. Ne jamais activer de service payant ni de règle cloud réelle.
 
 ### S8 — Fonctions qui combinent plusieurs objets / historiques
 
