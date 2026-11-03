@@ -3,7 +3,7 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { getUserCollection, putCloudRecord } from "../services/cloudRepository";
-import type { Activity, ActivityDraft, ActivityOccurrenceView, Result } from "../domain/types";
+import type { Activity, ActivityDraft, ActivityOccurrenceView, ActivitySchedule, RecurrenceRule, Result } from "../domain/types";
 
 /** M124 : les vues se recoupent ; une habitude horaire est aussi un événement. */
 export function classifyActivity(activity: Activity): ("task" | "habit" | "event")[] {
@@ -237,6 +237,144 @@ export async function deleteActivity(id: string): Promise<Result<void>> {
   } catch {
     return { ok: false, error: {
       code: "DELETE_ACTIVITY_FAILED", message: "Archivage impossible.",
+    }};
+  }
+}
+
+/** M138 · Définir date et horaires sans modifier l'identité de l'activité. */
+export async function setActivitySchedule(
+  id: string, schedule: ActivitySchedule,
+): Promise<Result<Activity>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !id || id.includes("/")) return { ok: false, error: {
+      code: "INVALID_ACTIVITY", message: "Session ou activité invalide.",
+    }};
+    const snapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
+    if (!snapshot.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const original = snapshot.data() as Activity;
+    const revised: Activity = { ...original };
+    delete revised.plannedOn;
+    delete revised.startAt;
+    delete revised.endAt;
+    if (schedule.plannedOn !== undefined) revised.plannedOn = schedule.plannedOn;
+    if (schedule.startAt !== undefined) revised.startAt = schedule.startAt;
+    if (schedule.endAt !== undefined) revised.endAt = schedule.endAt;
+    revised.timeZone = schedule.timeZone;
+    revised.autoComplete = Boolean(schedule.startAt)
+      && (schedule.autoComplete ?? (original.startAt ? original.autoComplete : true));
+    return await updateActivity(revised);
+  } catch {
+    return { ok: false, error: {
+      code: "SCHEDULE_FAILED", message: "Planification indisponible.",
+    }};
+  }
+}
+
+/** M139 · Ajouter ou enlever la récurrence sans créer de deuxième activité. */
+export async function setActivityRecurrence(
+  id: string, rule: RecurrenceRule | null,
+): Promise<Result<Activity>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !id || id.includes("/")) return { ok: false, error: {
+      code: "INVALID_ACTIVITY", message: "Session ou activité invalide.",
+    }};
+    const snapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
+    if (!snapshot.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const revised = snapshot.data() as Activity;
+    if (rule === null) delete revised.recurrence;
+    else revised.recurrence = rule;
+    return await updateActivity(revised);
+  } catch {
+    return { ok: false, error: {
+      code: "RECURRENCE_FAILED", message: "Récurrence indisponible.",
+    }};
+  }
+}
+
+/** M140 · Importance 1–3 étoiles ou suppression de l'importance. */
+export async function setActivityStars(
+  id: string, stars: 1 | 2 | 3 | null,
+): Promise<Result<Activity>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !id || id.includes("/")) return { ok: false, error: {
+      code: "INVALID_ACTIVITY", message: "Session ou activité invalide.",
+    }};
+    const snapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
+    if (!snapshot.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const revised = snapshot.data() as Activity;
+    if (stars === null) delete revised.stars;
+    else revised.stars = stars;
+    return await updateActivity(revised);
+  } catch {
+    return { ok: false, error: {
+      code: "STARS_FAILED", message: "Importance indisponible.",
+    }};
+  }
+}
+
+/** M141 · Change uniquement l'icône affichée à gauche de la ligne. */
+export async function setActivityIcon(
+  id: string, iconId: string,
+): Promise<Result<Activity>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !id || id.includes("/") || !iconId.trim()) return {
+      ok: false, error: {
+        code: "INVALID_ICON", message: "Icône ou activité invalide.",
+      },
+    };
+    const snapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
+    if (!snapshot.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const revised = snapshot.data() as Activity;
+    revised.iconId = iconId;
+    return await updateActivity(revised);
+  } catch {
+    return { ok: false, error: {
+      code: "ICON_FAILED", message: "Modification d'icône indisponible.",
+    }};
+  }
+}
+
+/** M142 · Une liste peut être reliée à plusieurs activités, sans transfert. */
+export async function attachChecklist(
+  activityId: string, checklistId: string | null,
+): Promise<Result<Activity>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !activityId || activityId.includes("/")) return {
+      ok: false, error: { code: "INVALID_ACTIVITY", message: "Activité ou session invalide." },
+    };
+    const snapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), activityId));
+    if (!snapshot.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const revised = snapshot.data() as Activity;
+    if (checklistId === null) delete revised.checklistId;
+    else {
+      if (!checklistId || checklistId.includes("/")) return { ok: false, error: {
+        code: "INVALID_CHECKLIST", message: "Liste invalide.",
+      }};
+      const list = await getDoc(doc(getUserCollection(user.uid, "checklists"), checklistId));
+      if (!list.exists() || list.data().archived === true) return { ok: false, error: {
+        code: "CHECKLIST_NOT_FOUND", message: "Liste absente ou archivée.",
+      }};
+      revised.checklistId = checklistId;
+    }
+    return await updateActivity(revised);
+  } catch {
+    return { ok: false, error: {
+      code: "CHECKLIST_ATTACH_FAILED", message: "Association de liste indisponible.",
     }};
   }
 }
