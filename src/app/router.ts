@@ -110,9 +110,97 @@ export function renderRoute(route: UiRoute): void {
       case "decor": screens.renderDecor(); break;
       case "settings": screens.renderSettings(); break;
       case "signin": screens.renderSignIn(); break;
-      case "monthlyReview":
-        content.textContent = "Le bilan mensuel sera disponible après S8.";
+      case "monthlyReview": {
+        // O38 reste une projection, aucun document de bilan n'est créé.
+        content.replaceChildren();
+        const panel = document.createElement("section");
+        panel.className = "page-intro";
+        const title = document.createElement("h2");
+        title.textContent = "Mon bilan mensuel";
+        const intro = document.createElement("p");
+        intro.className = "muted";
+        intro.textContent = "Les accomplissements confirmés et présumés du mois.";
+        const controls = document.createElement("div");
+        controls.className = "review-filters";
+        const month = document.createElement("input");
+        month.type = "month";
+        month.setAttribute("aria-label", "Mois du bilan");
+        month.value = new Date().toLocaleDateString("sv-SE", {
+          timeZone: getAppState().preferences.timeZone,
+        }).slice(0, 7);
+        const filter = document.createElement("select");
+        filter.setAttribute("aria-label", "Importance des accomplissements");
+        for (const [value, label] of [
+          ["", "Toutes les étoiles"], ["3", "★★★"], ["2", "★★"], ["1", "★"],
+        ] as const) {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = label;
+          filter.append(option);
+        }
+        const back = document.createElement("button");
+        back.type = "button";
+        back.className = "soft-button";
+        back.textContent = "← Paramètres";
+        back.onclick = () => navigate({name: "settings"});
+        controls.append(month, filter, back);
+        panel.append(title, intro, controls);
+        const summary = document.createElement("p");
+        summary.className = "muted";
+        summary.setAttribute("role", "status");
+        const results = document.createElement("div");
+        results.className = "entry-list";
+        content.append(panel, summary, results);
+        let generation = 0;
+        const refresh = () => {
+          const requestId = ++generation;
+          results.replaceChildren();
+          if (!getAppState().user) {
+            summary.textContent = "Connecte-toi pour consulter tes accomplissements.";
+            return;
+          }
+          summary.textContent = "Calcul du bilan…";
+          void import("../features/monthlyReview").then(async review => {
+            const stars = filter.value ? Number(filter.value) as 1 | 2 | 3 : undefined;
+            const result = await review.getMonthlyReview(month.value, stars);
+            if (!content.isConnected || getAppState().route.name !== "monthlyReview"
+              || requestId !== generation) return;
+            results.replaceChildren();
+            if (!result.ok) { summary.textContent = result.error.message; return; }
+            summary.textContent = result.value.entries.length + " accomplissement(s) · "
+              + result.value.assumedCount + " présumé(s) terminé(s).";
+            if (!result.value.entries.length) {
+              results.textContent = "Aucun accomplissement dans cette sélection.";
+            }
+            for (const item of result.value.entries) {
+              const article = document.createElement("article");
+              article.className = "activity-row";
+              const details = document.createElement("div");
+              details.className = "activity-details";
+              const name = document.createElement("strong");
+              name.textContent = item.activity.title;
+              const meta = document.createElement("span");
+              meta.className = "activity-meta";
+              meta.textContent = item.occurrence.localDate
+                + " · " + "★".repeat(item.activity.stars || 0)
+                + " · " + (item.completion.status === "auto_assumed"
+                  ? "Présumé terminé (corrigible depuis Jour)"
+                  : "Confirmé manuellement");
+              details.append(name, meta);
+              article.append(details);
+              results.append(article);
+            }
+          }).catch(() => {
+            if (requestId === generation && content.isConnected) {
+              summary.textContent = "Bilan indisponible.";
+            }
+          });
+        };
+        month.onchange = refresh;
+        filter.onchange = refresh;
+        refresh();
         break;
+      }
       case "day":
       default: screens.renderHome();
     }
