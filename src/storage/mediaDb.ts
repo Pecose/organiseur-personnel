@@ -1,6 +1,7 @@
 /** F31 / M46 · Stockage local des médias. Les blobs ne quittent pas l'iPhone.
  * Prépare les stores prévus au registre, sans importer de bibliothèque.
- * M47–M49 (CRUD médias) seront implémentés dans la strate S6.
+ * M47/M48 sont codées en S6 ; M49 reste différée tant que les références
+ * cloud et locales ne peuvent pas être vérifiées avant un effacement définitif.
  */
 import type { LocalMediaBlob, MediaDb, Result } from "../domain/types";
 
