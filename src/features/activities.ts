@@ -1,5 +1,9 @@
 /** F48 · S1 : classification et validation pures du seul objet métier Activity. */
-import type { Activity, ActivityOccurrenceView, Result } from "../domain/types";
+import { getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { getUserCollection, putCloudRecord } from "../services/cloudRepository";
+import type { Activity, ActivityDraft, ActivityOccurrenceView, Result } from "../domain/types";
 
 /** M124 : les vues se recoupent ; une habitude horaire est aussi un événement. */
 export function classifyActivity(activity: Activity): ("task" | "habit" | "event")[] {
@@ -133,4 +137,106 @@ export function shouldAutoComplete(occ: ActivityOccurrenceView, now: string): bo
   const nowMs = Date.parse(now);
   if (!Number.isFinite(deadlineMs) || !Number.isFinite(nowMs)) return false;
   return nowMs >= deadlineMs;
+}
+
+/** M121 · Une activité canonique, à ID stable ; aucune catégorie stockée. */
+export async function createActivity(input: ActivityDraft): Promise<Result<Activity>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user) return { ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Connecte-toi pour créer une activité.",
+    }};
+    const id = input.id ?? crypto.randomUUID();
+    const { id: _draftId, autoComplete: requestedAuto, ...fields } = input;
+    const candidate: Activity = {
+      ...fields,
+      id,
+      uid: user.uid,
+      autoComplete: requestedAuto ?? Boolean(input.startAt),
+      updatedAt: new Date().toISOString(),
+    };
+    const valid = validateActivity(candidate);
+    if (!valid.ok) return valid;
+    const clean = Object.fromEntries(Object.entries(valid.value)
+      .filter(([_name, value]) => value !== undefined)) as Activity;
+    const saved = await putCloudRecord(user.uid, "activities", id, clean);
+    if (!saved.ok) return saved;
+    return { ok: true, value: clean };
+  } catch {
+    return { ok: false, error: {
+      code: "CREATE_ACTIVITY_FAILED", message: "Création impossible ou session indisponible.",
+    }};
+  }
+}
+
+/** M122 · Écriture du même ID, jamais de duplication en changeant le planning. */
+export async function updateActivity(activity: Activity): Promise<Result<Activity>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || user.uid !== activity.uid) return { ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Cette activité n'appartient pas à la session active.",
+    }};
+    const ref = doc(getUserCollection(user.uid, "activities"), activity.id);
+    const original = await getDoc(ref);
+    if (!original.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const existing = original.data() as Activity;
+    if (existing.deletedAt) return { ok: false, error: {
+      code: "ACTIVITY_ARCHIVED", message: "Activité déjà supprimée.",
+    }};
+    const candidate: Activity = {
+      ...activity,
+      uid: user.uid,
+      id: existing.id,
+      googleLink: activity.googleLink ?? existing.googleLink,
+      updatedAt: new Date().toISOString(),
+    };
+    const valid = validateActivity(candidate);
+    if (!valid.ok) return valid;
+    const clean = Object.fromEntries(Object.entries(valid.value)
+      .filter(([_name, value]) => value !== undefined)) as Activity;
+    const saved = await putCloudRecord(user.uid, "activities", existing.id, clean);
+    if (!saved.ok) return saved;
+    return { ok: true, value: clean };
+  } catch {
+    return { ok: false, error: {
+      code: "UPDATE_ACTIVITY_FAILED", message: "Modification impossible.",
+    }};
+  }
+}
+
+/** M123 · Tombstone, sans effacer la liste associée ni les réalisations. */
+export async function deleteActivity(id: string): Promise<Result<void>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !id || id.includes("/")) return { ok: false, error: {
+      code: "INVALID_ACTIVITY", message: "Session ou identifiant invalide.",
+    }};
+    const snapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
+    if (!snapshot.exists()) return { ok: false, error: {
+      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    }};
+    const activity = snapshot.data() as Activity;
+    if (activity.deletedAt) return { ok: true, value: undefined };
+    const now = new Date().toISOString();
+    const archived: Activity = {
+      ...activity,
+      deletedAt: now,
+      updatedAt: now,
+      googleLink: activity.googleLink
+        ? { ...activity.googleLink, pending: "delete" } : undefined,
+    };
+    const valid = validateActivity(archived);
+    if (!valid.ok) return valid;
+    const clean = Object.fromEntries(Object.entries(archived)
+      .filter(([_name, value]) => value !== undefined)) as Activity;
+    const written = await putCloudRecord(user.uid, "activities", id, clean);
+    if (!written.ok) return written;
+    return { ok: true, value: undefined };
+  } catch {
+    return { ok: false, error: {
+      code: "DELETE_ACTIVITY_FAILED", message: "Archivage impossible.",
+    }};
+  }
 }
