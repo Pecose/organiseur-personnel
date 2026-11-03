@@ -509,7 +509,7 @@ Toutes les fonctions ci-dessous sont **PLANNED**, pas implémentées. F45 est la
 | M134 | `undoOccurrenceCompletion(key:string): Promise<Result<ActivityCompletion>>` | O33/F48 : transaction Firestore relecture + mise en veto `manually_undone` prioritaire entre appareils ; hors ligne erreur sans fausse confirmation (D24) |
 | M135 | `findMissedTasks(yesterday:LocalDate): Promise<Result<Activity[]>>` | M125/O31/O33 ; inachevées, datées hier, sans récurrence/heure |
 | M136 | `getCarryOverPrompt(today:LocalDate): Promise<Result<CarryOverPrompt>>` | F51/M135/O36 ; candidats de la veille moins décisions O36 déjà prises ; une proposition groupée non intrusive sur Aujourd'hui (D24) |
-| M137 | `applyCarryOver(choices:CarryOverChoice[]): Promise<Result<void>>` | F51/O31/O36 ; choix explicites, ID stable `${activityId}@${fromDate}` pour O36 ; déplacement de la date du **même** O31 et journalisation cohérente, jamais une copie (D24) |
+| M137 | `applyCarryOver(choices:CarryOverChoice[]): Promise<Result<void>>` | F51/O31/O33/O36 ; transaction revalidant activité, complétion courante et décision avant report ; ID stable `${activityId}@${fromDate}`, même O31 sans copie (D24) |
 | M138 | `setActivitySchedule(id:string,schedule:ActivitySchedule): Promise<Result<Activity>>` | M122/O31 ; date seule ou horaires, propose auto par défaut |
 | M139 | `setActivityRecurrence(id:string,rule:RecurrenceRule|null): Promise<Result<Activity>>` | M122/M130/O05/O31 ; combinaisons heure + cycles |
 | M140 | `setActivityStars(id:string,stars:1|2|3|null): Promise<Result<Activity>>` | M122/O31 ; priorité du bilan |
