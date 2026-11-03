@@ -835,6 +835,8 @@ export function renderSettings(): void {
     });
   };
   logout.onclick = () => {
+    // Ne pas laisser une piste privée audible après fermeture de la session.
+    pausePlayback();
     void signOut().then(result => {
       if (result.ok) navigate({name:"signin"});
       else feedback.textContent = result.error.message;
