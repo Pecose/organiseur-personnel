@@ -223,7 +223,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S3** | **VALIDÉE SUR SON PÉRIMÈTRE LOGIQUE (tests ciblés locaux)** | O06/O30/O33 dans F17, propriété `completion?: ActivityCompletion` approuvée, M133 dans F48, tests ajoutés à F54 | **18 tests ciblés passés** avec `tsc --strict` + Node sur reproduction isolée du prédicat ; **compilation intégrale depuis GitHub à reproduire**. Les mutations/persistances M132/M134/M154/M158 appartiennent aux strates ultérieures |
 | **S4** | **MODÈLES COMPLETS, VALIDATION PARTIELLE** | O19 et O38 dans F17, `MonthlyAchievement` basé sur O31/O32/O33, tests T19 publiés dans F56 ; **35/35 objets métier** | Contrat/tri vérifiés avec `tsc --strict` et Node sur copie autonome ; **F56 et toutes les suites du dépôt restent à exécuter sur clone**. M147/Firestore prévu en S8, aucun bilan opérationnel |
 | **S5** | **EN COURS : dépendances et services codés, non validés sur appareil** | Accord D10 et commit préalable ; F06 Vite/TS/Firebase ; F14 entrée ; F17 types SDK ; F27 M16 ; F28 M17–M20/M90 ; F29 M21–M24/M89 ; F30 M25–M27 ; F35 M79/M80 ; F42 scénarios T05 pour émulateurs ; F39 toujours non déployé | **Restant :** `npm install`, `npm run build`/tests réels, paramètres Firebase Web du projet, tests UID à l'émulateur, autorisation puis déploiement contrôlé des règles, icônes F10 et test réel iPhone Safari. Sans ces étapes S5 ne peut pas être déclarée validée |
-| **S6** | **OUVERTE POUR CODAGE (D23)** | Prérequis typés S0–S4 et services F29 déjà écrits ; modules S6 à compléter | **Aucun test maintenant** ; blocages de production et contrôles finaux conservés |
+| **S6** | **EN COURS : fonctions métier codées, NON TESTÉES (D23)** | F17 : ActivityDraft/ActivitySchedule/ChecklistDraft/ChecklistItemDraft ; F48 : M121–M123, M132/M134/M155, M138–M142 ; F22 : M125 ; F49 : M126 ; F50 : M143/M144/M146/M159/M160 | Restent M145, M158, M41–M44 et branche médias ; aucune compilation ni recette, aucun déploiement Firebase |
 | **S7–S10** | NON DÉMARRÉES | Aucun code de ces strates | Respecter l'ordre des dépendances codées, tests regroupés à la fin |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
@@ -377,14 +377,14 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Prérequis de code (D23) :** S0–S4 typés, dépôt UID-scope de S5 codé ; **tests et activation de S5 différés à la recette finale**. Sous-ordre : dépôt sécurisé → CRUD central → opérations spécialisées. Toutes les fonctions S6 restent **non testées** jusqu'à cette recette.
 
-- [ ] Activités : **M121–M126/M138–M142/M157**. Créer, lire, modifier, supprimer, classer, dater, répéter, étoiler, changer icône et associer une liste **sans changer l'ID**.
-- [ ] Listes : **M143–M146/M159–M160**. Définir une liste et ses articles, cases cochables, accès par ID, détachement sans effacer l'activité, pas de validation automatique du parent.
-- [ ] Réalisations : **M132/M134/M155/M158**. Créer/annuler une coche pour une seule occurrence ; persister le refus de recochage automatique. L'automatisation complète attend S8.
+- [x] **Code écrit, non testé** : activités M121–M126/M138–M142/M157. Créer, lire, modifier, supprimer logiquement, classer, dater, répéter, étoiler, changer icône et associer une liste sans changer l'ID. **Recette différée D23.**
+- [ ] **Listes partiellement codées, non testées** : M143/M144/M146/M159/M160 écrits, avec une coche d'article indépendante du parent ; **M145 (suppression et détachement contrôlé) reste à coder**.
+- [ ] **Réalisations partiellement codées, non testées** : M132/M134/M155 écrits pour la coche manuelle, la lecture et le veto anti-recochage par occurrence ; M158 reste à coder ; déclenchement global prévu S8.
 - [ ] Préparer l'accès aux rappels **M41–M44** avec activité/occurrence comme propriétaires ; l'envoi réel attend S9.
 - [ ] **Branche indépendante médias** (si la branche est activée dès maintenant) : M47–M57, M64–M65 et M95 pour blobs, métadonnées, imports et listes ; tests IndexedDB, aucune image/MP3 personnelle stockée dans Firestore.
-- [ ] Tester CRUD offline et retour du réseau, sauvegarde par UID, absence de doublon et présence des mêmes relations après reconnexion (T02/T03/T05/T18).
+- [ ] **Recette finale différée (D23)** : CRUD offline et retour du réseau, sauvegarde par UID, absence de doublons et liens conservés après reconnexion (T02/T03/T05/T18). Ne pas déclarer cette case réussie sans l'avoir exécutée.
 
-**Sortie S6 :** chaque objet peut être manipulé correctement sans dépendre d'un écran complexe.
+**État S6 : CODAGE PARTIEL, NON TESTÉ.** Les opérations métier essentielles ont été enregistrées, mais leur exécution dépend de Firebase, des règles par UID et des validations de fin de chantier ; la suppression complète des listes, la présomption automatique persistée, les rappels et les médias restent en attente. **Ne pas déployer ni utiliser des données réelles avant la recette finale.**
 
 ### S7 — Assembler les objets dans les **cinq vues**
 
