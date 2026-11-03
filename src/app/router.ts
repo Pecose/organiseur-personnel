@@ -2,10 +2,6 @@
 import type { UiRoute } from "../domain/types";
 import { getAppState, setAppState } from "./state";
 import { renderCommonStatus } from "../ui/components";
-import {
-  renderHome, renderAgenda, renderTasks, renderMusic, renderDecor,
-  renderSettings, renderSignIn, renderHabits, renderChecklists,
-} from "../ui/screens";
 
 /** M03 · Routage strict sur les noms O20, pas de chemin arbitraire. */
 export function resolveRoute(path: string): UiRoute {
@@ -101,19 +97,28 @@ export function renderRoute(route: UiRoute): void {
   app.append(page);
   renderCommonStatus(state.sync);
 
-  switch (route.name) {
-    case "calendar": renderAgenda(); break;
-    case "tasks": renderTasks(); break;
-    case "habits": renderHabits(); break;
-    case "lists": renderChecklists(); break;
-    case "music": renderMusic(); break;
-    case "decor": renderDecor(); break;
-    case "settings": renderSettings(); break;
-    case "signin": renderSignIn(); break;
-    case "monthlyReview":
-      content.textContent = "Le bilan mensuel sera disponible après S8.";
-      break;
-    case "day":
-    default: renderHome();
-  }
+  // F19 importe M02 pour ses actions. Chargement différé pour supprimer
+  // le cycle statique F15 ↔ F19, sans créer de service ni nouveau contrat.
+  void import("../ui/screens").then(screens => {
+    if (!content.isConnected || getAppState().route.name !== route.name) return;
+    switch (route.name) {
+      case "calendar": screens.renderAgenda(); break;
+      case "tasks": screens.renderTasks(); break;
+      case "habits": screens.renderHabits(); break;
+      case "lists": screens.renderChecklists(); break;
+      case "music": screens.renderMusic(); break;
+      case "decor": screens.renderDecor(); break;
+      case "settings": screens.renderSettings(); break;
+      case "signin": screens.renderSignIn(); break;
+      case "monthlyReview":
+        content.textContent = "Le bilan mensuel sera disponible après S8.";
+        break;
+      case "day":
+      default: screens.renderHome();
+    }
+  }).catch(() => {
+    if (content.isConnected) {
+      content.textContent = "Cette page ne peut pas être chargée.";
+    }
+  });
 }
