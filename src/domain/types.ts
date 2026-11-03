@@ -328,6 +328,19 @@ export interface CarryOverDecision {
  promptedAt: ISOInstant; decidedAt?: ISOInstant; updatedAt: ISOInstant;
 }
 /** Types de présentation F17, non persistés. */
+/** F17 / S8, contrat autorisé le 3 novembre 2026 : proposition groupée. */
+export interface CarryOverPrompt {
+  fromDate: LocalDate;
+  toDate: LocalDate;
+  candidates: Activity[];
+}
+/** F17 / S8 : décision explicite pour une tâche de la veille. */
+export interface CarryOverChoice {
+  activityId: string;
+  fromDate: LocalDate;
+  toDate: LocalDate;
+  decision: "move" | "keep" | "later";
+}
 export interface ActivityOccurrenceView { activity: Activity; occurrence: ActivityOccurrence; completion?: ActivityCompletion; }
 export interface DayGroups { withoutTime: ActivityOccurrenceView[]; withTime: ActivityOccurrenceView[]; }
 
