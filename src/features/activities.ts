@@ -3,7 +3,7 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { getUserCollection, putCloudRecord } from "../services/cloudRepository";
-import type { Activity, ActivityDraft, ActivityOccurrenceView, ActivitySchedule, RecurrenceRule, Result } from "../domain/types";
+import type { Activity, ActivityCompletion, ActivityDraft, ActivityOccurrenceView, ActivitySchedule, RecurrenceRule, Result } from "../domain/types";
 
 /** M124 : les vues se recoupent ; une habitude horaire est aussi un événement. */
 export function classifyActivity(activity: Activity): ("task" | "habit" | "event")[] {
@@ -375,6 +375,100 @@ export async function attachChecklist(
   } catch {
     return { ok: false, error: {
       code: "CHECKLIST_ATTACH_FAILED", message: "Association de liste indisponible.",
+    }};
+  }
+}
+
+/** M155 · Lire une validation isolée (une date, pas la série complète). */
+export async function getOccurrenceCompletion(
+  key: string,
+): Promise<Result<ActivityCompletion | null>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !key || key.includes("/")) return { ok: false, error: {
+      code: "INVALID_OCCURRENCE", message: "Session ou occurrence invalide.",
+    }};
+    const result = await getDoc(doc(getUserCollection(user.uid, "activityCompletions"), key));
+    return { ok: true, value: result.exists() ? result.data() as ActivityCompletion : null };
+  } catch {
+    return { ok: false, error: {
+      code: "COMPLETION_READ_FAILED", message: "Lecture de validation indisponible.",
+    }};
+  }
+}
+
+/** M132 · Changement manuel de la seule occurrence visée. */
+export async function setOccurrenceCompletion(
+  key: string, mode: "manual_done" | "pending",
+): Promise<Result<ActivityCompletion>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    const at = key.lastIndexOf("@");
+    const activityId = key.slice(0, at);
+    const localDate = key.slice(at + 1);
+    if (!user || at <= 0 || !activityId || activityId.includes("/") || key.includes("/")
+      || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)
+      || Number.isNaN(Date.parse(localDate + "T00:00:00Z"))) return {
+      ok: false, error: {
+        code: "INVALID_OCCURRENCE", message: "Clé d'occurrence invalide.",
+      },
+    };
+    const activitySnapshot = await getDoc(doc(getUserCollection(user.uid, "activities"), activityId));
+    if (!activitySnapshot.exists() || (activitySnapshot.data() as Activity).deletedAt) {
+      return { ok: false, error: {
+        code: "ACTIVITY_NOT_FOUND", message: "Activité inexistante ou archivée.",
+      }};
+    }
+    const previous = await getOccurrenceCompletion(key);
+    if (!previous.ok) return previous;
+    if (mode === "pending" && previous.value && previous.value.status !== "pending") {
+      return { ok: false, error: {
+        code: "USE_MANUAL_UNDO",
+        message: "Pour annuler une validation existante, utiliser l'annulation manuelle.",
+      }};
+    }
+    const now = new Date().toISOString();
+    const completion: ActivityCompletion = {
+      id: key, activityId, occurrenceKey: key,
+      status: mode, updatedAt: now,
+      ...(mode === "manual_done" ? { completedAt: now } : {}),
+    };
+    const saved = await putCloudRecord(user.uid, "activityCompletions", key, completion);
+    return saved.ok ? { ok: true, value: completion } : saved;
+  } catch {
+    return { ok: false, error: {
+      code: "COMPLETION_WRITE_FAILED", message: "Validation indisponible.",
+    }};
+  }
+}
+
+/** M134 · Veto manuel persistant contre le recochage automatique M133. */
+export async function undoOccurrenceCompletion(
+  key: string,
+): Promise<Result<ActivityCompletion>> {
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user || !key || key.includes("/")) return { ok: false, error: {
+      code: "INVALID_OCCURRENCE", message: "Session ou occurrence invalide.",
+    }};
+    const before = await getOccurrenceCompletion(key);
+    if (!before.ok) return before;
+    if (!before.value) return { ok: false, error: {
+      code: "COMPLETION_NOT_FOUND", message: "Aucune validation à annuler.",
+    }};
+    const now = new Date().toISOString();
+    const completion: ActivityCompletion = {
+      ...before.value,
+      status: "manually_undone",
+      overriddenAt: now,
+      updatedAt: now,
+    };
+    delete completion.completedAt;
+    const written = await putCloudRecord(user.uid, "activityCompletions", key, completion);
+    return written.ok ? { ok: true, value: completion } : written;
+  } catch {
+    return { ok: false, error: {
+      code: "COMPLETION_UNDO_FAILED", message: "Annulation indisponible.",
     }};
   }
 }
