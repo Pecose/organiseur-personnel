@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Registre contractuel intégral
 
 > **Projet :** `Pecose/organiseur-personnel` · **Date de référence :** 2026-11-01  
-> **Statut : ARCHITECTURE CIBLE EN COURS D'IMPLÉMENTATION**. Les strates S0 à S4 sont typées ; S5 et S6 sont codées partiellement ; les cinq vues principales S7 sont assemblées en TypeScript natif. La décision D23 reporte tous les tests à la recette finale : **aucun module S5–S7 n'est déclaré validé ni déployé**. **Ne jamais confondre un contrat ou un test local avec une fonctionnalité déjà déployée.**  
+> **Statut : ARCHITECTURE CIBLE EN COURS D'IMPLÉMENTATION**. Les strates S0 à S4 sont typées ; S5/S6 sont partiellement codées ; S7 comporte les cinq vues et médias ; les trois ajustements S8 approuvés D24 sont codés dans F15/F17/F19/F22/F48/F51/F52. La décision D23 reporte tous les tests à la recette finale : **aucun module S5–S8 n'est déclaré validé ni déployé**. **Ne jamais confondre code présent, contrat approuvé et fonctionnalité opérationnelle.**  
 > **Document de gouvernance :** [../AGENTS.md](../AGENTS.md) · **Périmètre fonctionnel :** [../ROADMAP.md](../ROADMAP.md).
 
 ## 0. Règle de changement obligatoire (BLOCAGE)
@@ -206,7 +206,7 @@ Types conceptuels de `F17`. Les ID sont stables et générés côté client, p. 
 | `MediaArchiveManifest` | O21 | `schemaVersion; createdAt; mediaEntries[]; metadata; checksums` | export/import des fichiers personnels |
 | `NotificationTestResult` | O22 | `supported; permitted; subscribed; sent?; message?` | retour état des diagnostics, pas garantie de livraison |
 
-### Modèle unifié (D14–D22, approuvé, non implémenté)
+### Modèle unifié (D14–D24, objets codés, persistance et interface non testées)
 
 **Priorité contractuelle :** O31–O38 remplacent les anciens O02/O03/O04 jamais implémentés. Une tâche qui reçoit un horaire ou une répétition **conserve son ID**.
 
