@@ -2,7 +2,7 @@
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc, getFirestore, runTransaction } from "firebase/firestore";
-import { getUserCollection, putCloudRecord } from "../services/cloudRepository";
+import { fetchCloudRecords, getUserCollection, putCloudRecord } from "../services/cloudRepository";
 import { expandActivityOccurrences } from "./habits";
 import type { Activity, ActivityCompletion, ActivityDraft, ActivityOccurrenceView, ActivitySchedule, RecurrenceRule, Result } from "../domain/types";
 
@@ -525,69 +525,145 @@ export async function undoOccurrenceCompletion(
   }
 }
 
-/** M158 · Persister une présomption seulement si M133 l'autorise.
- * Une annulation manuelle de cette occurrence bloque le recochage.
- * ATTENTION : sans transaction conditionnelle multi-appareils, une course entre
- * M134 et M158 reste possible. Recette finale obligatoire avant déploiement.
+/** M158 · Présomption atomique ; une annulation manuelle a toujours priorité.
+ * Relecture de O31 et O33 dans la même transaction Firestore. Pas de Push ni timer.
  */
 export async function markAutoCompletion(
   key: string, at: string,
 ): Promise<Result<ActivityCompletion>> {
+  const sep = key.lastIndexOf("@");
+  const activityId = key.slice(0, sep);
+  const localDate = key.slice(sep + 1);
+  const nowMs = Date.parse(at);
+  if (sep < 1 || !activityId || activityId.includes("/") || key.includes("/")
+    || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)
+    || !Number.isFinite(Date.parse(localDate + "T00:00:00Z"))
+    || new Date(localDate + "T00:00:00Z").toISOString().slice(0, 10) !== localDate
+    || !Number.isFinite(nowMs)) return {ok: false, error: {
+    code: "INVALID_OCCURRENCE", message: "Occurrence ou instant invalide.",
+  }};
   try {
-    const user = getAuth(getApp("organiseur-personnel")).currentUser;
-    const sep = key.lastIndexOf("@");
-    const id = key.slice(0, sep);
-    const day = key.slice(sep + 1);
-    if (!user || sep < 1 || !id || id.includes("/") || key.includes("/")
-      || !/^\d{4}-\d{2}-\d{2}$/.test(day)
-      || Number.isNaN(Date.parse(day + "T00:00:00Z"))
-      || new Date(day + "T00:00:00Z").toISOString().slice(0, 10) !== day
-      || !Number.isFinite(Date.parse(at))) {
-      return { ok: false, error: {
-        code: "INVALID_OCCURRENCE", message: "Occurrence ou date de vérification invalide.",
-      }};
-    }
-    const act = await getDoc(doc(getUserCollection(user.uid, "activities"), id));
-    if (!act.exists()) return { ok: false, error: {
-      code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+    const app = getApp("organiseur-personnel");
+    const user = getAuth(app).currentUser;
+    if (!user) return {ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Connexion requise pour la validation automatique.",
     }};
-    const activity = act.data() as Activity;
-    if (activity.deletedAt || !activity.autoComplete) {
-      return { ok: false, error: {
-        code: "AUTO_COMPLETION_DISABLED", message: "Validation automatique désactivée.",
-      }};
-    }
-    const midnight = Date.parse(day + "T00:00:00Z");
-    const occurrences = expandActivityOccurrences(activity, {
-      from: new Date(midnight - 2 * 86_400_000).toISOString(),
-      to: new Date(midnight + 3 * 86_400_000).toISOString(),
-    });
-    const occurrence = occurrences.find(item => item.occurrenceKey === key);
-    if (!occurrence) return { ok: false, error: {
-      code: "OCCURRENCE_NOT_FOUND", message: "Cette occurrence n'existe plus.",
-    }};
-    const previous = await getOccurrenceCompletion(key);
-    if (!previous.ok) return previous;
-    if (!shouldAutoComplete({activity, occurrence, completion: previous.value ?? undefined}, at)) {
-      return { ok: false, error: {
+    const activityRef = doc(getUserCollection(user.uid, "activities"), activityId);
+    const completionRef = doc(getUserCollection(user.uid, "activityCompletions"), key);
+    return await runTransaction(getFirestore(app), async tx => {
+      const [storedActivity, storedCompletion] = await Promise.all([
+        tx.get(activityRef), tx.get(completionRef),
+      ]);
+      if (!storedActivity.exists()) return {ok: false, error: {
+        code: "ACTIVITY_NOT_FOUND", message: "Activité introuvable.",
+      }} as Result<ActivityCompletion>;
+      const activity = storedActivity.data() as Activity;
+      if (activity.uid !== user.uid || activity.deletedAt || !activity.autoComplete) {
+        return {ok: false, error: {
+          code: "AUTO_COMPLETION_DISABLED", message: "Validation automatique indisponible.",
+        }} as Result<ActivityCompletion>;
+      }
+      const center = Date.parse(localDate + "T00:00:00Z");
+      const occurrences = expandActivityOccurrences(activity, {
+        from: new Date(center - 2 * 86_400_000).toISOString(),
+        to: new Date(center + 3 * 86_400_000).toISOString(),
+      });
+      const occurrence = occurrences.find(item => item.occurrenceKey === key);
+      if (!occurrence) return {ok: false, error: {
+        code: "OCCURRENCE_NOT_FOUND", message: "Occurrence absente ou déplacée.",
+      }} as Result<ActivityCompletion>;
+      const previous = storedCompletion.exists()
+        ? storedCompletion.data() as ActivityCompletion : null;
+      if (!shouldAutoComplete({
+        activity, occurrence, ...(previous ? {completion: previous} : {}),
+      }, at)) return {ok: false, error: {
         code: "AUTO_COMPLETION_NOT_DUE",
-        message: "L'échéance n'est pas atteinte ou une décision manuelle l'interdit.",
-      }};
-    }
-    const now = new Date().toISOString();
-    const completion: ActivityCompletion = {
-      id: key,
-      activityId: id,
-      occurrenceKey: key,
-      status: "auto_assumed",
-      completedAt: at,
-      updatedAt: now,
-    };
-    const stored = await putCloudRecord(user.uid, "activityCompletions", key, completion);
-    return stored.ok ? {ok: true, value: completion} : stored;
+        message: "Déjà validé, annulé manuellement ou horaire non atteint.",
+      }} as Result<ActivityCompletion>;
+      const now = new Date().toISOString();
+      const completion: ActivityCompletion = {
+        id: key, activityId, occurrenceKey: key,
+        status: "auto_assumed", completedAt: at, updatedAt: now,
+      };
+      tx.set(completionRef, completion);
+      return {ok: true, value: completion} as Result<ActivityCompletion>;
+    });
   } catch {
     return {ok: false, error: {
-      code: "AUTO_COMPLETION_FAILED", message: "Présomption non enregistrée.",
+      code: "AUTO_COMPLETION_TRANSACTION_FAILED",
+      message: "Validation non confirmée. Réessaie lorsque la connexion est disponible.",
+    }};
+  }
+}
+
+/** M154 · Réconciliation bornée à sept jours et 25 coches par reprise.
+ * Firestore ne fournit pas d'alarme OS en arrière-plan ; cette routine est
+ * invoquée à l'ouverture/retour au premier plan de la PWA.
+ */
+export async function reconcileDueAutoCompletions(
+  now: string,
+): Promise<Result<number>> {
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) return {ok: false, error: {
+    code: "INVALID_INSTANT", message: "Date de reprise invalide.",
+  }};
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user) return {ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Connexion requise pour les validations.",
+    }};
+    const { getAppState } = await import("../app/state");
+    const zone = getAppState().preferences.timeZone;
+    const localToday = new Date(nowMs).toLocaleDateString("sv-SE", {timeZone: zone});
+    const todayUtc = Date.parse(localToday + "T00:00:00Z");
+    if (!Number.isFinite(todayUtc)) return {ok: false, error: {
+      code: "INVALID_TIME_ZONE", message: "Fuseau ou date locale invalide.",
+    }};
+    // Sept jours civils dont aujourd'hui ; marges DST pour l'expansion.
+    const lower = todayUtc - 6 * 86_400_000;
+    const range = {
+      from: new Date(lower - 2 * 86_400_000).toISOString(),
+      to: new Date(todayUtc + 3 * 86_400_000).toISOString(),
+    };
+    const [activityRecords, completionRecords] = await Promise.all([
+      fetchCloudRecords<Activity>(user.uid, "activities"),
+      fetchCloudRecords<ActivityCompletion>(user.uid, "activityCompletions"),
+    ]);
+    if (!activityRecords.ok) return activityRecords;
+    if (!completionRecords.ok) return completionRecords;
+    const byKey = new Map(completionRecords.value.map(c => [c.occurrenceKey, c]));
+    const due: {key: string; at: string; deadline: number}[] = [];
+    for (const activity of activityRecords.value) {
+      if (activity.deletedAt || !activity.autoComplete || !activity.startAt) continue;
+      const occurrences = expandActivityOccurrences(activity, range);
+      for (const occurrence of occurrences) {
+        const localTime = Date.parse(occurrence.localDate + "T00:00:00Z");
+        if (localTime < lower || localTime > todayUtc) continue;
+        const completion = byKey.get(occurrence.occurrenceKey);
+        if (!shouldAutoComplete({
+          activity, occurrence, ...(completion ? {completion} : {}),
+        }, now)) continue;
+        const timestamp = occurrence.endsAt ?? occurrence.startsAt;
+        if (timestamp) due.push({
+          key: occurrence.occurrenceKey,
+          at: now,
+          deadline: Date.parse(timestamp),
+        });
+      }
+    }
+    due.sort((a, b) => a.deadline - b.deadline || a.key.localeCompare(b.key));
+    let count = 0;
+    for (const candidate of due.slice(0, 25)) {
+      const saved = await markAutoCompletion(candidate.key, candidate.at);
+      if (saved.ok) count++;
+      else if (!["AUTO_COMPLETION_NOT_DUE", "AUTO_COMPLETION_DISABLED",
+        "OCCURRENCE_NOT_FOUND"].includes(saved.error.code)) return saved;
+    }
+    return {ok: true, value: count};
+  } catch {
+    return {ok: false, error: {
+      code: "AUTO_RECONCILE_FAILED",
+      message: "Réconciliation impossible, aucune confirmation automatique annoncée.",
     }};
   }
 }
