@@ -573,36 +573,160 @@ export function renderChecklists(): void {
   });
 }
 
-/** M08 · Musique secondaire, aucun lecteur audio fictif à ce stade. */
+/** M08 · Import et lecteur local, sans hébergement audio distant. */
 export function renderMusic(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">UNE PETITE PAUSE</p>
-    <h2>Ma musique</h2><p class="muted">Tes morceaux personnels restent stockés sur cet appareil.</p>
-    <button type="button" class="soft-button" data-back>← Revenir à Jour</button></section>
-    <section class="day-section"><h3>Bibliothèque musicale</h3>
-      <div id="music-list" class="entry-list"></div></section>`;
+  root.innerHTML =
+    "<section class='page-intro'><p class='eyebrow'>UNE PETITE PAUSE</p>" +
+    "<h2>Ma musique</h2><p class='muted'>Les fichiers personnels restent sur cet appareil.</p>" +
+    "<button type='button' class='soft-button' data-back>← Revenir à Jour</button></section>" +
+    "<section class='day-section'><h3>Ajouter un morceau</h3>" +
+    "<form id='audio-import' class='media-import'><label>Fichier audio local" +
+    "<input type='file' name='file' accept='audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac' required></label>" +
+    "<button type='submit' class='primary-button compact'>Importer</button></form>" +
+    "<p id='music-feedback' role='status' aria-live='polite' class='muted'></p></section>" +
+    "<section class='day-section'><h3>Lecture</h3><div class='player-controls'>" +
+    "<button type='button' id='player-previous' class='soft-button' aria-label='Morceau précédent'>⏮</button>" +
+    "<button type='button' id='player-pause' class='soft-button' aria-label='Pause'>⏸</button>" +
+    "<button type='button' id='player-next' class='soft-button' aria-label='Morceau suivant'>⏭</button>" +
+    "<label>Mode <select id='player-mode'><option value='normal'>Normal</option>" +
+    "<option value='repeat'>Répéter le morceau</option><option value='shuffle'>Aléatoire</option></select></label>" +
+    "</div><p class='muted'>Lecture en arrière-plan iPhone à vérifier lors de la recette.</p></section>" +
+    "<section class='day-section'><h3>Mes playlists</h3>" +
+    "<form id='playlist-form' class='inline-form'><input name='name' aria-label='Nom de la playlist' maxlength='250' required placeholder='Nouvelle playlist'>" +
+    "<button type='submit' class='soft-button'>Créer</button></form>" +
+    "<div id='playlist-list' class='entry-list'></div></section>" +
+    "<section class='day-section'><h3>Bibliothèque musicale</h3>" +
+    "<div id='music-list' class='entry-list'></div></section>";
   root.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => navigate({name:"day"});
-  const target = root.querySelector<HTMLElement>("#music-list")!;
-  if (!getAppState().user) { target.textContent = "Connecte-toi pour consulter le catalogue musical."; return; }
+  const feedback = root.querySelector<HTMLElement>("#music-feedback")!;
+  const list = root.querySelector<HTMLElement>("#music-list")!;
+  const playlistList = root.querySelector<HTMLElement>("#playlist-list")!;
+  const importForm = root.querySelector<HTMLFormElement>("#audio-import")!;
+  const playlistForm = root.querySelector<HTMLFormElement>("#playlist-form")!;
+  const playPrevious = root.querySelector<HTMLButtonElement>("#player-previous")!;
+  const playPause = root.querySelector<HTMLButtonElement>("#player-pause")!;
+  const playNext = root.querySelector<HTMLButtonElement>("#player-next")!;
+  root.querySelector<HTMLSelectElement>("#player-mode")!.onchange = event => {
+    setPlaybackMode((event.currentTarget as HTMLSelectElement).value as "normal" | "repeat" | "shuffle");
+    feedback.textContent = "Mode de lecture modifié.";
+  };
+  playPause.onclick = () => {
+    pausePlayback();
+    feedback.textContent = "Lecture en pause.";
+  };
+  playPrevious.onclick = () => {
+    void previousTrack().then(result => {
+      feedback.textContent = result.ok ? "Lecture de la piste précédente." : result.error.message;
+    });
+  };
+  playNext.onclick = () => {
+    void nextTrack().then(result => {
+      feedback.textContent = result.ok ? "Lecture de la piste suivante." : result.error.message;
+    });
+  };
+  if (!getAppState().user) {
+    list.textContent = "Connecte-toi pour retrouver les titres et métadonnées.";
+    playlistList.textContent = "Playlists disponibles après connexion.";
+    importForm.querySelector<HTMLButtonElement>("[type=submit]")!.disabled = true;
+    playlistForm.querySelector<HTMLButtonElement>("[type=submit]")!.disabled = true;
+    return;
+  }
+  importForm.onsubmit = event => {
+    event.preventDefault();
+    const file = (importForm.elements.namedItem("file") as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const submit = importForm.querySelector<HTMLButtonElement>("[type=submit]")!;
+    submit.disabled = true;
+    feedback.textContent = "Import local du morceau…";
+    void importAudio(file, {}).then(result => {
+      submit.disabled = false;
+      if (result.ok) renderMusic();
+      else feedback.textContent = result.error.message;
+    }).catch(() => {
+      submit.disabled = false;
+      feedback.textContent = "L'import audio a échoué.";
+    });
+  };
+  playlistForm.onsubmit = event => {
+    event.preventDefault();
+    const name = (playlistForm.elements.namedItem("name") as HTMLInputElement).value.trim();
+    if (!name) return;
+    const submit = playlistForm.querySelector<HTMLButtonElement>("[type=submit]")!;
+    submit.disabled = true;
+    void savePlaylist({
+      id: crypto.randomUUID(), name, trackIds: [], updatedAt: new Date().toISOString(),
+    }).then(result => {
+      submit.disabled = false;
+      if (result.ok) renderMusic();
+      else feedback.textContent = result.error.message;
+    }).catch(() => {
+      submit.disabled = false;
+      feedback.textContent = "Impossible de créer la playlist.";
+    });
+  };
+  playlistList.textContent = "Chargement des playlists…";
+  void listPlaylists().then(result => {
+    if (!root.isConnected || getAppState().route.name !== "music") return;
+    playlistList.replaceChildren();
+    if (!result.ok) { playlistList.textContent = result.error.message; return; }
+    if (!result.value.length) { playlistList.textContent = "Aucune playlist créée."; return; }
+    for (const playlist of result.value) {
+      const item = document.createElement("article");
+      item.className = "activity-row";
+      item.textContent = "♫  " + playlist.name + " · " + playlist.trackIds.length + " titres";
+      playlistList.append(item);
+    }
+  }).catch(() => { if (playlistList.isConnected) playlistList.textContent = "Playlists indisponibles."; });
+
+  list.textContent = "Chargement des morceaux…";
   void listTracks().then(result => {
     if (!root.isConnected || getAppState().route.name !== "music") return;
-    target.replaceChildren();
-    if (!result.ok) { target.textContent = result.error.message; return; }
-    if (!result.value.length) { target.textContent = "Aucun morceau importé sur cet appareil."; return; }
+    list.replaceChildren();
+    if (!result.ok) { list.textContent = result.error.message; return; }
+    if (!result.value.length) { list.textContent = "Aucun morceau importé sur cet appareil."; return; }
+    setPlaybackQueue(result.value.map(track => track.id));
     for (const track of result.value) {
       const row = document.createElement("article");
       row.className = "activity-row";
-      const icon = document.createElement("span");
-      icon.className = "activity-icon";
-      icon.textContent = "♫";
+      const play = document.createElement("button");
+      play.type = "button";
+      play.className = "activity-icon";
+      play.textContent = "▶";
+      play.setAttribute("aria-label", "Lire " + track.title);
+      play.onclick = () => {
+        feedback.textContent = "Chargement de " + track.title + "…";
+        void playTrack(track.id).then(loaded => {
+          feedback.textContent = loaded.ok ? "Lecture : " + track.title : loaded.error.message;
+        });
+      };
       const name = document.createElement("div");
       name.className = "activity-details";
-      name.textContent = track.title + (track.artist ? " · " + track.artist : "");
-      row.append(icon, name);
-      target.append(row);
+      const title = document.createElement("strong");
+      title.textContent = track.title;
+      const meta = document.createElement("span");
+      meta.className = "activity-meta";
+      meta.textContent = (track.artist || "Artiste non renseigné")
+        + (track.source === "imported" ? " · Fichier personnel" : " · Catalogue");
+      name.append(title, meta);
+      const favorite = document.createElement("button");
+      favorite.type = "button";
+      favorite.className = "check-control";
+      favorite.textContent = track.favorite ? "★" : "☆";
+      favorite.setAttribute("aria-label", (track.favorite ? "Retirer des favoris : " : "Ajouter aux favoris : ") + track.title);
+      favorite.onclick = () => {
+        favorite.disabled = true;
+        void setTrackFavorite(track.id, !track.favorite).then(saved => {
+          favorite.disabled = false;
+          if (saved.ok) renderMusic();
+          else feedback.textContent = saved.error.message;
+        });
+      };
+      row.append(play, name, favorite);
+      list.append(row);
     }
-  });
+  }).catch(() => { if (list.isConnected) list.textContent = "Bibliothèque indisponible."; });
 }
 
 /** M09 · Décoration secondaire, sans exposition d'images locales à Firestore. */
