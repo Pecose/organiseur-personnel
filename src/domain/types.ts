@@ -451,3 +451,10 @@ export type ChecklistItemDraft = Pick<ChecklistItem,
   "checklistId" | "text" | "checked" | "position"> & {
   id?: string;
 };
+
+/** F17 / M127/M156 · Sommaire d'une date, projection non persistée de O31/O32. */
+export interface CalendarDaySummary {
+  date: LocalDate;
+  count: number;
+  labels: string[];
+}
