@@ -207,7 +207,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 ## 7. Roadmap par **strates de dépendances** (ordre de construction)
 
-> **Règle d'exécution :** on ne commence pas par « faire un écran ». On commence par **les objets qui n'ont besoin d'aucun autre objet du projet**, puis les objets qui ne dépendent que de ceux déjà terminés. Après viennent les services, les opérations, les vues, les automatisations et les intégrations. Une strate est **bloquée** tant que ses prérequis, tests et références architecturales ne sont pas validés. Ce chapitre **remplace l'ancien ordre par fonctionnalités** sans supprimer leur périmètre.
+> **Règle d'exécution (D23, 3 novembre 2026) :** construire les objets et fonctions par **dépendances documentées** ; les **tests de toutes les strates sont regroupés à la recette finale** à la demande de l'utilisateur. Une strate peut être **codée** avant validation technique de la précédente, si ses contrats et dépendances existent dans le code. Son statut reste **NON TESTÉ / NON VALIDÉ**. Aucune activation de Firebase réel, aucune donnée privée, aucun déploiement ou facturation avant validation de sécurité et d'iPhone. Ce chapitre conserve le périmètre initial.
 >
 > **Statut :** architecture **PLANIFIÉE**, application **non développée**. Les identifiants **O/F/M/C/T/D** sont ceux du [registre architectural](docs/ARCHITECTURE.md) ; **aucun nouveau contrat n'est introduit ici**. Seules les entités **O01, O05–O38 sauf O02–O04**, soit **35 objets actifs**, doivent être réalisées. **O02, O03 et O04 sont SUPERSEDED**, ne jamais les coder.
 >
@@ -223,7 +223,8 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S3** | **VALIDÉE SUR SON PÉRIMÈTRE LOGIQUE (tests ciblés locaux)** | O06/O30/O33 dans F17, propriété `completion?: ActivityCompletion` approuvée, M133 dans F48, tests ajoutés à F54 | **18 tests ciblés passés** avec `tsc --strict` + Node sur reproduction isolée du prédicat ; **compilation intégrale depuis GitHub à reproduire**. Les mutations/persistances M132/M134/M154/M158 appartiennent aux strates ultérieures |
 | **S4** | **MODÈLES COMPLETS, VALIDATION PARTIELLE** | O19 et O38 dans F17, `MonthlyAchievement` basé sur O31/O32/O33, tests T19 publiés dans F56 ; **35/35 objets métier** | Contrat/tri vérifiés avec `tsc --strict` et Node sur copie autonome ; **F56 et toutes les suites du dépôt restent à exécuter sur clone**. M147/Firestore prévu en S8, aucun bilan opérationnel |
 | **S5** | **EN COURS : dépendances et services codés, non validés sur appareil** | Accord D10 et commit préalable ; F06 Vite/TS/Firebase ; F14 entrée ; F17 types SDK ; F27 M16 ; F28 M17–M20/M90 ; F29 M21–M24/M89 ; F30 M25–M27 ; F35 M79/M80 ; F42 scénarios T05 pour émulateurs ; F39 toujours non déployé | **Restant :** `npm install`, `npm run build`/tests réels, paramètres Firebase Web du projet, tests UID à l'émulateur, autorisation puis déploiement contrôlé des règles, icônes F10 et test réel iPhone Safari. Sans ces étapes S5 ne peut pas être déclarée validée |
-| **S6–S10** | NON DÉMARRÉES | Aucun code de ces strates | S5 doit satisfaire sa porte de validation avant S6 |
+| **S6** | **OUVERTE POUR CODAGE (D23)** | Prérequis typés S0–S4 et services F29 déjà écrits ; modules S6 à compléter | **Aucun test maintenant** ; blocages de production et contrôles finaux conservés |
+| **S7–S10** | NON DÉMARRÉES | Aucun code de ces strates | Respecter l'ordre des dépendances codées, tests regroupés à la fin |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -281,13 +282,15 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Lecture stricte :** l'appartenance à S0–S4 concerne d'abord la **définition typée et les règles pures** (F17/F18), pas encore les écritures dans une base. Un identifiant de relation (`activityId`, `checklistId`, `uid`) est vérifié ensuite dans les opérations de la strate S6 ; il ne faut pas créer le serveur avant d'avoir stabilisé les formes des données. Les objets Google/Push sont **modélisés** ici, mais leur activation n'arrive qu'à S9.
 
-### Porte de validation commune (obligatoire après chaque strate)
+### Portes d'avancement et de validation finale (décision D23)
 
-- [ ] Le **registre d'architecture** contient chaque objet/fonction/fichier utilisé ; aucun nouvel ID implicite, aucune signature modifiée sans autorisation préalable.
-- [ ] Tous les **prérequis de la strate** sont effectivement terminés, pas seulement notés « prévus ».
-- [ ] Les types, règles métier, relations et migrations concernées sont vérifiés ; aucune dépendance circulaire.
-- [ ] Les tests ciblés de la strate passent ; erreurs et comportements limites documentés.
-- [ ] La roadmap indique **validé / en cours / bloqué**, avec preuve (test, commit, essai iPhone quand applicable) ; **seulement ensuite** commencer la suivante.
+**Pendant le développement, sans exécuter les tests maintenant :**
+- [ ] Conserver les contrats F/O/M/C/D et toutes les approbations d'architecture obligatoires, avec commit de documentation préalable aux nouveaux contrats.
+- [ ] N'ouvrir une fonction que si **les objets, types et fonctions dont elle dépend sont déjà codés**, même si leurs tests sont reportés ; consigner les hypothèses et les blocages.
+- [ ] Marquer **« codé, non testé »**, jamais « validé » par défaut. Une compilation non lancée n'est pas un succès.
+- [ ] Ne jamais activer les règles Firebase réelles, importer les données de l'utilisatrice, publier la PWA comme prête ou déclencher de facturation avant la recette de sécurité.
+
+**En toute fin, avant toute mise en service :** exécuter toutes les suites S0–S10, la compilation du dépôt, les tests Firebase Emulator avec deux UID, le mode hors ligne, la restauration, la sécurité et l'installation iPhone. Corriger les échecs, puis seulement cocher les jalons « validé ».
 
 ### S0 — Objets totalement autonomes (aucun objet métier requis)
 
@@ -372,7 +375,7 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 ### S6 — Fonctions élémentaires sur **un seul objet à la fois**
 
-**Prérequis : S5 et types S0–S4 validés.** Sous-ordre : **dépôt sécurisé → CRUD central → opérations spécialisées**.
+**Prérequis de code (D23) :** S0–S4 typés, dépôt UID-scope de S5 codé ; **tests et activation de S5 différés à la recette finale**. Sous-ordre : dépôt sécurisé → CRUD central → opérations spécialisées. Toutes les fonctions S6 restent **non testées** jusqu'à cette recette.
 
 - [ ] Activités : **M121–M126/M138–M142/M157**. Créer, lire, modifier, supprimer, classer, dater, répéter, étoiler, changer icône et associer une liste **sans changer l'ID**.
 - [ ] Listes : **M143–M146/M159–M160**. Définir une liste et ses articles, cases cochables, accès par ID, détachement sans effacer l'activité, pas de validation automatique du parent.
