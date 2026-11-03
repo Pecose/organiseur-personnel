@@ -1,6 +1,6 @@
 /**
- * F26 · S0 uniquement : M67, résolution pure de la saison.
- * Les fonctionnalités de galerie et d'éditeur F26 attendent les strates ultérieures.
+ * F26 · M67 (saisons), M64/M65/M95 (images personnelles locales).
+ * Les opérations sensibles non testées restent réservées à la recette D23.
  */
 import { openMediaDb, storeMedia } from "../storage/mediaDb";
 import { loadBundledCatalog } from "../storage/catalog";
