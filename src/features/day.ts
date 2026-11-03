@@ -4,6 +4,7 @@ import { getAuth } from "firebase/auth";
 import { doc, getFirestore, runTransaction } from "firebase/firestore";
 import { fetchCloudRecords, getUserCollection } from "../services/cloudRepository";
 import { findMissedTasks } from "./tasks";
+import { getAppState } from "../app/state";
 import { expandActivityOccurrences } from "./habits";
 import type {
   Activity, ActivityCompletion, ActivityOccurrenceView, CarryOverChoice, CarryOverDecision, CarryOverPrompt, DayGroups, LocalDate, Result,
@@ -94,6 +95,12 @@ export async function getCarryOverPrompt(today: LocalDate): Promise<Result<Carry
       code: "INVALID_DATE", message: "Date de proposition invalide.",
     }};
   }
+  const currentDate = new Date().toLocaleDateString("sv-SE", {
+    timeZone: getAppState().preferences.timeZone,
+  });
+  if (today !== currentDate) return {ok: false, error: {
+    code: "NOT_TODAY", message: "Cette proposition ne concerne que la journée actuelle.",
+  }};
   const yesterday = new Date(midnight - 86_400_000).toISOString().slice(0, 10);
   try {
     const user = getAuth(getApp("organiseur-personnel")).currentUser;
@@ -139,6 +146,9 @@ export async function applyCarryOver(choices: CarryOverChoice[]): Promise<Result
       code: "INVALID_CHOICES", message: "Choisis entre une et cent tâches à traiter.",
     }};
   }
+  const actualToday = new Date().toLocaleDateString("sv-SE", {
+    timeZone: getAppState().preferences.timeZone,
+  });
   const selected = new Set<string>();
   for (const choice of choices) {
     if (!choice || !choice.activityId || choice.activityId.includes("/")
@@ -152,7 +162,7 @@ export async function applyCarryOver(choices: CarryOverChoice[]): Promise<Result
     const d1 = Date.parse(choice.fromDate + "T00:00:00Z");
     const d2 = Date.parse(choice.toDate + "T00:00:00Z");
     if (!Number.isFinite(d1) || !Number.isFinite(d2)
-      || d2 - d1 !== 86_400_000
+      || d2 - d1 !== 86_400_000 || choice.toDate !== actualToday
       || new Date(d1).toISOString().slice(0, 10) !== choice.fromDate
       || new Date(d2).toISOString().slice(0, 10) !== choice.toDate
       || selected.has(choice.activityId + "@" + choice.fromDate)) {
