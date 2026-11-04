@@ -2,7 +2,12 @@
  * Le Worker OAuth/Cron reste volontairement NON CONFIGURÉ et NON DÉPLOYÉ.
  * Aucun endpoint HTTP, aucun jeton, aucun secret, aucun compte activé ici.
  */
-import type { GoogleCalendarSyncError } from "../../../src/domain/types";
+import type {
+  Activity, CalendarSyncConflict, CalendarSyncRun, GoogleCalendarChange,
+  GoogleCalendarSyncError, GoogleEventLink, GoogleSyncCursor, Reminder,
+  PushSubscriptionRecord, NotificationTestResult, DispatchSummary,
+  ReminderDispatchCandidate, PushDeliveryResult,
+} from "../../../src/domain/types";
 
 /** M118 · Parser uniquement le statut HTTP et une catégorie contrôlée.
  * Ne jamais recopier dans les logs ni l'UI une erreur brute de Google qui
@@ -435,4 +440,90 @@ async function completeGoogleOAuthCallback(
   const status={uid,calendarId:"primary" as const,status:"active" as const};
   await writeDocument("users/"+uid+"/googleCalendarConnection/status",status,env);
   return status;
+}
+
+/** M109 · Pagination et syncToken Google, sans destruction si 410 Gone. */
+async function pullGoogleCalendarChanges(uid:string,cursor:GoogleSyncCursor,
+  env:WorkerEnv):Promise<{changes:GoogleCalendarChange[];token?:string}> {
+  const all:GoogleCalendarChange[]=[];
+  let page:string|undefined;let nextToken:string|undefined;
+  let resetOnce=false;
+  for(let count=0;count<4;count++){
+    const uri=new URL("/calendar/v3/calendars/primary/events","https://www.googleapis.com");
+    uri.searchParams.set("maxResults","100");
+    uri.searchParams.set("showDeleted","true");
+    if(cursor.nextSyncToken)uri.searchParams.set("syncToken",cursor.nextSyncToken);
+    else uri.searchParams.set("timeMin",new Date(Date.now()-365*86_400_000).toISOString());
+    if(page)uri.searchParams.set("pageToken",page);
+    const response=await googleRequest(uri.pathname+uri.search,{},uid,env);
+    if(response.status===410 && cursor.nextSyncToken&&!resetOnce){
+      cursor.nextSyncToken=undefined;resetOnce=true;page=undefined;count=-1;all.length=0;
+      continue;
+    }
+    if(!response.ok)throw Error("Google Calendar pull failed");
+    const data=await response.json() as {
+      items?:Array<Record<string,unknown>>;
+      nextPageToken?:string;nextSyncToken?:string;
+    };
+    for(const item of data.items??[]){
+      if(typeof item.id!=="string"||!item.id)continue;
+      all.push({
+        calendarId:"primary",
+        eventId:item.id,etag:typeof item.etag==="string"?item.etag:undefined,
+        status:item.status==="cancelled"?"cancelled":"confirmed",
+        updatedAt:typeof item.updated==="string"?item.updated:new Date().toISOString(),
+        start:item.start,end:item.end,recurrence:item.recurrence,
+        payload:{
+          summary:typeof item.summary==="string"?item.summary:"Sans titre",
+          ...(typeof item.recurringEventId==="string"
+            ?{recurringEventId:item.recurringEventId}:{}),
+        },
+      });
+    }
+    if(!data.nextPageToken) {
+      nextToken=data.nextSyncToken;
+      return {changes:all,token:nextToken};
+    }
+    page=data.nextPageToken;
+  }
+  throw Error("Google Calendar pagination exceeds bounded free batch");
+}
+
+/** M111 · Transformation prudente d'un événement horaire non récurrent.
+ * Cas complexes : résultat d'erreur, à traiter comme conflit explicite.
+ */
+async function mapGoogleEvent(change:GoogleCalendarChange,uid:string,
+  local?:Activity):Promise<{ok:true;value:Activity}|{ok:false;error:{code:string;message:string}}> {
+  const start=change.start as {dateTime?:string;timeZone?:string}|undefined;
+  const end=change.end as {dateTime?:string;timeZone?:string}|undefined;
+  const payload=change.payload as {summary?:string;recurringEventId?:string};
+  if(change.status==="cancelled"||!start?.dateTime||!end?.dateTime
+    ||change.recurrence||payload?.recurringEventId) return {ok:false,error:{
+      code:"UNSUPPORTED_GOOGLE_EVENT",
+      message:"Récurrence, exception ou événement sans horaire : résolution manuelle nécessaire.",
+    }};
+  const t1=Date.parse(start.dateTime),t2=Date.parse(end.dateTime);
+  if(!Number.isFinite(t1)||!Number.isFinite(t2)||t2<t1) return {ok:false,error:{
+    code:"INVALID_GOOGLE_DATES",message:"Horaires de l'événement non reconnus.",
+  }};
+  const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",
+    codec.encode(change.calendarId+":"+change.eventId)));
+  const id=local?.id??("g_"+b64url(digest).slice(0,30));
+  const zone=start.timeZone||local?.timeZone||"Europe/Paris";
+  try{new Intl.DateTimeFormat("fr-FR",{timeZone:zone});}catch{
+    return {ok:false,error:{code:"GOOGLE_ZONE_INVALID",message:"Fuseau horaire non reconnu."}};
+  }
+  const link:GoogleEventLink={
+    calendarId:change.calendarId,googleEventId:change.eventId,etag:change.etag,
+    remoteUpdatedAt:change.updatedAt,pending:"none",source:local?.googleLink?.source??"google",
+  };
+  const result:Activity={
+    ...(local??{}),id,uid,
+    title:(payload.summary||"Sans titre").slice(0,500),
+    startAt:new Date(t1).toISOString(),endAt:new Date(t2).toISOString(),
+    timeZone:zone,autoComplete:local?.autoComplete??true,
+    updatedAt:new Date().toISOString(),googleLink:link,
+  };
+  delete result.deletedAt;
+  return {ok:true,value:result};
 }
