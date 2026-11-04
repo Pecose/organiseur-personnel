@@ -168,8 +168,19 @@ if (typeof document === "undefined" && "registration" in globalThis && "clients"
     const e = event as { request: Request; respondWith(promise: Promise<Response>): void };
     const request = e.request;
     const url = new URL(request.url);
+    // M80 : seules les ressources publiques explicitement prévues par
+    // la PWA sont cachées. Un retour OAuth avec ?code ou ?state ne l'est jamais.
+    const relative = url.pathname.startsWith(appScope)
+      ? url.pathname.slice(appScope.length) : null;
+    const publicAsset = relative !== null && (
+      relative === "" || relative === "index.html"
+      || relative === "manifest.webmanifest"
+      || relative === "service-worker.js"
+      || /^assets\/[a-zA-Z0-9._/-]+$/.test(relative)
+      || /^catalog\/[a-zA-Z0-9._/-]+$/.test(relative)
+    );
     if (request.method !== "GET" || url.origin !== location.origin
-      || !url.pathname.startsWith(appScope)) return;
+      || url.search !== "" || !publicAsset) return;
     e.respondWith((async (): Promise<Response> => {
       try {
         const response = await fetch(request);
