@@ -572,8 +572,12 @@ async function pushGoogleCalendarEvent(uid:string,activity:Activity,
   const remote=method==="DELETE"?null:await response.json() as {
     id?:string;etag?:string;updated?:string;
   };
+  const finalGoogleEventId=remote?.id??link.googleEventId;
+  if(!finalGoogleEventId)return {ok:false,error:{
+    code:"GOOGLE_EVENT_ID_MISSING",message:"Identifiant Google non confirmé.",
+  }};
   return {ok:true,value:{
-    calendarId:"primary",googleEventId:(remote?.id??link.googleEventId??""),
+    calendarId:"primary",googleEventId:finalGoogleEventId,
     etag:remote?.etag??link.etag,
     remoteUpdatedAt:remote?.updated??new Date().toISOString(),
     pending:"none",source:link.source,
