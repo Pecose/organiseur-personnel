@@ -797,9 +797,15 @@ async function handleWorkerRequest(req:Request,env:WorkerEnv):Promise<Response> 
       await completeGoogleOAuthCallback(code,state,env);
     }catch{
       // Aucun code OAuth ni état n'est jamais recopié dans la redirection.
-      return Response.redirect(env.APP_ORIGIN+"/organiseur-personnel/#settings",303);
+      return new Response(null,{status:303,headers:{
+        Location:env.APP_ORIGIN+"/organiseur-personnel/#settings",
+        "Cache-Control":"no-store","Referrer-Policy":"no-referrer",
+      }});
     }
-    return Response.redirect(env.APP_ORIGIN+"/organiseur-personnel/#calendar",303);
+    return new Response(null,{status:303,headers:{
+      Location:env.APP_ORIGIN+"/organiseur-personnel/#calendar",
+      "Cache-Control":"no-store","Referrer-Policy":"no-referrer",
+    }});
   }
   if(!allowed||origin!==env.APP_ORIGIN)
     return new Response("Origine refusée.",{status:403,headers:{"Cache-Control":"no-store"}});
