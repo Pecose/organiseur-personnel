@@ -226,7 +226,9 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S6** | **LARGEMENT CODÉE, NON TESTÉE (D23)** | M121–M126/M132–M134/M138–M146/M155/M157–M160 (M133 et M157 antérieurs) ; M41–M44 ; M47/M48 ; M52–M57 ; M64/M65/M95. Activités, listes archivables, coches, rappels locaux, import musique/image et métadonnées | Restent M49/M69 (suppression média et contrôle des références), sécurisation concurrence M158, recette de toutes les fonctions. **Aucun test ni déploiement** |
 | **S7** | **CINQ VUES CODÉES, NON TESTÉES (D23)** | F14 M01 ; F15 M02–M04 ; F16 M13–M15/M148 ; F17 CalendarDaySummary ; F19 M05–M11/M149–M152 ; F20 M12 ; F21 M127/M128/M156 ; F51 M129 ; F53 M153 ; F08 habillage mobile pastel | Lecture et édition des données réelles, iPhone/VoiceOver, build Vite, cache des chunks différés et corrections finales restent **à tester en recette** ; Musique/Décoration encore basiques, Bilan S8 absent |
 | **S8** | **CONTRATS D24 CODÉS, NON TESTÉS** | M135–M137, M132/M134/M154/M158 transactionnels, fenêtre groupée Jour et bilan M147/F15 | Recette complète différée D23, aucune utilisation de Firebase réel |
-| **S9–S10** | NON DÉMARRÉES | Connecteurs externes et déploiement non activés | Aucun service payant, priorité aux fonctions autorisées puis recette finale |
+| **S9A** | **DÉMARRÉE, NON TESTÉE : analyse Google + M118** | F37 M118 classe les erreurs Google ; aucun jeton, aucune liaison OAuth ni Worker opérationnel | Le protocole HTTP Worker, les secrets et l'authentification serveur exigent un accord d'architecture explicite |
+| **S9B** | **DÉMARRÉE, NON TESTÉE : M75 et M81** | F33 demande l'autorisation Web Push sur geste ; F35 reçoit des messages génériques sans données privées | Pas de VAPID, d'abonnement, d'envoi ni de Cron ; configuration/protocole à autoriser |
+| **S10** | NON DÉMARRÉE | Sauvegardes, mise à jour et recette non engagées | Respecter D23 ; 0 € |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
 
@@ -420,17 +422,17 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **S9A — Google Agenda bidirectionnel (G02)**
 - [ ] Valider API Google Calendar, **consentement OAuth distinct de Firebase Auth**, scopes limités et conditions de jeton durable. Compte Google de l'utilisatrice connecté volontairement.
-- [ ] Mettre en œuvre **M103–M120** : flux OAuth serveur, `state` unique, grant O27 chiffré, curseur O25, liaison O24, conflits O26, reprise `410 Gone`, identifiants stables et suppression contrôlée.
+- [ ] **S9A partielle, non testée** : **M118** (classification 400/401/403/409/410/412/429/5xx, sans jetons) présente en F37. **M103–M117/M119–M120 restent non codées** : flux OAuth serveur, `state` unique, grant O27 chiffré, curseur O25, liaison O24, conflits O26, reprise `410 Gone`, identifiants stables et suppression contrôlée. Routes HTTP et bindings serveur à approuver avant code.
 - [ ] **O31 horaire ↔ Google Agenda** en deux sens, sans exporter systématiquement les tâches non horaires ni toutes les habitudes ; exceptions et fuseaux testés.
 - [ ] Fonctionnement PWA ouverte d'abord ; puis, uniquement si le Worker gratuit est configuré et validé, **synchronisation distante périodique** quand elle est fermée. Pas de promesse de temps réel.
 - [ ] Tests **T10–T14**, sécurité des jetons et absence de doublons/conflits silencieux.
 
 **S9B — Notifications Web Push et rappels (G05)**
 - [ ] Configurer plus tard Cloudflare Workers/Cron **gratuit** et ses secrets pour F37/F38, en réutilisant les protections prévues, **aucun compte requis avant cette strate**.
-- [ ] Implémenter **M75–M78/M81/M84–M88/M100** : consentement de la PWA installée, abonnement O14, rappels O06, reçus O19, préventions de doublon, envois de test et renouvellement.
+- [ ] **S9B partielle, non testée** : **M75** (demande d'autorisation sur geste et PWA iPhone installée) et **M81** (réception Push minimaliste, aucune donnée privée) codées en F33/F35. **M76–M78/M84–M88/M100 restent non codées**, sans VAPID, abonnement O14, reçu O19, anti-doublon serveur ni envoi distant. Contrats HTTP/bindings VAPID/Worker à autoriser avant code.
 - [ ] Tester iPhone fermé/verrouillé, réseau absent, modes Concentration, décalage possible, fuseau et répétitions (T07). **Push ≠ alarme système hors ligne**.
 
-**Sortie S9 :** chaque intégration distante n'est validée qu'après ses propres tests et garde-fous ; aucun coût activé sans nouveau consentement explicite.
+**État S9 : démarrage préparatoire, non testé et non déployé.** Les fonctions M75/M81/M118 sont codées, et F35 n'enregistre plus d'URLs avec paramètres OAuth dans le cache. **Aucune intégration externe n'est opérationnelle**, aucun serveur Worker, aucune authentification Google, aucun VAPID, aucune synchronisation et aucun envoi Push. La vérification Google des scopes, l'expiration des jetons de `Testing` après sept jours et les limites Workers Free sont des points de décision avant activation. **Blocage de l'architecture :** fixer par accord explicite le protocole des routes HTTP Worker, la sécurité des secrets, la persistance OAuth, les bindings Firebase et la configuration VAPID publique. Tests T07/T10–T14 reportés à la recette finale D23, sans déploiement ni facturation. Le budget 0 € reste obligatoire.
 
 ### S10 — Restauration, versionnement et recette finale
 
