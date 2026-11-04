@@ -759,3 +759,156 @@ async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
     ...issue,status:"resolved",
   },env,issue.__updateTime?{updateTime:issue.__updateTime}:undefined);
 }
+
+/** D25 · Routeur HTTPS à liste blanche, sans UID fourni par le client. */
+async function handleWorkerRequest(req:Request,env:WorkerEnv):Promise<Response> {
+  const url=new URL(req.url);
+  const origin=req.headers.get("Origin")??"";
+  const allowed=env.APP_ORIGIN==="https://pecose.github.io";
+  const cors:HeadersInit={
+    "Access-Control-Allow-Origin":env.APP_ORIGIN||"null",
+    "Access-Control-Allow-Headers":"authorization, content-type",
+    "Access-Control-Allow-Methods":"GET,POST,OPTIONS",
+    "Cache-Control":"no-store",
+    "Vary":"Origin",
+  };
+  if(req.method==="OPTIONS"){
+    if(!allowed||origin!==env.APP_ORIGIN)return new Response(null,{status:403});
+    return new Response(null,{status:204,headers:cors});
+  }
+  // Google arrive sans Origin mais le code et l'état restent confidentiels :
+  // seule l'URL de callback fixe peut les recevoir.
+  if(url.pathname==="/oauth/google/callback"){
+    if(req.method!=="GET"||!configured(env)
+      ||url.origin+url.pathname!==env.GOOGLE_REDIRECT_URI
+      ||!allowed)return new Response("Callback non disponible.",{status:503,
+        headers:{"Cache-Control":"no-store"}});
+    try{
+      const code=url.searchParams.get("code")??"";
+      const state=url.searchParams.get("state")??"";
+      await completeGoogleOAuthCallback(code,state,env);
+    }catch{
+      // Aucun code OAuth ni état n'est jamais recopié dans la redirection.
+      return Response.redirect(env.APP_ORIGIN+"/organiseur-personnel/#settings",303);
+    }
+    return Response.redirect(env.APP_ORIGIN+"/organiseur-personnel/#calendar",303);
+  }
+  if(!allowed||origin!==env.APP_ORIGIN)
+    return new Response("Origine refusée.",{status:403,headers:{"Cache-Control":"no-store"}});
+  if(!configured(env))return respond({ok:false,error:{
+    code:"WORKER_NOT_CONFIGURED",message:"Les clés du service gratuit ne sont pas configurées.",
+  }},origin,503);
+  const routes:Record<string,string>={
+    "/api/google/link":"POST","/api/google/sync":"POST",
+    "/api/google/status":"GET","/api/google/unlink":"POST",
+    "/api/google/conflicts":"GET","/api/google/resolve":"POST",
+    "/api/push/test":"POST",
+  };
+  if(!routes[url.pathname])return respond({ok:false,error:{
+    code:"NOT_FOUND",message:"Route inconnue.",
+  }},origin,404);
+  if(req.method!==routes[url.pathname])return respond({ok:false,error:{
+    code:"METHOD_NOT_ALLOWED",message:"Méthode interdite.",
+  }},origin,405);
+  if(url.search)return respond({ok:false,error:{
+    code:"QUERY_FORBIDDEN",message:"Paramètres URL interdits sur l'API.",
+  }},origin,400);
+  const auth=req.headers.get("Authorization")??"";
+  if(!auth.startsWith("Bearer "))return respond({ok:false,error:{
+    code:"AUTH_REQUIRED",message:"Session nécessaire.",
+  }},origin,401);
+  let uid:string;
+  try{uid=await verifyFirebaseToken(auth.slice(7),env);}
+  catch{return respond({ok:false,error:{
+    code:"AUTH_INVALID",message:"La session Firebase n'est pas reconnue.",
+  }},origin,401);}
+  try{
+    const length=Number(req.headers.get("Content-Length")??"0");
+    if(length>16_384)throw Error("Body too large");
+    const raw=req.method==="POST"?await req.text():"";
+    if(raw.length>16_384)throw Error("Body too large");
+    const input=raw?JSON.parse(raw) as Record<string,unknown>:{};
+    if(!input||typeof input!=="object"||Array.isArray(input))
+      throw Error("Body invalid");
+    const path=url.pathname;
+    if(path==="/api/google/link"){
+      const result=await beginGoogleOAuth(auth.slice(7),env);
+      return respond({ok:true,value:result},origin);
+    }
+    if(path==="/api/google/status"){
+      const status=await readDocument("users/"+uid+"/googleCalendarConnection/status",env);
+      const value=status?{
+        uid,calendarId:"primary",status:status.status??"error",
+        lastSyncAt:status.lastSyncAt,lastError:status.lastError,
+      }:{uid,calendarId:"primary",status:"disconnected"};
+      return respond({ok:true,value},origin);
+    }
+    if(path==="/api/google/sync"){
+      if(!["startup","edit","manual"].includes(String(input.reason)))
+        return respond({ok:false,error:{code:"INVALID_REASON",
+          message:"Motif de synchronisation inconnu."}},origin,400);
+      const status=await readDocument("users/"+uid+"/googleCalendarConnection/status",env);
+      if(status?.status!=="active")return respond({ok:false,error:{
+        code:"GOOGLE_NOT_CONNECTED",message:"Connecte d'abord Google Agenda.",
+      }},origin,409);
+      const result=await syncGoogleCalendar(uid,
+        input.reason as "startup"|"edit"|"manual",env);
+      return respond({ok:true,value:result},origin);
+    }
+    if(path==="/api/google/conflicts"){
+      const docs=await listDocuments("users/"+uid+"/googleCalendarConflicts",env);
+      const value=docs.filter(d=>d.uid===uid&&d.status==="open").map(item=>({
+        id:item.id,uid,localEventId:item.localEventId,
+        googleEventId:item.googleEventId,kind:item.kind,
+        localVersion:item.localVersion,googleVersion:item.googleVersion,
+        detectedAt:item.detectedAt,status:item.status,
+      }));
+      return respond({ok:true,value},origin);
+    }
+    if(path==="/api/google/resolve"){
+      if(typeof input.conflictId!=="string"
+        ||!["keepLocal","keepGoogle","keepBoth"].includes(String(input.choice)))
+        return respond({ok:false,error:{code:"INVALID_CONFLICT",
+          message:"Décision de conflit invalide."}},origin,400);
+      await resolveGoogleCalendarConflict(uid,input.conflictId,
+        input.choice as "keepLocal"|"keepGoogle"|"keepBoth",env);
+      return respond({ok:true,value:null},origin);
+    }
+    if(path==="/api/google/unlink"){
+      const grantPath="users/"+uid+"/googleOAuthGrant/primary";
+      const stored=await readDocument(grantPath,env);
+      if(stored&&!stored.revokedAt){
+        const token=await openGoogleGrant(uid,stored,env);
+        const response=await fetch("https://oauth2.googleapis.com/revoke",{
+          method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+          body:new URLSearchParams({token:token.refresh_token??""}),
+          redirect:"error",
+        });
+        if(!response.ok&&response.status!==400)throw Error("Révocation non confirmée");
+        await writeDocument(grantPath,{
+          uid,calendarId:"primary",ciphertext:"",keyVersion:"v1",
+          scopes:[],issuedAt:stored.issuedAt,
+          revokedAt:new Date().toISOString(),
+        },env,stored.__updateTime?{updateTime:stored.__updateTime}:undefined);
+      }
+      await writeDocument("users/"+uid+"/googleCalendarConnection/status",{
+        uid,calendarId:"primary",status:"disconnected",
+      },env);
+      return respond({ok:true,value:null},origin);
+    }
+    if(path==="/api/push/test"){
+      if(typeof input.deviceId!=="string")
+        return respond({ok:false,error:{code:"INVALID_DEVICE",
+          message:"Identifiant d'abonnement invalide."}},origin,400);
+      const result=await handlePushTestRequest(auth.slice(7),input.deviceId,env);
+      return respond(result,origin,result.ok?200:409);
+    }
+    return respond({ok:false,error:{code:"NOT_FOUND",message:"Route absente."}},origin,404);
+  }catch{
+    // Jamais de réponse brute Google, Firestore ou OAuth contenant un secret.
+    return respond({ok:false,error:{
+      code:"REMOTE_OPERATION_FAILED",
+      message:"Le serveur n'a pas confirmé l'opération. Réessaie sans risque.",
+    }},origin,503);
+  }
+}
