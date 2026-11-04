@@ -301,3 +301,58 @@ async function listDocuments(path:string,env:WorkerEnv):Promise<RecordDoc[]> {
   }
   throw Error("Pagination au-delà du budget sécurisé de cette opération");
 }
+
+/** D25 / O27 · Grant chiffré AES-256-GCM, UID lié cryptographiquement. */
+type TokenResponse = {access_token:string;refresh_token?:string;expires_in?:number;scope?:string};
+async function sealGoogleGrant(uid:string,token:TokenResponse,env:WorkerEnv):Promise<string> {
+  const secret=unb64(env.GOOGLE_GRANT_AES_KEY);
+  if(secret.length!==32)throw Error("Clé de chiffrement absente ou invalide");
+  const key=await crypto.subtle.importKey("raw",secret,"AES-GCM",false,["encrypt"]);
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const encrypted=await crypto.subtle.encrypt({
+    name:"AES-GCM",iv,additionalData:codec.encode(uid),
+  },key,codec.encode(JSON.stringify(token)));
+  const bytes=new Uint8Array(12+encrypted.byteLength);
+  bytes.set(iv);bytes.set(new Uint8Array(encrypted),12);
+  return b64url(bytes);
+}
+async function openGoogleGrant(uid:string,stored:RecordDoc,env:WorkerEnv):Promise<TokenResponse> {
+  if(stored.uid!==uid||stored.keyVersion!=="v1"||stored.revokedAt
+    ||typeof stored.ciphertext!=="string")throw Error("Autorisation Google inaccessible");
+  const secret=unb64(env.GOOGLE_GRANT_AES_KEY);
+  const raw=unb64(stored.ciphertext);
+  if(secret.length!==32||raw.length<29)throw Error("Grant chiffré invalide");
+  const key=await crypto.subtle.importKey("raw",secret,"AES-GCM",false,["decrypt"]);
+  const clear=await crypto.subtle.decrypt({
+    name:"AES-GCM",iv:raw.slice(0,12),additionalData:codec.encode(uid),
+  },key,raw.slice(12));
+  const data=JSON.parse(readable.decode(clear)) as TokenResponse;
+  if(!data.refresh_token)throw Error("Google doit être reconnecté");
+  return data;
+}
+async function googleAccessToken(uid:string,env:WorkerEnv):Promise<string> {
+  const grant=await readDocument("users/"+uid+"/googleOAuthGrant/primary",env);
+  if(!grant)throw Error("Google non lié");
+  const data=await openGoogleGrant(uid,grant,env);
+  const response=await fetch("https://oauth2.googleapis.com/token",{
+    method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({
+      client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,
+      refresh_token:data.refresh_token!,
+      grant_type:"refresh_token",
+    }),redirect:"error",
+  });
+  if(!response.ok)throw Error("Réautorisation Google nécessaire");
+  const token=await response.json() as {access_token?:string};
+  if(!token.access_token)throw Error("Jeton Google absent");
+  return token.access_token;
+}
+async function googleRequest(path:string,init:RequestInit,uid:string,env:WorkerEnv):Promise<Response> {
+  const url=new URL(path,"https://www.googleapis.com");
+  if(url.hostname!=="www.googleapis.com"||!url.pathname.startsWith("/calendar/v3/")
+    ||url.protocol!=="https:")throw Error("Destination Google refusée");
+  return fetch(url,{
+    ...init,headers:{...init.headers,Authorization:"Bearer "+await googleAccessToken(uid,env)},
+    redirect:"error",cache:"no-store",
+  });
+}
