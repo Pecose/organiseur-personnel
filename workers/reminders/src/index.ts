@@ -912,3 +912,37 @@ async function handleWorkerRequest(req:Request,env:WorkerEnv):Promise<Response> 
     }},origin,503);
   }
 }
+
+/** M100 · La route de test reste fermée tant que la couche RFC8291
+ * et le contrôle anti-abus n'ont pas passé la recette. Jamais de faux succès.
+ */
+async function handlePushTestRequest(
+  authToken:string,deviceId:string,env:WorkerEnv,
+):Promise<{ok:true;value:NotificationTestResult}|{ok:false;error:{code:string;message:string}}> {
+  const uid=await verifyFirebaseToken(authToken,env);
+  if(!/^[a-zA-Z0-9_-]{1,150}$/.test(deviceId))return {ok:false,error:{
+    code:"INVALID_DEVICE",message:"Identifiant d'appareil invalide.",
+  }};
+  const stored=await readDocument("users/"+uid+"/pushSubscriptions/"+deviceId,env);
+  if(!stored||stored.id!==deviceId||typeof stored.endpoint!=="string")
+    return {ok:false,error:{
+      code:"PUSH_DEVICE_NOT_FOUND",message:"Aucun abonnement correspondant à cet appareil.",
+    }};
+  return {ok:false,error:{
+    code:"PUSH_SENDING_NOT_READY",
+    message:"L'envoi de notifications attend encore sa validation de sécurité et de chiffrement.",
+  }};
+}
+
+/** F37 · Worker sans activation implicite. Aucun job Cron dans F38. */
+export default {
+  fetch(request:Request,env:WorkerEnv):Promise<Response> {
+    return handleWorkerRequest(request,env);
+  },
+  async scheduled(_controller:unknown,env:WorkerEnv):Promise<void> {
+    // Même en cas de configuration accidentelle d'un déclencheur,
+    // aucune notification ni mutation distante n'a lieu sans recette.
+    if(env.ENABLE_CRON!=="true")return;
+    throw Error("CRON_NOT_VALIDATED");
+  },
+};
