@@ -465,6 +465,21 @@ export type ChecklistItemDraft = Pick<ChecklistItem,
   id?: string;
 };
 
+/** F17 · S9B : message Web Push sans titre privé, contenu de calendrier ou URL. */
+export interface PushPayload {
+  kind: "reminder" | "test";
+  reminderId?: string;
+  occurrenceKey?: string;
+}
+
+/** F17 · S9A : erreur Google classée sans exposer jeton ni réponse brute. */
+export interface GoogleCalendarSyncError {
+  code: string;
+  message: string;
+  retryable: boolean;
+  action: "reauthorize" | "resync" | "wait" | "resolve" | "none";
+}
+
 /** F17 / M127/M156 · Sommaire d'une date, projection non persistée de O31/O32. */
 export interface CalendarDaySummary {
   date: LocalDate;
