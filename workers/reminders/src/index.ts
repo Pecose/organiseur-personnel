@@ -356,3 +356,83 @@ async function googleRequest(path:string,init:RequestInit,uid:string,env:WorkerE
     redirect:"error",cache:"no-store",
   });
 }
+
+/** M104 · Consentement Google restreint aux événements possédés. */
+function buildGoogleOAuthUrl(uid:string,stateId:string,env:WorkerEnv):{url:string} {
+  if(!uid||!stateId||!env.GOOGLE_CLIENT_ID||!env.GOOGLE_REDIRECT_URI)
+    throw Error("OAuth non configuré");
+  const redirect=new URL(env.GOOGLE_REDIRECT_URI);
+  if(redirect.protocol!=="https:"||redirect.pathname!=="/oauth/google/callback"
+    ||redirect.search||redirect.hash)throw Error("Callback OAuth non autorisé");
+  const url=new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  url.searchParams.set("client_id",env.GOOGLE_CLIENT_ID);
+  url.searchParams.set("redirect_uri",redirect.toString());
+  url.searchParams.set("response_type","code");
+  url.searchParams.set("scope",calendarScope);
+  url.searchParams.set("state",stateId);
+  url.searchParams.set("access_type","offline");
+  url.searchParams.set("prompt","consent");
+  return {url:url.toString()};
+}
+
+/** M105 · Chaque tentative est liée à un UID Firebase vérifié. */
+async function beginGoogleOAuth(idToken:string,env:WorkerEnv):Promise<{url:string}> {
+  const uid=await verifyFirebaseToken(idToken,env);
+  const stateId=randomId();
+  const now=new Date();
+  await writeDocument("serverOAuthStates/"+stateId,{
+    stateId,uid,nonce:randomId(),
+    redirectPath:"/organiseur-personnel/#calendar",
+    expiresAt:new Date(now.getTime()+10*60*1000).toISOString(),
+  },env,{exists:false});
+  return buildGoogleOAuthUrl(uid,stateId,env);
+}
+
+/** M120 · L'état OAuth n'est jamais accepté deux fois. */
+async function validateGoogleOAuthState(state:string,env:WorkerEnv):Promise<RecordDoc> {
+  if(!/^[a-zA-Z0-9_-]{32}$/.test(state))throw Error("État OAuth invalide");
+  const doc=await readDocument("serverOAuthStates/"+state,env);
+  if(!doc||doc.stateId!==state||doc.consumedAt
+    ||typeof doc.uid!=="string"||typeof doc.nonce!=="string"
+    ||typeof doc.expiresAt!=="string"||Date.parse(doc.expiresAt)<=Date.now()
+    ||!doc.__updateTime)throw Error("État OAuth expiré ou utilisé");
+  return doc;
+}
+
+/** M106 · Consomme l'état atomiquement AVANT l'échange du code Google.
+ * Sur échec de réseau, l'utilisatrice peut redémarrer le lien volontairement.
+ */
+async function completeGoogleOAuthCallback(
+  code:string,state:string,env:WorkerEnv,
+):Promise<{uid:string;calendarId:"primary";status:"active"}> {
+  if(!code||code.length>4096)throw Error("Code OAuth invalide");
+  const stored=await validateGoogleOAuthState(state,env);
+  const uid=stored.uid as string;
+  const {__updateTime:revision,...original}=stored;
+  delete original.__name;
+  await writeDocument("serverOAuthStates/"+state,{
+    ...original,consumedAt:new Date().toISOString(),
+  },env,{updateTime:revision});
+  const response=await fetch("https://oauth2.googleapis.com/token",{
+    method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({
+      code,client_id:env.GOOGLE_CLIENT_ID,
+      client_secret:env.GOOGLE_CLIENT_SECRET,
+      redirect_uri:env.GOOGLE_REDIRECT_URI,
+      grant_type:"authorization_code",
+    }),redirect:"error",
+  });
+  if(!response.ok)throw Error("Code OAuth non accepté");
+  const token=await response.json() as TokenResponse;
+  if(!token.refresh_token||!token.access_token
+    ||!token.scope?.split(" ").includes(calendarScope))
+    throw Error("Consentement Google insuffisant");
+  const ciphertext=await sealGoogleGrant(uid,token,env);
+  await writeDocument("users/"+uid+"/googleOAuthGrant/primary",{
+    uid,calendarId:"primary",ciphertext,keyVersion:"v1",
+    scopes:[calendarScope],issuedAt:new Date().toISOString(),
+  },env);
+  const status={uid,calendarId:"primary" as const,status:"active" as const};
+  await writeDocument("users/"+uid+"/googleCalendarConnection/status",status,env);
+  return status;
+}
