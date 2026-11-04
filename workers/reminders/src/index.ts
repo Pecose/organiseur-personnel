@@ -527,3 +527,55 @@ async function mapGoogleEvent(change:GoogleCalendarChange,uid:string,
   delete result.deletedAt;
   return {ok:true,value:result};
 }
+
+/** M110 · Écriture Google seulement pour une activité liée explicitement.
+ * ETag strict pour modifier/supprimer un événement existant.
+ */
+async function pushGoogleCalendarEvent(uid:string,activity:Activity,
+  env:WorkerEnv):Promise<{ok:true;value:GoogleEventLink}|{ok:false;error:{code:string;message:string}}> {
+  const link=activity.googleLink;
+  if(activity.uid!==uid||!link||link.pending==="none"
+    ||link.calendarId!=="primary")return {ok:false,error:{
+      code:"GOOGLE_LINK_REQUIRED",message:"Événement non lié ou sans modification demandée.",
+    }};
+  if(link.pending==="delete" && !link.googleEventId) return {ok:false,error:{
+    code:"GOOGLE_EVENT_ID_MISSING",message:"Suppression sans événement distant identifié.",
+  }};
+  if(link.pending==="upsert"&&(!activity.startAt||!activity.endAt
+    ||activity.recurrence))return {ok:false,error:{
+      code:"GOOGLE_EVENT_UNSUPPORTED",
+      message:"Seuls les événements horaires simples et complets peuvent être exportés.",
+    }};
+  const base="/calendar/v3/calendars/primary/events";
+  const target=link.googleEventId
+    ?base+"/"+encodeURIComponent(link.googleEventId):base;
+  const method=link.pending==="delete"?"DELETE":link.googleEventId?"PATCH":"POST";
+  const headers:Record<string,string>={};
+  if(method!=="DELETE")headers["Content-Type"]="application/json";
+  if(link.googleEventId && link.etag)headers["If-Match"]=link.etag;
+  // Sans ETag sur une cible existante, pas d'écrasement aveugle.
+  if(link.googleEventId&&!link.etag) return {ok:false,error:{
+    code:"GOOGLE_ETAG_REQUIRED",message:"Version Google inconnue, synchronise avant modification.",
+  }};
+  const payload=method==="DELETE"?undefined:JSON.stringify({
+    summary:activity.title,
+    start:{dateTime:activity.startAt,timeZone:activity.timeZone},
+    end:{dateTime:activity.endAt,timeZone:activity.timeZone},
+  });
+  const response=await googleRequest(target,{
+    method,headers,...(payload?{body:payload}:{}),
+  },uid,env);
+  if(!response.ok)return {ok:false,error:{
+    code:response.status===409||response.status===412?"GOOGLE_CONFLICT":"GOOGLE_PUSH_FAILED",
+    message:"Google n'a pas confirmé la modification, les données locales sont conservées.",
+  }};
+  const remote=method==="DELETE"?null:await response.json() as {
+    id?:string;etag?:string;updated?:string;
+  };
+  return {ok:true,value:{
+    calendarId:"primary",googleEventId:remote?.id??link.googleEventId,
+    etag:remote?.etag??link.etag,
+    remoteUpdatedAt:remote?.updated??new Date().toISOString(),
+    pending:"none",source:link.source,
+  }};
+}
