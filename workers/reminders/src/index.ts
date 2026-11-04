@@ -701,3 +701,61 @@ async function syncGoogleCalendar(uid:string,
     details:conflicts?"Certains événements nécessitent une décision.":undefined,
   };
 }
+
+/** M113 · La décision d'une personne prime sur les versions concurrentes.
+ * En cas d'événement Google non représentable, le conflit reste ouvert.
+ */
+async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
+  choice:"keepLocal"|"keepGoogle"|"keepBoth",env:WorkerEnv):Promise<void> {
+  if(!/^[a-zA-Z0-9_-]{1,150}$/.test(conflictId)
+    ||!["keepLocal","keepGoogle","keepBoth"].includes(choice))
+    throw Error("Décision de conflit invalide");
+  const conflictPath="users/"+uid+"/googleCalendarConflicts/"+conflictId;
+  const issue=await readDocument(conflictPath,env);
+  if(!issue||issue.uid!==uid||issue.status!=="open"
+    ||typeof issue.localEventId!=="string"||typeof issue.googleEventId!=="string")
+    throw Error("Conflit absent ou déjà traité");
+  const localPath="users/"+uid+"/activities/"+issue.localEventId;
+  const original=await readDocument(localPath,env);
+  const local=original as unknown as Activity|null;
+  if(choice==="keepLocal"){
+    if(!original||!local?.googleLink)throw Error("Aucune liaison locale à pousser");
+    await writeDocument(localPath,{
+      ...local,googleLink:{...local.googleLink,pending:"upsert"},
+      updatedAt:new Date().toISOString(),
+    },env,original.__updateTime?{updateTime:original.__updateTime}:undefined);
+  }else{
+    const uri="/calendar/v3/calendars/primary/events/"+
+      encodeURIComponent(issue.googleEventId);
+    const response=await googleRequest(uri,{},uid,env);
+    if(!response.ok)throw Error("Version distante inaccessible");
+    const remote=await response.json() as Record<string,unknown>;
+    const change:GoogleCalendarChange={
+      calendarId:"primary",eventId:issue.googleEventId,
+      etag:typeof remote.etag==="string"?remote.etag:undefined,
+      status:remote.status==="cancelled"?"cancelled":"confirmed",
+      updatedAt:typeof remote.updated==="string"?remote.updated:new Date().toISOString(),
+      start:remote.start,end:remote.end,recurrence:remote.recurrence,
+      payload:{
+        summary:typeof remote.summary==="string"?remote.summary:"Sans titre",
+        ...(typeof remote.recurringEventId==="string"
+          ?{recurringEventId:remote.recurringEventId}:{}),
+      },
+    };
+    const mapped=await mapGoogleEvent(change,uid,choice==="keepGoogle"?(local??undefined):undefined);
+    if(!mapped.ok)throw Error("La récurrence doit être réglée manuellement dans Google");
+    if(choice==="keepBoth"&&local&&original){
+      const copyId="copy_"+randomId();
+      await writeDocument("users/"+uid+"/activities/"+copyId,{
+        ...local,id:copyId,googleLink:undefined,updatedAt:new Date().toISOString(),
+      },env,{exists:false});
+    }
+    const dest="users/"+uid+"/activities/"+mapped.value.id;
+    await writeDocument(dest,mapped.value as unknown as Record<string,unknown>,
+      env,choice==="keepGoogle"&&original?.__updateTime
+        ?{updateTime:original.__updateTime}:undefined);
+  }
+  await writeDocument(conflictPath,{
+    ...issue,status:"resolved",
+  },env,issue.__updateTime?{updateTime:issue.__updateTime}:undefined);
+}
