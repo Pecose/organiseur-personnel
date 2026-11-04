@@ -453,7 +453,7 @@ async function pullGoogleCalendarChanges(uid:string,cursor:GoogleSyncCursor,
     uri.searchParams.set("maxResults","100");
     uri.searchParams.set("showDeleted","true");
     if(cursor.nextSyncToken)uri.searchParams.set("syncToken",cursor.nextSyncToken);
-    else uri.searchParams.set("timeMin",new Date(Date.now()-365*86_400_000).toISOString());
+    // Synchronisation initiale non filtrée : nécessaire à un syncToken cohérent.
     if(page)uri.searchParams.set("pageToken",page);
     const response=await googleRequest(uri.pathname+uri.search,{},uid,env);
     if(response.status===410 && cursor.nextSyncToken&&!resetOnce){
