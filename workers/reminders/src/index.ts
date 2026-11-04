@@ -579,3 +579,125 @@ async function pushGoogleCalendarEvent(uid:string,activity:Activity,
     pending:"none",source:link.source,
   }};
 }
+
+/** M112 · Rapprochement sans clonage ni dernière-écriture-gagnante.
+ * O26 matérialise chaque événement distant non pris en charge ou concurrent.
+ */
+async function reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[],
+  env:WorkerEnv):Promise<{pulled:number;conflicts:number}> {
+  const path="users/"+uid+"/activities";
+  const previous=await listDocuments(path,env);
+  const byId=new Map(previous.map(item=>[item.id as string,item]));
+  let conflicts=0;
+  for(const change of changes){
+    const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",
+      codec.encode(change.calendarId+":"+change.eventId)));
+    const id="g_"+b64url(digest).slice(0,30);
+    const existing=byId.get(id);
+    const stored=existing as unknown as Activity|undefined;
+    const pending=stored?.googleLink?.pending;
+    const mapped=await mapGoogleEvent(change,uid,stored);
+    const other= mapped.ok ? previous.find(local=>
+      local.id!==id && !local.googleLink
+      && local.title===mapped.value.title && local.startAt===mapped.value.startAt
+      && !local.deletedAt) : undefined;
+    const mustResolve=(!mapped.ok && change.status!=="cancelled")
+      ||Boolean(pending&&pending!=="none")||Boolean(other);
+    if(mustResolve){
+      const conflictHash=new Uint8Array(await crypto.subtle.digest("SHA-256",
+        codec.encode(uid+":"+change.eventId)));
+      const conflictId="c_"+b64url(conflictHash).slice(0,28);
+      const conflict:CalendarSyncConflict={
+        id:conflictId,uid,localEventId:(other?.id as string)||id,
+        googleEventId:change.eventId,
+        kind:!mapped.ok ? "recurrence" : other ? "mapping" : "update",
+        localVersion:stored?.updatedAt??"",
+        googleVersion:change.etag??change.updatedAt,
+        detectedAt:new Date().toISOString(),status:"open",
+      };
+      await writeDocument("users/"+uid+"/googleCalendarConflicts/"+conflictId,
+        conflict as unknown as Record<string,unknown>,env);
+      conflicts++;
+      continue;
+    }
+    if(change.status==="cancelled"){
+      if(!stored||stored.deletedAt)continue;
+      const {__updateTime:revision}=existing!;
+      await writeDocument(path+"/"+id,{
+        ...stored,deletedAt:new Date().toISOString(),
+        updatedAt:new Date().toISOString(),
+        googleLink:{...stored.googleLink,pending:"none",remoteUpdatedAt:change.updatedAt},
+      },env,revision?{updateTime:revision}:undefined);
+      continue;
+    }
+    if(!mapped.ok)continue;
+    if(existing?.googleLink && (existing.googleLink as GoogleEventLink).etag===change.etag)
+      continue;
+    await writeDocument(path+"/"+id,mapped.value as unknown as Record<string,unknown>,
+      env,existing?.__updateTime
+        ?{updateTime:existing.__updateTime}:{exists:false});
+  }
+  return {pulled:changes.length,conflicts};
+}
+
+/** M108 · Synchronisation volontaire ou à l'ouverture, en petites tranches.
+ * La première association IMPORTE les événements distants sans pousser tous
+ * les événements locaux dépourvus de lien explicite.
+ */
+async function syncGoogleCalendar(uid:string,
+  reason:"startup"|"edit"|"manual",env:WorkerEnv):Promise<CalendarSyncRun> {
+  const startedAt=new Date().toISOString();
+  const statePath="users/"+uid+"/googleCalendarSync/state";
+  const cursorDoc=await readDocument(statePath,env);
+  const cursor:GoogleSyncCursor={
+    uid,calendarId:"primary",
+    ...(typeof cursorDoc?.nextSyncToken==="string"
+      ?{nextSyncToken:cursorDoc.nextSyncToken}:{}),
+  };
+  const gathered=await pullGoogleCalendarChanges(uid,cursor,env);
+  const merged=await reconcileGoogleCalendar(uid,gathered.changes,env);
+  let pushed=0,conflicts=merged.conflicts;
+  const activities=await listDocuments("users/"+uid+"/activities",env);
+  // Les changements locaux doivent porter explicitement O24.pending.
+  for(const item of activities){
+    const local=item as unknown as Activity;
+    if(local.uid!==uid||!local.googleLink
+      ||local.googleLink.pending==="none")continue;
+    const result=await pushGoogleCalendarEvent(uid,local,env);
+    if(result.ok){
+      await writeDocument("users/"+uid+"/activities/"+local.id,{
+        ...local,googleLink:result.value,updatedAt:new Date().toISOString(),
+      },env,item.__updateTime?{updateTime:item.__updateTime}:undefined);
+      pushed++;
+    }else{
+      conflicts++;
+      const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",
+        codec.encode(uid+":"+local.id+":"+local.googleLink.googleEventId)));
+      const id="c_"+b64url(digest).slice(0,28);
+      const record:CalendarSyncConflict={
+        id,uid,localEventId:local.id,googleEventId:local.googleLink.googleEventId,
+        kind:local.deletedAt?"delete":"update",localVersion:local.updatedAt,
+        googleVersion:local.googleLink.etag??"",
+        detectedAt:new Date().toISOString(),status:"open",
+      };
+      await writeDocument("users/"+uid+"/googleCalendarConflicts/"+id,
+        record as unknown as Record<string,unknown>,env);
+    }
+  }
+  const finishedAt=new Date().toISOString();
+  await writeDocument(statePath,{
+    uid,calendarId:"primary",
+    ...(gathered.token?{nextSyncToken:gathered.token}:{}),
+    ...(cursor.nextSyncToken?{}:{lastFullSyncAt:finishedAt}),
+    lastIncrementalSyncAt:finishedAt,
+  },env);
+  await writeDocument("users/"+uid+"/googleCalendarConnection/status",{
+    uid,calendarId:"primary",status:"active",lastSyncAt:finishedAt,
+  },env);
+  return {
+    uid,calendarId:"primary",startedAt,finishedAt,
+    pulled:merged.pulled,pushed,conflicts,
+    status:conflicts?"partial":"ok",
+    details:conflicts?"Certains événements nécessitent une décision.":undefined,
+  };
+}
