@@ -75,3 +75,54 @@ export function parseGoogleSyncError(error: unknown): GoogleCalendarSyncError {
       };
   }
 }
+
+/** D25 · Bindings Cloudflare : noms seulement, jamais de valeurs dans GitHub. */
+interface WorkerEnv {
+  FIREBASE_PROJECT_ID: string;
+  FIREBASE_SERVICE_ACCOUNT_EMAIL: string;
+  FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_REDIRECT_URI: string;
+  GOOGLE_GRANT_AES_KEY: string;
+  VAPID_PUBLIC_KEY: string;
+  VAPID_PRIVATE_KEY: string;
+  VAPID_CONTACT: string;
+  APP_ORIGIN: string;
+  ENABLE_CRON?: string;
+}
+
+const codec = new TextEncoder();
+const readable = new TextDecoder();
+const calendarScope = "https://www.googleapis.com/auth/calendar.events.owned";
+type RecordDoc = Record<string,unknown> & {__updateTime?:string;__name?:string};
+
+function b64url(input:Uint8Array):string {
+  let ascii="";
+  for(const value of input)ascii+=String.fromCharCode(value);
+  return btoa(ascii).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function unb64(input:string):Uint8Array {
+  if(!/^[a-zA-Z0-9_-]+$/.test(input)||input.length>100000)throw Error("Invalid encoding");
+  const pad=input.replace(/-/g,"+").replace(/_/g,"/");
+  return Uint8Array.from(atob(pad+"=".repeat((4-pad.length%4)%4)),value=>value.charCodeAt(0));
+}
+function randomId():string {
+  return b64url(crypto.getRandomValues(new Uint8Array(24)));
+}
+function configured(env:WorkerEnv):boolean {
+  return Boolean(env.FIREBASE_PROJECT_ID && env.FIREBASE_SERVICE_ACCOUNT_EMAIL
+    && env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY
+    && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    && env.GOOGLE_REDIRECT_URI && env.GOOGLE_GRANT_AES_KEY
+    && env.APP_ORIGIN==="https://pecose.github.io");
+}
+function respond(value:unknown,origin:string,status=200):Response {
+  return new Response(JSON.stringify(value),{
+    status,headers:{"Content-Type":"application/json; charset=utf-8",
+      "Cache-Control":"no-store", "Access-Control-Allow-Origin":origin,
+      "Access-Control-Allow-Headers":"authorization, content-type",
+      "Access-Control-Allow-Methods":"GET,POST,OPTIONS",
+      "Vary":"Origin","X-Content-Type-Options":"nosniff"},
+  });
+}
