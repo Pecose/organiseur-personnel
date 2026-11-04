@@ -1,0 +1,22 @@
+# F38 · D25/S9 · Configuration reproductible, NON DÉPLOYÉE.
+# Exclusivement Cloudflare Workers Free. Ne pas activer de plan payant.
+name = "organiseur-personnel-reminders"
+main = "src/index.ts"
+compatibility_date = "2026-11-04"
+workers_dev = true
+
+# Aucun Cron pour l'instant. Après T07/T10–T14 et consentement explicite
+# de mise en service, envisager un déclencheur limité (ex. toutes les 30 min).
+# [triggers]
+# crons = ["*/30 * * * *"]
+
+# Bindings à fournir PLUS TARD via les secrets du Worker,
+# jamais dans ce fichier ni dans le dépôt public :
+# FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY, FIREBASE_SERVICE_ACCOUNT_EMAIL
+# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
+# GOOGLE_GRANT_AES_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
+# VAPID_CONTACT. Variables sans secret : FIREBASE_PROJECT_ID,
+# APP_ORIGIN (https://pecose.github.io), ENABLE_CRON (reste false).
+#
+# Les variables publiques Vite VITE_WORKER_ORIGIN et VITE_VAPID_PUBLIC_KEY
+# ne sont pas des secrets. Les définir seulement à la recette finale.
