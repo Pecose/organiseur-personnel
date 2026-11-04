@@ -1,5 +1,5 @@
 /** F35 · Service worker de l'app shell S5 ; jamais de données Firebase. */
-import type { Result } from "../domain/types";
+import type { PushPayload, Result } from "../domain/types";
 
 const appScope = "/organiseur-personnel/";
 const shellRevision = "s5-1";
@@ -69,6 +69,30 @@ export async function cacheAppShell(revision: string): Promise<Result<void>> {
   }
 }
 
+/** M81 · Notification locale reçue par le service worker, sans données
+ * d'agenda privées. Le serveur ne fournit ni HTML, ni URL ni titre libre.
+ */
+export async function handlePushMessage(payload: PushPayload): Promise<void> {
+  if (!payload || (payload.kind !== "reminder" && payload.kind !== "test")
+    || typeof document !== "undefined") return;
+  if (payload.kind === "reminder" && (typeof payload.reminderId !== "string"
+    || !/^[a-zA-Z0-9@_-]{1,150}$/.test(payload.reminderId))) return;
+  const registration = (globalThis as unknown as {
+    registration?: {
+      showNotification: (title: string, options?: NotificationOptions) => Promise<void>;
+    };
+  }).registration;
+  if (!registration?.showNotification) return;
+  await registration.showNotification(
+    payload.kind === "test" ? "Notification de test" : "Rappel personnel", {
+      body: payload.kind === "test"
+        ? "Les notifications de l'organiseur peuvent apparaître sur cet appareil."
+        : "Une activité prévue mérite ton attention. Ouvre ton organiseur.",
+      tag: payload.kind === "test" ? "organiseur-test" : "organiseur-" + payload.reminderId,
+    },
+  );
+}
+
 // Cette portion est active uniquement dans le service worker compilé.
 // Ce même module est aussi importé dans la page pour M79.
 if (typeof document === "undefined" && "registration" in globalThis && "clients" in globalThis) {
@@ -97,6 +121,47 @@ if (typeof document === "undefined" && "registration" in globalThis && "clients"
       // Ne toucher ni à IndexedDB ni au cache Firestore.
       await worker.clients.claim();
     })());
+  });
+
+  worker.addEventListener("push", (event: unknown) => {
+    const e = event as {
+      data?: {json(): unknown};
+      waitUntil(promise: Promise<unknown>): void;
+    };
+    let payload: PushPayload | null = null;
+    try {
+      const incoming: unknown = e.data?.json();
+      if (typeof incoming === "object" && incoming !== null
+        && !Array.isArray(incoming)) {
+        const value = incoming as Record<string, unknown>;
+        if (value.kind === "test") payload = {kind: "test"};
+        else if (value.kind === "reminder"
+          && typeof value.reminderId === "string") {
+          payload = {kind: "reminder", reminderId: value.reminderId};
+        }
+      }
+    } catch {
+      // Toute charge illisible est ignorée, jamais affichée comme texte libre.
+    }
+    if (payload) e.waitUntil(handlePushMessage(payload));
+  });
+
+  worker.addEventListener("notificationclick", (event: unknown) => {
+    const e = event as {
+      notification: {close(): void};
+      waitUntil(promise: Promise<unknown>): void;
+    };
+    e.notification.close();
+    const workerClients = globalThis as unknown as {
+      clients: {openWindow?: (url: string) => Promise<unknown>};
+      location: Location;
+    };
+    // La destination est fixée en dur : aucune redirection provenant du Push.
+    if (workerClients.clients.openWindow) {
+      e.waitUntil(workerClients.clients.openWindow(
+        new URL(appScope + "#day", workerClients.location.origin).toString(),
+      ));
+    }
   });
 
   worker.addEventListener("fetch", (event: unknown) => {
