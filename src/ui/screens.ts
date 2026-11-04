@@ -28,6 +28,7 @@ import { resolveCatalogAsset } from "../storage/catalog";
 import { listImages, importImage } from "../features/decor";
 import { signIn, signOut, sendPasswordReset, registerAccount } from "../services/auth";
 import { configurePersistence } from "../services/sync";
+import { requestPushPermission, unsubscribeFromPush } from "../services/push";
 import { openActivityEditor } from "./dayComponents";
 import { formatZonedTime } from "../domain/dates";
 import type { ActivityOccurrenceView, LocalDate } from "../domain/types";
@@ -923,6 +924,11 @@ export function renderSettings(): void {
     <section class="day-section settings-list">
     <button type="button" class="soft-button" id="settings-monthly">Voir mon bilan mensuel</button>
     <button type="button" class="soft-button" id="settings-cache">Activer le mode hors ligne sur appareil de confiance</button>
+    <h3>Notifications sur cet iPhone</h3>
+    <p class="muted">Demander l'autorisation ne déclenche aucun rappel : l'abonnement et le serveur gratuit doivent encore être configurés.</p>
+    <button type="button" class="soft-button" id="settings-push-permission">Autoriser les notifications</button>
+    <button type="button" class="soft-button" id="settings-push-revoke">Retirer l'abonnement de cet appareil</button>
+    <p class="muted" id="settings-push-status" role="status" aria-live="polite">Aucun envoi distant n'est actif.</p>
     <button type="button" class="soft-button" id="settings-signout">Se déconnecter</button>
     <button type="button" class="soft-button" id="settings-login">Connexion</button>
     <p class="muted" id="settings-status" role="status"></p>
@@ -933,6 +939,36 @@ export function renderSettings(): void {
   const logout = root.querySelector<HTMLButtonElement>("#settings-signout")!;
   cache.disabled = !state.user;
   logout.disabled = !state.user;
+  const pushPermission = root.querySelector<HTMLButtonElement>("#settings-push-permission")!;
+  const pushRevoke = root.querySelector<HTMLButtonElement>("#settings-push-revoke")!;
+  const pushStatus = root.querySelector<HTMLElement>("#settings-push-status")!;
+  // La demande d'autorisation n'est jamais initiée au chargement de l'écran.
+  pushPermission.disabled = !state.user;
+  pushRevoke.disabled = !state.user;
+  pushPermission.onclick = () => {
+    // Appelé directement par le geste utilisateur requis sur iPhone.
+    void requestPushPermission().then(result => {
+      pushStatus.textContent = result.ok
+        ? result.value === "granted"
+          ? "Autorisation accordée. Aucun abonnement distant actif pour le moment."
+          : result.value === "denied"
+            ? "Autorisation refusée dans les réglages du téléphone."
+            : "Autorisation non accordée. Aucun envoi de notification n'est actif."
+        : result.error.message;
+    }).catch(() => {pushStatus.textContent = "Autorisation non confirmée.";});
+  };
+  pushRevoke.onclick = () => {
+    pushRevoke.disabled = true;
+    void unsubscribeFromPush().then(result => {
+      pushRevoke.disabled = false;
+      pushStatus.textContent = result.ok
+        ? "Abonnement retiré de cet appareil, ou aucun abonnement enregistré."
+        : result.error.message;
+    }).catch(() => {
+      pushRevoke.disabled = false;
+      pushStatus.textContent = "Révocation non confirmée.";
+    });
+  };
   root.querySelector<HTMLButtonElement>("#settings-monthly")!.onclick = () => navigate({name:"monthlyReview"});
   root.querySelector<HTMLButtonElement>("#settings-login")!.onclick = () => navigate({name:"signin"});
   const feedback = root.querySelector<HTMLElement>("#settings-status")!;
