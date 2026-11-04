@@ -593,12 +593,16 @@ async function reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]
     const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",
       codec.encode(change.calendarId+":"+change.eventId)));
     const id="g_"+b64url(digest).slice(0,30);
-    const existing=byId.get(id);
+    const existing=previous.find(record=>{
+      const link=record.googleLink as GoogleEventLink|undefined;
+      return link?.calendarId===change.calendarId&&link.googleEventId===change.eventId;
+    })??byId.get(id);
+    const effectiveId=existing?.id as string|undefined ?? id;
     const stored=existing as unknown as Activity|undefined;
     const pending=stored?.googleLink?.pending;
     const mapped=await mapGoogleEvent(change,uid,stored);
     const other= mapped.ok ? previous.find(local=>
-      local.id!==id && !local.googleLink
+      local.id!==effectiveId && !local.googleLink
       && local.title===mapped.value.title && local.startAt===mapped.value.startAt
       && !local.deletedAt) : undefined;
     const mustResolve=(!mapped.ok && change.status!=="cancelled")
@@ -608,7 +612,7 @@ async function reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]
         codec.encode(uid+":"+change.eventId)));
       const conflictId="c_"+b64url(conflictHash).slice(0,28);
       const conflict:CalendarSyncConflict={
-        id:conflictId,uid,localEventId:(other?.id as string)||id,
+        id:conflictId,uid,localEventId:(other?.id as string)||effectiveId,
         googleEventId:change.eventId,
         kind:!mapped.ok ? "recurrence" : other ? "mapping" : "update",
         localVersion:stored?.updatedAt??"",
@@ -623,7 +627,7 @@ async function reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]
     if(change.status==="cancelled"){
       if(!stored||stored.deletedAt)continue;
       const {__updateTime:revision}=existing!;
-      await writeDocument(path+"/"+id,{
+      await writeDocument(path+"/"+effectiveId,{
         ...stored,deletedAt:new Date().toISOString(),
         updatedAt:new Date().toISOString(),
         googleLink:{...stored.googleLink,pending:"none",remoteUpdatedAt:change.updatedAt},
@@ -633,7 +637,7 @@ async function reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]
     if(!mapped.ok)continue;
     if(existing?.googleLink && (existing.googleLink as GoogleEventLink).etag===change.etag)
       continue;
-    await writeDocument(path+"/"+id,mapped.value as unknown as Record<string,unknown>,
+    await writeDocument(path+"/"+effectiveId,mapped.value as unknown as Record<string,unknown>,
       env,existing?.__updateTime
         ?{updateTime:existing.__updateTime}:{exists:false});
   }
