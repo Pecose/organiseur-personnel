@@ -202,3 +202,102 @@ async function serviceAccessToken(env:WorkerEnv):Promise<string> {
     Math.max(60,Math.min((result.expires_in??3600)-120,3000))*1000};
   return result.access_token;
 }
+
+/** D25 · Sérialisation contrôlée des documents Firestore REST. */
+function firestoreField(value:unknown):unknown {
+  if(value==null)return {nullValue:null};
+  if(typeof value==="string")return {stringValue:value};
+  if(typeof value==="boolean")return {booleanValue:value};
+  if(typeof value==="number"){
+    if(!Number.isFinite(value))throw Error("Valeur Firestore invalide");
+    return Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value};
+  }
+  if(Array.isArray(value))return {arrayValue:{values:value.map(firestoreField)}};
+  if(typeof value==="object"){
+    const fields:Record<string,unknown>={};
+    for(const [key,entry]of Object.entries(value))
+      if(entry!==undefined)fields[key]=firestoreField(entry);
+    return {mapValue:{fields}};
+  }
+  throw Error("Type Firestore interdit");
+}
+function unpackField(input:unknown):unknown {
+  if(!input||typeof input!=="object")return null;
+  const field=input as Record<string,unknown>;
+  if("nullValue" in field)return null;
+  if("stringValue" in field)return field.stringValue;
+  if("booleanValue" in field)return field.booleanValue;
+  if("integerValue" in field)return Number(field.integerValue);
+  if("doubleValue" in field)return Number(field.doubleValue);
+  if("timestampValue" in field)return field.timestampValue;
+  if("arrayValue" in field)
+    return ((field.arrayValue as {values?:unknown[]}).values??[]).map(unpackField);
+  if("mapValue" in field){
+    const data=(field.mapValue as {fields?:Record<string,unknown>}).fields??{};
+    const obj:Record<string,unknown>={};
+    for(const [key,val] of Object.entries(data))obj[key]=unpackField(val);
+    return obj;
+  }
+  throw Error("Type Firestore inconnu");
+}
+function unpackDocument(input:unknown):RecordDoc {
+  const item=input as {name?:string;updateTime?:string;fields?:Record<string,unknown>};
+  const result:RecordDoc={};
+  for(const [key,val] of Object.entries(item.fields??{}))result[key]=unpackField(val);
+  result.__name=item.name;
+  result.__updateTime=item.updateTime;
+  return result;
+}
+function firestoreUrl(path:string,env:WorkerEnv):URL {
+  if(path.length>650||!/^[-a-zA-Z0-9_@./]+$/.test(path)
+    ||path.includes("..")||path.startsWith("/")||path.endsWith("/"))
+    throw Error("Chemin Firestore interdit");
+  return new URL("https://firestore.googleapis.com/v1/projects/"+
+    encodeURIComponent(env.FIREBASE_PROJECT_ID)+
+    "/databases/(default)/documents/"+path);
+}
+async function readDocument(path:string,env:WorkerEnv):Promise<RecordDoc|null> {
+  const response=await fetch(firestoreUrl(path,env),{
+    headers:{Authorization:"Bearer "+await serviceAccessToken(env)},
+    redirect:"error",cache:"no-store",
+  });
+  if(response.status===404)return null;
+  if(!response.ok)throw Error("Lecture Firestore refusée");
+  return unpackDocument(await response.json());
+}
+async function writeDocument(path:string,data:Record<string,unknown>,env:WorkerEnv,
+  condition?:{exists?:boolean;updateTime?:string}):Promise<void>{
+  const url=firestoreUrl(path,env);
+  if(condition?.exists!==undefined)
+    url.searchParams.set("currentDocument.exists",String(condition.exists));
+  if(condition?.updateTime)
+    url.searchParams.set("currentDocument.updateTime",condition.updateTime);
+  const fields:Record<string,unknown>={};
+  for(const [key,value]of Object.entries(data))
+    if(!key.startsWith("__")&&value!==undefined)fields[key]=firestoreField(value);
+  const response=await fetch(url,{method:"PATCH",headers:{
+    Authorization:"Bearer "+await serviceAccessToken(env),
+    "Content-Type":"application/json",
+  },body:JSON.stringify({fields}),redirect:"error",cache:"no-store"});
+  if(!response.ok)throw Error("Écriture Firestore refusée ou périmée");
+}
+async function listDocuments(path:string,env:WorkerEnv):Promise<RecordDoc[]> {
+  const results:RecordDoc[]=[];let cursor:string|undefined;
+  for(let page=0;page<3;page++){
+    const url=firestoreUrl(path,env);
+    url.searchParams.set("pageSize","100");
+    if(cursor)url.searchParams.set("pageToken",cursor);
+    const response=await fetch(url,{headers:{
+      Authorization:"Bearer "+await serviceAccessToken(env),
+    },redirect:"error",cache:"no-store"});
+    if(response.status===404)return results;
+    if(!response.ok)throw Error("Consultation Firestore indisponible");
+    const data=await response.json() as {
+      documents?:unknown[];nextPageToken?:string;
+    };
+    for(const item of data.documents??[])results.push(unpackDocument(item));
+    if(!data.nextPageToken)return results;
+    cursor=data.nextPageToken;
+  }
+  throw Error("Pagination au-delà du budget sécurisé de cette opération");
+}
