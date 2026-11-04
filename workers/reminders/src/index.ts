@@ -143,7 +143,7 @@ async function verifyFirebaseToken(token:string,env:WorkerEnv):Promise<string> {
   if(header.alg!=="RS256"||typeof header.kid!=="string"
     ||payload.aud!==env.FIREBASE_PROJECT_ID
     ||payload.iss!=="https://securetoken.google.com/"+env.FIREBASE_PROJECT_ID
-    ||typeof payload.sub!=="string"||payload.sub.length<1||payload.sub.length>128
+    ||typeof payload.sub!=="string"||!/^[A-Za-z0-9_-]{1,128}$/.test(payload.sub)
     ||typeof payload.exp!=="number"||payload.exp<=now
     ||typeof payload.iat!=="number"||payload.iat>now+60
     ||typeof payload.auth_time!=="number"||payload.auth_time>now+60)
