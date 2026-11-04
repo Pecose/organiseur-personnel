@@ -480,6 +480,36 @@ export interface GoogleCalendarSyncError {
   action: "reauthorize" | "resync" | "wait" | "resolve" | "none";
 }
 
+/** F17 · D25/S9, types techniques de la frontière sécurisée. */
+export interface AuthorizationUrl {
+  url: string;
+}
+/** Token réponse du seul Worker, jamais sérialisé vers la PWA. */
+export interface OAuthTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type?: string;
+  scope?: string;
+}
+/** Émetteur Worker exclusivement, jamais envoyé au navigateur. */
+export interface ReminderDispatchCandidate {
+  uid: string;
+  reminder: Reminder;
+  subscriptions: PushSubscriptionRecord[];
+}
+export interface PushDeliveryResult {
+  ok: boolean;
+  status: number;
+  retryable: boolean;
+}
+export interface DispatchSummary {
+  scanned: number;
+  claimed: number;
+  sent: number;
+  failed: number;
+}
+
 /** F17 / M127/M156 · Sommaire d'une date, projection non persistée de O31/O32. */
 export interface CalendarDaySummary {
   date: LocalDate;
