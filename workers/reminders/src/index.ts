@@ -162,3 +162,43 @@ async function verifyFirebaseToken(token:string,env:WorkerEnv):Promise<string> {
     throw Error("Signature Firebase invalide");
   return payload.sub;
 }
+
+/** D25 · Jeton Firestore serveur uniquement, non retourné au navigateur. */
+let serviceCache: {token:string;until:number}|undefined;
+async function serviceAccessToken(env:WorkerEnv):Promise<string> {
+  if(!env.FIREBASE_SERVICE_ACCOUNT_EMAIL||!env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY)
+    throw Error("Accès Firestore non configuré");
+  if(serviceCache&&serviceCache.until>Date.now())return serviceCache.token;
+  const stamp=Math.floor(Date.now()/1000);
+  const header=b64url(codec.encode(JSON.stringify({alg:"RS256",typ:"JWT"})));
+  const claims=b64url(codec.encode(JSON.stringify({
+    iss:env.FIREBASE_SERVICE_ACCOUNT_EMAIL,
+    aud:"https://oauth2.googleapis.com/token",
+    scope:"https://www.googleapis.com/auth/datastore",
+    iat:stamp,exp:stamp+3500,
+  })));
+  const data=header+"."+claims;
+  const clean=env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY
+    .replace(/\\n/g,"\n").replace(/-----[^-]+-----/g,"").replace(/\s+/g,"");
+  const privateKey=await crypto.subtle.importKey(
+    "pkcs8",
+    Uint8Array.from(atob(clean),c=>c.charCodeAt(0)),
+    {name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"],
+  );
+  const signature=await crypto.subtle.sign("RSASSA-PKCS1-v1_5",
+    privateKey,codec.encode(data));
+  const assertion=data+"."+b64url(new Uint8Array(signature));
+  const response=await fetch("https://oauth2.googleapis.com/token",{
+    method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({
+      grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),redirect:"error",
+  });
+  if(!response.ok)throw Error("Autorisation du service Firestore refusée");
+  const result=await response.json() as {access_token?:string;expires_in?:number};
+  if(!result.access_token)throw Error("Jeton Firestore absent");
+  serviceCache={token:result.access_token,until:Date.now()+
+    Math.max(60,Math.min((result.expires_in??3600)-120,3000))*1000};
+  return result.access_token;
+}
