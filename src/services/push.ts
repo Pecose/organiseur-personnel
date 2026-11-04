@@ -5,8 +5,9 @@
  */
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { fetchCloudRecords, removeCloudRecord } from "./cloudRepository";
-import type { PushSubscriptionRecord, Result } from "../domain/types";
+import { fetchCloudRecords, putCloudRecord, removeCloudRecord } from "./cloudRepository";
+import { workerRequest } from "./googleCalendarBridge";
+import type { NotificationTestResult, PushSubscriptionRecord, Result } from "../domain/types";
 
 /** M75 · À appeler uniquement depuis un bouton touché par l'utilisatrice.
  * PermissionState natif : granted, denied ou prompt.
@@ -96,6 +97,115 @@ export async function unsubscribeFromPush(): Promise<Result<void>> {
     return {ok: false, error: {
       code: "PUSH_UNSUBSCRIBE_FAILED",
       message: "Révocation non confirmée. Réessaie en ligne depuis cet appareil.",
+    }};
+  }
+}
+
+/** M76 · Inscription volontaire sur cet appareil, avec clé publique VAPID
+ * et document O14 sous le seul UID authentifié. Aucun envoi lancé.
+ */
+export async function subscribeToPush(): Promise<Result<PushSubscriptionRecord>> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)
+    || typeof PushManager === "undefined") return {ok:false,error:{
+    code:"PUSH_UNSUPPORTED",message:"Abonnement Push indisponible ici.",
+  }};
+  const key = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+  if (!key || !/^[A-Za-z0-9_-]{86,90}$/.test(key)) return {ok:false,error:{
+    code:"VAPID_NOT_CONFIGURED",
+    message:"Le serveur gratuit de notifications n'est pas encore configuré.",
+  }};
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user) return {ok:false,error:{
+      code:"AUTH_REQUIRED",message:"Connexion nécessaire avant l'abonnement.",
+    }};
+    // M75 est appelé depuis le bouton de souscription, jamais automatiquement.
+    const permission = await requestPushPermission();
+    if (!permission.ok) return permission;
+    if (permission.value !== "granted") return {ok:false,error:{
+      code:"PUSH_PERMISSION_NOT_GRANTED",message:"Autorisation non accordée.",
+    }};
+    const scope = new URL("/organiseur-personnel/", location.origin).toString();
+    const reg = await navigator.serviceWorker.getRegistration(scope);
+    if (!reg) return {ok:false,error:{
+      code:"SERVICE_WORKER_NOT_READY",
+      message:"La PWA doit être installée et son service worker actif.",
+    }};
+    const bytes = atob(key.replace(/-/g,"+").replace(/_/g,"/")
+      + "=".repeat((4 - key.length % 4) % 4));
+    const publicKey = Uint8Array.from(bytes, c => c.charCodeAt(0));
+    if (publicKey.length !== 65 || publicKey[0] !== 4) throw Error("Bad public VAPID key");
+    const prior = await reg.pushManager.getSubscription();
+    const subscription = prior ?? await reg.pushManager.subscribe({
+      userVisibleOnly:true, applicationServerKey:publicKey,
+    });
+    const raw = subscription.toJSON();
+    const p256dh = raw.keys?.p256dh;
+    const auth = raw.keys?.auth;
+    if (!p256dh || !auth || !subscription.endpoint.startsWith("https://")) {
+      if (!prior) await subscription.unsubscribe();
+      throw Error("Incomplete subscription");
+    }
+    const stored = await fetchCloudRecords<PushSubscriptionRecord>(
+      user.uid, "pushSubscriptions",
+    );
+    if (!stored.ok) {
+      if (!prior) await subscription.unsubscribe();
+      return stored;
+    }
+    const same = stored.value.find(item => item.endpoint === subscription.endpoint);
+    if (same) return {ok:true,value:same};
+    const record:PushSubscriptionRecord = {
+      id:crypto.randomUUID(), endpoint:subscription.endpoint,
+      p256dh,auth,updatedAt:new Date().toISOString(),
+    };
+    const saved = await putCloudRecord(user.uid,"pushSubscriptions",record.id,record);
+    if (!saved.ok) {
+      if (!prior) await subscription.unsubscribe();
+      return saved;
+    }
+    return {ok:true,value:record};
+  } catch {
+    return {ok:false,error:{
+      code:"PUSH_SUBSCRIPTION_FAILED",
+      message:"Abonnement non confirmé sur cet appareil. Aucun envoi n'est garanti.",
+    }};
+  }
+}
+
+/** M78 · Test uniquement sur l'abonnement de ce navigateur et son UID.
+ * La réponse du Worker ne garantit pas l'apparition d'une notification.
+ */
+export async function testPushSubscription(): Promise<Result<NotificationTestResult>> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return {ok:false,error:{code:"PUSH_UNSUPPORTED",message:"Web Push indisponible."}};
+  }
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user) return {ok:false,error:{
+      code:"AUTH_REQUIRED",message:"Connexion nécessaire pour tester le Push.",
+    }};
+    const scope = new URL("/organiseur-personnel/",location.origin).toString();
+    const reg = await navigator.serviceWorker.getRegistration(scope);
+    const local = await reg?.pushManager.getSubscription();
+    if (!local) return {ok:false,error:{
+      code:"PUSH_NOT_SUBSCRIBED",message:"Cet appareil n'est pas abonné.",
+    }};
+    const records = await fetchCloudRecords<PushSubscriptionRecord>(
+      user.uid,"pushSubscriptions",
+    );
+    if (!records.ok) return records;
+    const item = records.value.find(value => value.endpoint === local.endpoint);
+    if (!item) return {ok:false,error:{
+      code:"PUSH_DEVICE_NOT_FOUND",message:"Abonnement de cet appareil non enregistré.",
+    }};
+    return workerRequest<NotificationTestResult>("/api/push/test","POST",{
+      deviceId:item.id,
+    });
+  } catch {
+    return {ok:false,error:{
+      code:"PUSH_TEST_UNAVAILABLE",
+      message:"Test de notification indisponible ; aucun envoi confirmé.",
     }};
   }
 }
