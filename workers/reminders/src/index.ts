@@ -126,3 +126,39 @@ function respond(value:unknown,origin:string,status=200):Response {
       "Vary":"Origin","X-Content-Type-Options":"nosniff"},
   });
 }
+
+/** D25 · Contrôle cryptographique Firebase SecureToken, UID serveur fiable. */
+let secureKeys: {until:number;keys:JsonWebKey[]} | undefined;
+async function verifyFirebaseToken(token:string,env:WorkerEnv):Promise<string> {
+  const segments=token.split(".");
+  if(segments.length!==3||token.length>9000)throw Error("Token invalide");
+  const header=JSON.parse(readable.decode(unb64(segments[0]))) as {alg?:string;kid?:string};
+  const payload=JSON.parse(readable.decode(unb64(segments[1]))) as Record<string,unknown>;
+  const now=Math.floor(Date.now()/1000);
+  if(header.alg!=="RS256"||typeof header.kid!=="string"
+    ||payload.aud!==env.FIREBASE_PROJECT_ID
+    ||payload.iss!=="https://securetoken.google.com/"+env.FIREBASE_PROJECT_ID
+    ||typeof payload.sub!=="string"||payload.sub.length<1||payload.sub.length>128
+    ||typeof payload.exp!=="number"||payload.exp<=now
+    ||typeof payload.iat!=="number"||payload.iat>now+60
+    ||typeof payload.auth_time!=="number"||payload.auth_time>now+60)
+    throw Error("Token Firebase non accepté");
+  if(!secureKeys||secureKeys.until<Date.now()){
+    const response=await fetch(
+      "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
+      {redirect:"error"},
+    );
+    if(!response.ok)throw Error("Clés publiques Firebase indisponibles");
+    const data=await response.json() as {keys?:JsonWebKey[]};
+    if(!Array.isArray(data.keys))throw Error("Clés publiques incorrectes");
+    secureKeys={keys:data.keys,until:Date.now()+20*60*1000};
+  }
+  const signingKey=secureKeys.keys.find(entry=>entry.kid===header.kid);
+  if(!signingKey)throw Error("Signature Firebase inconnue");
+  const key=await crypto.subtle.importKey("jwk",signingKey,
+    {name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);
+  if(!await crypto.subtle.verify("RSASSA-PKCS1-v1_5",key,
+    unb64(segments[2]),codec.encode(segments[0]+"."+segments[1])))
+    throw Error("Signature Firebase invalide");
+  return payload.sub;
+}
