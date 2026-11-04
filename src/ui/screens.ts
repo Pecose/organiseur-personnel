@@ -28,7 +28,11 @@ import { resolveCatalogAsset } from "../storage/catalog";
 import { listImages, importImage } from "../features/decor";
 import { signIn, signOut, sendPasswordReset, registerAccount } from "../services/auth";
 import { configurePersistence } from "../services/sync";
-import { requestPushPermission, unsubscribeFromPush } from "../services/push";
+import { requestPushPermission, subscribeToPush, testPushSubscription, unsubscribeFromPush } from "../services/push";
+import {
+  startGoogleCalendarLink, requestGoogleCalendarSync, readGoogleCalendarStatus,
+  queryGoogleCalendarConflicts, resolveGoogleCalendarConflict, unlinkGoogleCalendar,
+} from "../features/googleCalendar";
 import { openActivityEditor } from "./dayComponents";
 import { formatZonedTime } from "../domain/dates";
 import type { ActivityOccurrenceView, LocalDate } from "../domain/types";
@@ -927,12 +931,23 @@ export function renderSettings(): void {
     <h3>Notifications sur cet iPhone</h3>
     <p class="muted">Demander l'autorisation ne déclenche aucun rappel : l'abonnement et le serveur gratuit doivent encore être configurés.</p>
     <button type="button" class="soft-button" id="settings-push-permission">Autoriser les notifications</button>
+    <button type="button" class="soft-button" id="settings-push-subscribe">Abonner cet appareil (après configuration)</button>
+    <button type="button" class="soft-button" id="settings-push-test">Demander un test de notification</button>
     <button type="button" class="soft-button" id="settings-push-revoke">Retirer l'abonnement de cet appareil</button>
     <p class="muted" id="settings-push-status" role="status" aria-live="polite">Aucun envoi distant n'est actif.</p>
     <button type="button" class="soft-button" id="settings-signout">Se déconnecter</button>
     <button type="button" class="soft-button" id="settings-login">Connexion</button>
     <p class="muted" id="settings-status" role="status"></p>
-    <p class="muted">Les sauvegardes indépendantes et Google Agenda seront ajoutés plus tard.</p></section>`;
+    <h3>Google Agenda (facultatif)</h3>
+    <p class="muted">La connexion Google est distincte de celle de l'organiseur. Aucune synchronisation n'est active sans autorisation explicite.</p>
+    <button type="button" class="soft-button" id="google-link">Connecter mon Google Agenda</button>
+    <button type="button" class="soft-button" id="google-status">Vérifier le statut Google</button>
+    <button type="button" class="soft-button" id="google-sync">Synchroniser maintenant</button>
+    <button type="button" class="soft-button" id="google-conflicts">Afficher les conflits</button>
+    <button type="button" class="soft-button" id="google-unlink">Délier Google Agenda</button>
+    <div id="google-conflict-list" class="entry-list"></div>
+    <p class="muted" id="google-feedback" role="status" aria-live="polite">Google Agenda n'est pas configuré.</p>
+    <p class="muted">Sauvegardes indépendantes : prévues pour S10. Aucun service payant.</p></section>`;
   root.querySelector<HTMLElement>("#account-label")!.textContent =
     state.user?.email || "Aucun compte connecté.";
   const cache = root.querySelector<HTMLButtonElement>("#settings-cache")!;
@@ -945,6 +960,34 @@ export function renderSettings(): void {
   // La demande d'autorisation n'est jamais initiée au chargement de l'écran.
   pushPermission.disabled = !state.user;
   pushRevoke.disabled = !state.user;
+  const subscribe = root.querySelector<HTMLButtonElement>("#settings-push-subscribe")!;
+  const pushTest = root.querySelector<HTMLButtonElement>("#settings-push-test")!;
+  subscribe.disabled = !state.user;
+  pushTest.disabled = !state.user;
+  subscribe.onclick = () => {
+    subscribe.disabled = true;
+    void subscribeToPush().then(result => {
+      subscribe.disabled = false;
+      pushStatus.textContent = result.ok
+        ? "Abonnement local enregistré ; les rappels distants restent inactifs sans serveur."
+        : result.error.message;
+    }).catch(() => {
+      subscribe.disabled = false;
+      pushStatus.textContent = "Abonnement non confirmé.";
+    });
+  };
+  pushTest.onclick = () => {
+    pushTest.disabled = true;
+    void testPushSubscription().then(result => {
+      pushTest.disabled = false;
+      pushStatus.textContent = result.ok
+        ? result.value.message ?? "Demande de test reçue, livraison non garantie."
+        : result.error.message;
+    }).catch(() => {
+      pushTest.disabled = false;
+      pushStatus.textContent = "Aucun test distant confirmé.";
+    });
+  };
   pushPermission.onclick = () => {
     // Appelé directement par le geste utilisateur requis sur iPhone.
     void requestPushPermission().then(result => {
@@ -972,6 +1015,89 @@ export function renderSettings(): void {
   root.querySelector<HTMLButtonElement>("#settings-monthly")!.onclick = () => navigate({name:"monthlyReview"});
   root.querySelector<HTMLButtonElement>("#settings-login")!.onclick = () => navigate({name:"signin"});
   const feedback = root.querySelector<HTMLElement>("#settings-status")!;
+  const googleFeedback = root.querySelector<HTMLElement>("#google-feedback")!;
+  const conflicts = root.querySelector<HTMLElement>("#google-conflict-list")!;
+  const googleIds = ["google-link","google-status","google-sync","google-conflicts","google-unlink"];
+  for (const id of googleIds)
+    root.querySelector<HTMLButtonElement>("#"+id)!.disabled = !state.user;
+  root.querySelector<HTMLButtonElement>("#google-link")!.onclick = () => {
+    googleFeedback.textContent = "Préparation du consentement Google…";
+    void startGoogleCalendarLink().then(result => {
+      if (result.ok) window.location.assign(result.value.url);
+      else googleFeedback.textContent = result.error.message;
+    }).catch(() => {googleFeedback.textContent = "Connexion Google indisponible.";});
+  };
+  root.querySelector<HTMLButtonElement>("#google-status")!.onclick = () => {
+    googleFeedback.textContent = "Lecture du statut de liaison…";
+    void readGoogleCalendarStatus().then(result => {
+      googleFeedback.textContent = result.ok
+        ? "Google Agenda : "+result.value.status+
+          (result.value.lastSyncAt ? " · dernière synchronisation : "+result.value.lastSyncAt : "")
+        : result.error.message;
+    });
+  };
+  root.querySelector<HTMLButtonElement>("#google-sync")!.onclick = () => {
+    googleFeedback.textContent = "Demande de synchronisation…";
+    void requestGoogleCalendarSync("manual").then(result => {
+      googleFeedback.textContent = result.ok
+        ? "Synchronisation : "+result.value.status+" · "+
+          result.value.pulled+" reçus · "+result.value.pushed+" envoyés · "+
+          result.value.conflicts+" conflits"
+        : result.error.message;
+    });
+  };
+  root.querySelector<HTMLButtonElement>("#google-conflicts")!.onclick = () => {
+    conflicts.replaceChildren();
+    googleFeedback.textContent = "Recherche des conflits…";
+    void queryGoogleCalendarConflicts().then(result => {
+      if (!result.ok) {googleFeedback.textContent = result.error.message;return;}
+      googleFeedback.textContent = result.value.length+" conflit(s) accessible(s).";
+      for (const conflict of result.value) {
+        if (conflict.status !== "open") continue;
+        const row = document.createElement("article");
+        row.className = "checklist-card";
+        const info = document.createElement("p");
+        info.textContent = "Conflit "+conflict.kind+" sur l'activité "+conflict.localEventId;
+        const choices = document.createElement("div");
+        choices.className = "header-actions";
+        for (const [choice,label] of [
+          ["keepLocal","Conserver dans l'organiseur"],
+          ["keepGoogle","Conserver Google"],
+          ["keepBoth","Garder les deux"],
+        ] as const) {
+          const button = document.createElement("button");
+          button.className = "soft-button";
+          button.type = "button";
+          button.textContent = label;
+          button.onclick = () => {
+            if (!window.confirm("Confirmer : "+label+" ?")) return;
+            button.disabled = true;
+            void resolveGoogleCalendarConflict(conflict.id,choice).then(saved => {
+              button.disabled = false;
+              if (saved.ok) {
+                googleFeedback.textContent = "Conflit résolu, demande une nouvelle synchronisation.";
+                row.remove();
+              } else googleFeedback.textContent = saved.error.message;
+            });
+          };
+          choices.append(button);
+        }
+        row.append(info,choices);
+        conflicts.append(row);
+      }
+    });
+  };
+  root.querySelector<HTMLButtonElement>("#google-unlink")!.onclick = () => {
+    if (!state.user || !window.confirm(
+      "Délier Google Agenda ? Tes activités locales seront conservées.",
+    )) return;
+    googleFeedback.textContent = "Déliaison en cours…";
+    void unlinkGoogleCalendar(state.user.uid).then(result => {
+      googleFeedback.textContent = result.ok
+        ? "Google Agenda délié, activités locales conservées." : result.error.message;
+    });
+  };
+
   cache.onclick = () => {
     void configurePersistence().then(result => {
       feedback.textContent = result.ok
