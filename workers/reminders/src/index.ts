@@ -573,7 +573,7 @@ async function pushGoogleCalendarEvent(uid:string,activity:Activity,
     id?:string;etag?:string;updated?:string;
   };
   return {ok:true,value:{
-    calendarId:"primary",googleEventId:remote?.id??link.googleEventId,
+    calendarId:"primary",googleEventId:(remote?.id??link.googleEventId??""),
     etag:remote?.etag??link.etag,
     remoteUpdatedAt:remote?.updated??new Date().toISOString(),
     pending:"none",source:link.source,
