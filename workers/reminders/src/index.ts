@@ -941,6 +941,22 @@ async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
         currentDocument:{exists:false},
       });
     }
+    if(choice==="keepBoth" && destination!==localPath && original && local){
+      // Garder l'activité locale sur son ID, mais délier son ancienne
+      // référence Google : seul l'événement distant garde O24.
+      const detached:Record<string,unknown>={};
+      for(const [key,value]of Object.entries({
+        ...local,googleLink:undefined,
+        updatedAt:new Date().toISOString(),
+      })){
+        if(!key.startsWith("__")&&value!==undefined)
+          detached[key]=firestoreField(value);
+      }
+      writes.push({
+        update:{name:endpointPrefix+localPath,fields:detached},
+        currentDocument:{updateTime:original.__updateTime},
+      });
+    }
     const fields:Record<string,unknown>={};
     for(const [key,value]of Object.entries(mapped.value)){
       if(!key.startsWith("__")&&value!==undefined)
