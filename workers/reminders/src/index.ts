@@ -1039,9 +1039,16 @@ async function handleWorkerRequest(req:Request,env:WorkerEnv):Promise<Response> 
   }
 }
 
-/** M100 · La route de test reste fermée tant que la couche RFC8291
- * et le contrôle anti-abus n'ont pas passé la recette. Jamais de faux succès.
+/** M100 · Test Push préparé, NON ACTIVÉ avant recette T07.
+ * Interrupteur compilé à false : même un Worker déployé par erreur ne peut
+ * expédier de notification. Le passage à true nécessite la recette et une
+ * décision explicite de mise en service, sans ajout de compte payant.
+ *
+ * À l'activation future : UID JWT vérifié, endpoint appartenant à cet UID,
+ * signature VAPID, charge chiffrée RFC8291 et claim Firestore atomique O19
+ * limitant les essais d'un même appareil à un toutes les dix minutes.
  */
+const PUSH_TEST_SECURITY_APPROVED=false;
 async function handlePushTestRequest(
   authToken:string,deviceId:string,env:WorkerEnv,
 ):Promise<{ok:true;value:NotificationTestResult}|{ok:false;error:{code:string;message:string}}> {
@@ -1049,14 +1056,70 @@ async function handlePushTestRequest(
   if(!/^[a-zA-Z0-9_-]{1,150}$/.test(deviceId))return {ok:false,error:{
     code:"INVALID_DEVICE",message:"Identifiant d'appareil invalide.",
   }};
+  if(!PUSH_TEST_SECURITY_APPROVED)return {ok:false,error:{
+    code:"PUSH_SENDING_NOT_READY",
+    message:"L'envoi chiffré est préparé mais reste désactivé jusqu'à la recette de sécurité.",
+  }};
+  // La recherche est strictement sous l'UID vérifié, jamais depuis le corps.
   const stored=await readDocument("users/"+uid+"/pushSubscriptions/"+deviceId,env);
-  if(!stored||stored.id!==deviceId||typeof stored.endpoint!=="string")
+  if(!stored||stored.id!==deviceId||typeof stored.endpoint!=="string"
+    ||typeof stored.p256dh!=="string"||typeof stored.auth!=="string")
     return {ok:false,error:{
       code:"PUSH_DEVICE_NOT_FOUND",message:"Aucun abonnement correspondant à cet appareil.",
     }};
-  return {ok:false,error:{
-    code:"PUSH_SENDING_NOT_READY",
-    message:"L'envoi de notifications attend encore sa validation de sécurité et de chiffrement.",
+  const subscription:PushSubscriptionRecord={
+    id:deviceId,endpoint:stored.endpoint,p256dh:stored.p256dh,
+    auth:stored.auth,updatedAt:String(stored.updatedAt??""),
+  };
+  // Chiffrer et signer AVANT de consommer un reçu de tentative.
+  // createVapidJWT valide aussi la liste des fournisseurs HTTPS autorisés.
+  const token=await createVapidJWT(subscription.endpoint,env);
+  const payload=await encryptWebPush({kind:"test"},subscription);
+  const now=Date.now();
+  const receiptPath="users/"+uid+"/dispatchReceipts/test@"+deviceId;
+  const previous=await readDocument(receiptPath,env);
+  if(previous){
+    const last=typeof previous.attemptedAt==="string"
+      ?Date.parse(previous.attemptedAt):NaN;
+    // En cas de date incohérente, refuser plutôt que contourner le quota.
+    if(!Number.isFinite(last)||now-last<600_000)return {ok:false,error:{
+      code:"PUSH_TEST_RATE_LIMITED",
+      message:"Test déjà demandé récemment sur cet appareil. Réessaie plus tard.",
+    }};
+    if(!previous.__updateTime)throw Error("Reçu sans version Firestore");
+  }
+  const attemptedAt=new Date(now).toISOString();
+  const receipt={
+    reminderId:"test",occurrenceKey:deviceId,attemptedAt,
+    outcome:"attempted",retryAfter:new Date(now+600_000).toISOString(),
+  };
+  // Précondition atomique Firestore : deux appels concurrents ne peuvent
+  // pas tous les deux réserver le même créneau de dix minutes.
+  await writeDocument(receiptPath,receipt,env,previous
+    ?{updateTime:previous.__updateTime}:{exists:false});
+  const accepted=await fetch(subscription.endpoint,{
+    method:"POST",redirect:"error",cache:"no-store",
+    headers:{
+      "Authorization":"vapid t="+token+", k="+env.VAPID_PUBLIC_KEY,
+      "Content-Encoding":"aes128gcm",
+      "Content-Type":"application/octet-stream",
+      "TTL":"120",
+      "Urgency":"normal",
+    },
+    body:payload,
+  });
+  // Une erreur lors de l'écriture du résultat ne rend jamais la réservation
+  // disponible dans la même fenêtre (sécurité anti-doublon avant confort).
+  await writeDocument(receiptPath,{
+    ...receipt,outcome:accepted.ok?"accepted":"rejected",
+  },env);
+  if(!accepted.ok)return {ok:false,error:{
+    code:"PUSH_PROVIDER_REJECTED",
+    message:"Le fournisseur n'a pas accepté le test de notification.",
+  }};
+  return {ok:true,value:{
+    supported:true,permitted:true,subscribed:true,sent:true,
+    message:"Le fournisseur a accepté le test. Son affichage sur l'iPhone n'est pas garanti.",
   }};
 }
 
