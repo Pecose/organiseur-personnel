@@ -370,7 +370,8 @@ async function encryptWebPush(
     cleanPayload={kind:"reminder",reminderId:payload.reminderId};
   else throw Error("Charge Push interdite");
   const plaintext=codec.encode(JSON.stringify(cleanPayload));
-  if(plaintext.length+1+16>4096)throw Error("Message Push trop volumineux");
+  // RFC8291 : 4096 octets au total, en-tête (86), délimiteur (1), tag (16).
+  if(plaintext.length>3993)throw Error("Message Push trop volumineux");
   const remoteKey=await crypto.subtle.importKey(
     "raw",receiver,{name:"ECDH",namedCurve:"P-256"},false,[],
   );
