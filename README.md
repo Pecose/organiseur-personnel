@@ -54,6 +54,8 @@ Le cache Firestore persistant est **soumis à la confirmation que l'appareil est
 
 **Développement S9B/S7, 5 novembre 2026 :** une transaction Firestore relie désormais la relecture du rappel O06 à la réservation anti-doublon O19 ; les playlists peuvent recevoir, perdre et réordonner des titres et être supprimées sans supprimer les MP3. L'écran « Ma musique » expose ces commandes avec confirmation de suppression. La synchronisation Google fermée, la suppression définitive de médias et les sauvegardes restent à traiter, sans inventer des schémas non approuvés. Tout demeure non testé, sans Cron actif, sans déploiement ni facturation.
 
+**Google Agenda, résolution des conflits (5 novembre 2026) :** l'arbitrage « local / Google / les deux » est préparé dans un commit Firestore atomique avec contrôle des versions et gestion d'une seule liaison Google par événement conservé. Le résultat n'a pas été testé sur Google réel et la synchronisation en application fermée est encore différée. Services et Cron restent inactifs.
+
 Le fichier `tests/security.test.ts` contient le scénario T05 : deux UID distincts, refus de lecture/écriture croisée, blocage des jetons Google et des reçus serveur. Il **n'est pas exécuté automatiquement** et n'utilise **que les émulateurs locaux Firebase**, avec `FIREBASE_EMULATOR_TEST=1`. Un test ignoré ne constitue pas une validation. Aucun paquet Firebase CLI additionnel n'a été ajouté au projet par cet accord.
 
 **Propriétaire :** `Pecose`. Indépendant de tout dépôt `T-C-Umbral`.
