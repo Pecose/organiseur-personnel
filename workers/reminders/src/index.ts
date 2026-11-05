@@ -923,7 +923,7 @@ async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
         ||!current.__updateTime)
         throw Error("Une activité distincte occupe cet identifiant");
     }
-    if(choice==="keepBoth" && destination===localPath){
+    if(choice==="keepBoth" && destination===localPath && local && original){
       // Collision rare : déplacer l'ancienne version locale dans une copie
       // avant de replacer Google au même ID. Deux versions au total, pas trois.
       const copyId="copy_"+randomId();
