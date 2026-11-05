@@ -826,28 +826,67 @@ async function syncGoogleCalendar(uid:string,
   };
 }
 
-/** M113 · La décision d'une personne prime sur les versions concurrentes.
- * En cas d'événement Google non représentable, le conflit reste ouvert.
+/** M113 · Une décision utilisateur = un commit Firestore atomique.
+ * O26 + O31 (et éventuelle copie) sont écrits en un seul lot avec CAS.
+ * Jamais de suppression ou de clonage si le conflit a déjà été résolu.
  */
 async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
   choice:"keepLocal"|"keepGoogle"|"keepBoth",env:WorkerEnv):Promise<void> {
-  if(!/^[a-zA-Z0-9_-]{1,150}$/.test(conflictId)
+  if(!/^[A-Za-z0-9_-]{1,150}$/.test(uid)
+    ||!/^[A-Za-z0-9_-]{1,150}$/.test(conflictId)
     ||!["keepLocal","keepGoogle","keepBoth"].includes(choice))
     throw Error("Décision de conflit invalide");
   const conflictPath="users/"+uid+"/googleCalendarConflicts/"+conflictId;
   const issue=await readDocument(conflictPath,env);
   if(!issue||issue.uid!==uid||issue.status!=="open"
-    ||typeof issue.localEventId!=="string"||typeof issue.googleEventId!=="string")
-    throw Error("Conflit absent ou déjà traité");
+    ||!issue.__updateTime
+    ||typeof issue.localEventId!=="string"
+    ||!(/^[A-Za-z0-9_-]{1,150}$/).test(issue.localEventId)
+    ||typeof issue.googleEventId!=="string"
+    ||!issue.googleEventId||issue.googleEventId.length>512)
+    throw Error("Conflit absent, périmé ou déjà traité");
+
   const localPath="users/"+uid+"/activities/"+issue.localEventId;
   const original=await readDocument(localPath,env);
   const local=original as unknown as Activity|null;
+  if(original && (!original.__updateTime||local?.uid!==uid))
+    throw Error("Version de l'activité indisponible");
+
+  const database="projects/"+env.FIREBASE_PROJECT_ID+"/databases/(default)";
+  const writes:Array<{
+    update:{name:string;fields:Record<string,unknown>};
+    currentDocument:{exists?:boolean;updateTime?:string};
+  }>=[];
+  const endpointPrefix=database+"/documents/";
   if(choice==="keepLocal"){
-    if(!original||!local?.googleLink)throw Error("Aucune liaison locale à pousser");
-    await writeDocument(localPath,{
-      ...local,googleLink:{...local.googleLink,pending:"upsert"},
+    if(!original||!local?.googleLink
+      ||local.googleLink.googleEventId!==issue.googleEventId
+      ||local.googleLink.calendarId!=="primary")
+      throw Error("Aucune liaison locale compatible à conserver");
+    const uri="/calendar/v3/calendars/primary/events/"+
+      encodeURIComponent(issue.googleEventId);
+    // Le choix « local » doit utiliser le dernier ETag Google : l'API
+    // empêchera ainsi un écrasement si Google change après l'arbitrage.
+    const response=await googleRequest(uri,{},uid,env);
+    if(!response.ok)throw Error("Version Google non vérifiable");
+    const remote=await response.json() as {etag?:string;id?:string};
+    if(!remote.etag||remote.id!==issue.googleEventId)
+      throw Error("ETag Google manquant");
+    const replacement:Record<string,unknown>={
+      ...local,googleLink:{
+        ...local.googleLink,etag:remote.etag,pending:"upsert",
+      },
       updatedAt:new Date().toISOString(),
-    },env,original.__updateTime?{updateTime:original.__updateTime}:undefined);
+    };
+    const fields:Record<string,unknown>={};
+    for(const [key,value]of Object.entries(replacement)){
+      if(!key.startsWith("__")&&value!==undefined)
+        fields[key]=firestoreField(value);
+    }
+    writes.push({
+      update:{name:endpointPrefix+localPath,fields},
+      currentDocument:{updateTime:original.__updateTime},
+    });
   }else{
     const uri="/calendar/v3/calendars/primary/events/"+
       encodeURIComponent(issue.googleEventId);
@@ -858,7 +897,8 @@ async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
       calendarId:"primary",eventId:issue.googleEventId,
       etag:typeof remote.etag==="string"?remote.etag:undefined,
       status:remote.status==="cancelled"?"cancelled":"confirmed",
-      updatedAt:typeof remote.updated==="string"?remote.updated:new Date().toISOString(),
+      updatedAt:typeof remote.updated==="string"
+        ?remote.updated:new Date().toISOString(),
       start:remote.start,end:remote.end,recurrence:remote.recurrence,
       payload:{
         summary:typeof remote.summary==="string"?remote.summary:"Sans titre",
@@ -866,22 +906,77 @@ async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
           ?{recurringEventId:remote.recurringEventId}:{}),
       },
     };
-    const mapped=await mapGoogleEvent(change,uid,choice==="keepGoogle"?(local??undefined):undefined);
-    if(!mapped.ok)throw Error("La récurrence doit être réglée manuellement dans Google");
-    if(choice==="keepBoth"&&local&&original){
-      const copyId="copy_"+randomId();
-      await writeDocument("users/"+uid+"/activities/"+copyId,{
-        ...local,id:copyId,googleLink:undefined,updatedAt:new Date().toISOString(),
-      },env,{exists:false});
+    if(choice==="keepBoth"&&!local)
+      throw Error("Deux versions demandées sans événement local");
+    const mapped=await mapGoogleEvent(change,uid,
+      choice==="keepGoogle"?(local??undefined):undefined);
+    if(!mapped.ok)throw Error(
+      "La récurrence ou suppression Google doit être réglée manuellement");
+    const destination="users/"+uid+"/activities/"+mapped.value.id;
+    const current=destination===localPath
+      ?original:await readDocument(destination,env);
+    // Une cible portant déjà un événement différent ne peut être écrasée.
+    if(current && destination!==localPath){
+      const link=current.googleLink as GoogleEventLink|undefined;
+      if(link?.calendarId!=="primary"
+        ||link.googleEventId!==issue.googleEventId
+        ||!current.__updateTime)
+        throw Error("Une activité distincte occupe cet identifiant");
     }
-    const dest="users/"+uid+"/activities/"+mapped.value.id;
-    await writeDocument(dest,mapped.value as unknown as Record<string,unknown>,
-      env,choice==="keepGoogle"&&original?.__updateTime
-        ?{updateTime:original.__updateTime}:undefined);
+    if(choice==="keepBoth" && destination===localPath){
+      // Collision rare : déplacer l'ancienne version locale dans une copie
+      // avant de replacer Google au même ID. Deux versions au total, pas trois.
+      const copyId="copy_"+randomId();
+      const copyFields:Record<string,unknown>={};
+      for(const [key,value]of Object.entries({
+        ...local,id:copyId,googleLink:undefined,
+        updatedAt:new Date().toISOString(),
+      })){
+        if(!key.startsWith("__")&&value!==undefined)
+          copyFields[key]=firestoreField(value);
+      }
+      writes.push({
+        update:{name:endpointPrefix+"users/"+uid+"/activities/"+copyId,
+          fields:copyFields},
+        currentDocument:{exists:false},
+      });
+    }
+    const fields:Record<string,unknown>={};
+    for(const [key,value]of Object.entries(mapped.value)){
+      if(!key.startsWith("__")&&value!==undefined)
+        fields[key]=firestoreField(value);
+    }
+    writes.push({
+      update:{name:endpointPrefix+destination,fields},
+      currentDocument:current?.__updateTime
+        ?{updateTime:current.__updateTime}:{exists:false},
+    });
   }
-  await writeDocument(conflictPath,{
-    ...issue,status:"resolved",
-  },env,issue.__updateTime?{updateTime:issue.__updateTime}:undefined);
+
+  const updatedIssue:Record<string,unknown>={};
+  for(const [key,value]of Object.entries({...issue,status:"resolved"})){
+    if(!key.startsWith("__")&&value!==undefined)
+      updatedIssue[key]=firestoreField(value);
+  }
+  writes.push({
+    update:{name:endpointPrefix+conflictPath,fields:updatedIssue},
+    currentDocument:{updateTime:issue.__updateTime},
+  });
+
+  // Le commit est atomique et ordonné : si un document a changé pendant
+  // l'affichage/lecture distante, aucun des objets n'est écrasé ni copié.
+  const commit=new URL("https://firestore.googleapis.com/v1/"+
+    database+"/documents:commit");
+  const finished=await fetch(commit,{
+    method:"POST",redirect:"error",cache:"no-store",
+    headers:{
+      "Authorization":"Bearer "+await serviceAccessToken(env),
+      "Content-Type":"application/json",
+    },
+    body:JSON.stringify({writes}),
+  });
+  if(!finished.ok)
+    throw Error("Conflit modifié en parallèle : aucune décision appliquée");
 }
 
 /** D25 · Routeur HTTPS à liste blanche, sans UID fourni par le client. */
