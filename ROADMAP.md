@@ -434,6 +434,8 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **État S9 au 4 novembre 2026 : S9A CODAGE AVANCÉ / S9B CLIENT PRÉPARÉ, NON TESTÉS ET NON DÉPLOYÉS.** Contrat HTTP/secret approuvé par D25 et codé dans F37/F45/F46/F38. **Aucune intégration externe n'est opérationnelle** : aucun binding réel configuré, aucun Worker publié, aucun OAuth Google connecté, aucune règle Firestore activée et aucune synchronisation constatée. **Web Push distant reste bloqué explicitement**, car l'encryptage et l'ordonnanceur sûr ne sont pas achevés. Les coûts Cloudflare Workers Free, le statut Google OAuth Testing et les scopes seront vérifiés à la recette D23 avec T05/T07/T10–T14. **0 € impératif ; aucune facturation ou déploiement.**
 
+**S9B, 5 novembre 2026 (code non testé) :** F37 prépare la signature VAPID ES256 et le chiffrement ECDH/HKDF/AES128GCM (RFC8291/8188). M100 prépare le test par appareil avec reçu O19 `test@{deviceId}`, précondition Firestore et délai de dix minutes. `PUSH_TEST_SECURITY_APPROVED=false` interdit toujours tout envoi ; Cron demeure désactivé ; M84–M88 et T07 restent à réaliser. Aucun déploiement ni secret configuré.
+
 ### S10 — Restauration, versionnement et recette finale
 
 **Prérequis : S8 validée et branches S9 livrées ou explicitement différées.**
