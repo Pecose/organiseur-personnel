@@ -18,7 +18,7 @@ import {
   saveChecklistItem, setChecklistItemChecked, deleteChecklist,
 } from "../features/checklists";
 import {
-  listTracks, importAudio, setTrackFavorite, listPlaylists, savePlaylist,
+  listTracks, importAudio, setTrackFavorite, listPlaylists, savePlaylist, deletePlaylist, reorderPlaylist,
 } from "../features/music";
 import {
   playTrack, pausePlayback, nextTrack, previousTrack, setPlaybackMode, setPlaybackQueue,
@@ -779,27 +779,170 @@ export function renderMusic(): void {
     });
   };
   playlistList.textContent = "Chargement des playlists…";
-  void listPlaylists().then(result => {
+  list.textContent = "Chargement des morceaux…";
+  // Une seule lecture de bibliothèque pour la page entière : évite de
+  // multiplier les requêtes lors du classement des playlists.
+  void Promise.all([listPlaylists(), listTracks()]).then(([playlists, tracks]) => {
     if (!root.isConnected || getAppState().route.name !== "music") return;
     playlistList.replaceChildren();
-    if (!result.ok) { playlistList.textContent = result.error.message; return; }
-    if (!result.value.length) { playlistList.textContent = "Aucune playlist créée."; return; }
-    for (const playlist of result.value) {
-      const item = document.createElement("article");
-      item.className = "activity-row";
-      item.textContent = "♫  " + playlist.name + " · " + playlist.trackIds.length + " titres";
-      playlistList.append(item);
-    }
-  }).catch(() => { if (playlistList.isConnected) playlistList.textContent = "Playlists indisponibles."; });
-
-  list.textContent = "Chargement des morceaux…";
-  void listTracks().then(result => {
-    if (!root.isConnected || getAppState().route.name !== "music") return;
     list.replaceChildren();
-    if (!result.ok) { list.textContent = result.error.message; return; }
-    if (!result.value.length) { list.textContent = "Aucun morceau importé sur cet appareil."; return; }
-    setPlaybackQueue(result.value.map(track => track.id));
-    for (const track of result.value) {
+
+    if (!playlists.ok) {
+      playlistList.textContent = playlists.error.message;
+    } else if (!playlists.value.length) {
+      playlistList.textContent = "Aucune playlist créée.";
+    } else {
+      const known = new Map(
+        (tracks.ok ? tracks.value : []).map(track => [track.id, track.title]),
+      );
+      for (const playlist of playlists.value) {
+        const item = document.createElement("article");
+        item.className = "day-section";
+        const title = document.createElement("h4");
+        title.textContent = "♫  " + playlist.name + " · " + playlist.trackIds.length + " titres";
+        item.append(title);
+
+        const removePlaylist = document.createElement("button");
+        removePlaylist.type = "button";
+        removePlaylist.className = "soft-button compact";
+        removePlaylist.textContent = "Supprimer la playlist";
+        removePlaylist.setAttribute("aria-label", "Supprimer la playlist " + playlist.name);
+        removePlaylist.onclick = () => {
+          if (!window.confirm("Supprimer « " + playlist.name +
+            " » ? Les morceaux et leurs fichiers seront conservés.")) return;
+          removePlaylist.disabled = true;
+          void deletePlaylist(playlist.id).then(result => {
+            if (result.ok) renderMusic();
+            else {
+              removePlaylist.disabled = false;
+              feedback.textContent = result.error.message;
+            }
+          }).catch(() => {
+            removePlaylist.disabled = false;
+            feedback.textContent = "Suppression de playlist indisponible.";
+          });
+        };
+        item.append(removePlaylist);
+
+        const entries = document.createElement("div");
+        entries.className = "entry-list";
+        if (!playlist.trackIds.length) {
+          const empty = document.createElement("p");
+          empty.className = "muted";
+          empty.textContent = "Playlist vide. Choisis un morceau ci-dessous.";
+          entries.append(empty);
+        }
+        for (const [index, trackId] of playlist.trackIds.entries()) {
+          const entry = document.createElement("div");
+          entry.className = "activity-row";
+          const name = document.createElement("span");
+          name.className = "activity-details";
+          name.textContent = known.get(trackId) ?? "Morceau indisponible sur cet appareil";
+          entry.append(name);
+          for (const direction of [-1, 1] as const) {
+            const to = index + direction;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "soft-button compact";
+            button.disabled = to < 0 || to >= playlist.trackIds.length;
+            button.textContent = direction < 0 ? "↑" : "↓";
+            button.setAttribute("aria-label", (direction < 0 ? "Monter " : "Descendre ")
+              + (known.get(trackId) ?? trackId));
+            button.onclick = () => {
+              button.disabled = true;
+              const reordered = [...playlist.trackIds];
+              [reordered[index], reordered[to]] = [reordered[to], reordered[index]];
+              void reorderPlaylist(playlist.id, reordered).then(result => {
+                if (result.ok) renderMusic();
+                else {
+                  button.disabled = false;
+                  feedback.textContent = result.error.message;
+                }
+              }).catch(() => {
+                button.disabled = false;
+                feedback.textContent = "Réordonnancement indisponible.";
+              });
+            };
+            entry.append(button);
+          }
+          const unlink = document.createElement("button");
+          unlink.type = "button";
+          unlink.className = "soft-button compact";
+          unlink.textContent = "Retirer";
+          unlink.setAttribute("aria-label", "Retirer " + (known.get(trackId) ?? trackId)
+            + " de la playlist " + playlist.name);
+          unlink.onclick = () => {
+            unlink.disabled = true;
+            void savePlaylist({
+              ...playlist, trackIds:playlist.trackIds.filter(id => id !== trackId),
+            }).then(result => {
+              if (result.ok) renderMusic();
+              else {
+                unlink.disabled = false;
+                feedback.textContent = result.error.message;
+              }
+            }).catch(() => {
+              unlink.disabled = false;
+              feedback.textContent = "Modification de playlist indisponible.";
+            });
+          };
+          entry.append(unlink);
+          entries.append(entry);
+        }
+        item.append(entries);
+
+        if (tracks.ok) {
+          const available = tracks.value.filter(track => !playlist.trackIds.includes(track.id));
+          if (available.length) {
+            const addRow = document.createElement("div");
+            addRow.className = "inline-form";
+            const choice = document.createElement("select");
+            choice.setAttribute("aria-label", "Ajouter un morceau à " + playlist.name);
+            for (const track of available) {
+              const option = document.createElement("option");
+              option.value = track.id;
+              option.textContent = track.title;
+              choice.append(option);
+            }
+            const add = document.createElement("button");
+            add.type = "button";
+            add.className = "soft-button compact";
+            add.textContent = "Ajouter";
+            add.setAttribute("aria-label", "Ajouter à " + playlist.name);
+            add.onclick = () => {
+              if (!choice.value) return;
+              add.disabled = true;
+              void savePlaylist({
+                ...playlist, trackIds:[...playlist.trackIds,choice.value],
+              }).then(result => {
+                if (result.ok) renderMusic();
+                else {
+                  add.disabled = false;
+                  feedback.textContent = result.error.message;
+                }
+              }).catch(() => {
+                add.disabled = false;
+                feedback.textContent = "Ajout à la playlist indisponible.";
+              });
+            };
+            addRow.append(choice,add);
+            item.append(addRow);
+          }
+        }
+        playlistList.append(item);
+      }
+    }
+
+    if (!tracks.ok) {
+      list.textContent = tracks.error.message;
+      return;
+    }
+    if (!tracks.value.length) {
+      list.textContent = "Aucun morceau importé sur cet appareil.";
+      return;
+    }
+    setPlaybackQueue(tracks.value.map(track => track.id));
+    for (const track of tracks.value) {
       const row = document.createElement("article");
       row.className = "activity-row";
       const play = document.createElement("button");
@@ -838,7 +981,10 @@ export function renderMusic(): void {
       row.append(play, name, favorite);
       list.append(row);
     }
-  }).catch(() => { if (list.isConnected) list.textContent = "Bibliothèque indisponible."; });
+  }).catch(() => {
+    if (playlistList.isConnected) playlistList.textContent = "Playlists indisponibles.";
+    if (list.isConnected) list.textContent = "Bibliothèque indisponible.";
+  });
 }
 
 /** M09 · Galerie et import privé, sans rendre publics les fichiers locaux. */
