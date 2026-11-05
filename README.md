@@ -48,6 +48,8 @@ Le cache Firestore persistant est **soumis à la confirmation que l'appareil est
 
 **Dernier lot S9B (5 novembre 2026) :** le Worker inclut maintenant une implémentation préparatoire de VAPID ES256 et du chiffrement Web Push RFC8291, ainsi que le verrou Firestore destiné à éviter les tests de notification répétés. **Les notifications distantes restent désactivées dans le code**, et aucun test, Cron, déploiement, secret ni coût n'a été engagé.
 
+**S9B, moteur Cron du 5 novembre 2026 :** les fonctions M84–M88 sont préparées dans le Worker pour sélectionner les rappels, les réserver avec un reçu Firestore anti-doublon, envoyer un Web Push chiffré et journaliser le résultat. Le scan est borné à 80 rappels au total et trois candidats par passage. Les notifications restent **totalement désactivées dans le code** (`CRON_SECURITY_APPROVED=false`), sans déploiement, secret ou facturation ; leur sécurité et compatibilité iPhone doivent être éprouvées pendant la recette finale.
+
 Le fichier `tests/security.test.ts` contient le scénario T05 : deux UID distincts, refus de lecture/écriture croisée, blocage des jetons Google et des reçus serveur. Il **n'est pas exécuté automatiquement** et n'utilise **que les émulateurs locaux Firebase**, avec `FIREBASE_EMULATOR_TEST=1`. Un test ignoré ne constitue pas une validation. Aucun paquet Firebase CLI additionnel n'a été ajouté au projet par cet accord.
 
 **Propriétaire :** `Pecose`. Indépendant de tout dépôt `T-C-Umbral`.
