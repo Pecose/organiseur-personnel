@@ -6,7 +6,7 @@ import type {
   Activity, CalendarSyncConflict, CalendarSyncRun, GoogleCalendarChange,
   GoogleCalendarSyncError, GoogleEventLink, GoogleSyncCursor, Reminder,
   PushSubscriptionRecord, NotificationTestResult, DispatchSummary,
-  ReminderDispatchCandidate, PushDeliveryResult,
+  ReminderDispatchCandidate, PushDeliveryResult, PushPayload,
 } from "../../../src/domain/types";
 
 /** M118 · Parser uniquement le statut HTTP et une catégorie contrôlée.
@@ -305,6 +305,118 @@ async function listDocuments(path:string,env:WorkerEnv):Promise<RecordDoc[]> {
     cursor=data.nextPageToken;
   }
   throw Error("Pagination au-delà du budget sécurisé de cette opération");
+}
+
+/** M87 / D25 · Signature VAPID ES256, jamais exposée au navigateur.
+ * Le JWT autorise seulement l'origine du fournisseur Push désigné.
+ * Ne déclenche aucun envoi : l'ordonnanceur et M100 restent bloqués.
+ */
+async function createVapidJWT(endpoint:string,env:WorkerEnv):Promise<string> {
+  const target=new URL(endpoint);
+  const trusted=new Set([
+    "web.push.apple.com",
+    "fcm.googleapis.com",
+    "updates.push.services.mozilla.com",
+  ]);
+  if(target.protocol!=="https:" || !trusted.has(target.hostname)
+    || target.port || target.username || target.password || target.hash
+    || target.pathname.length<2 || endpoint.length>2200)
+    throw Error("Fournisseur Web Push non autorisé");
+  const contact=env.VAPID_CONTACT;
+  if(!contact || contact.length>200 ||
+    !(/^mailto:[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)
+      || /^https:\/\/[a-zA-Z0-9.-]+\/[^\s]*$/.test(contact)))
+    throw Error("Contact VAPID non configuré");
+  const pub=unb64(env.VAPID_PUBLIC_KEY??"");
+  if(pub.length!==65 || pub[0]!==4)
+    throw Error("Clé publique VAPID invalide");
+  const privateKey=await crypto.subtle.importKey(
+    "pkcs8",unb64(env.VAPID_PRIVATE_KEY??""),
+    {name:"ECDSA",namedCurve:"P-256"},false,["sign"],
+  );
+  const now=Math.floor(Date.now()/1000);
+  const header=b64url(codec.encode(JSON.stringify({typ:"JWT",alg:"ES256"})));
+  const claims=b64url(codec.encode(JSON.stringify({
+    aud:target.origin,exp:now+3600,sub:contact,
+  })));
+  const body=header+"."+claims;
+  // WebCrypto ECDSA produit la signature IEEE P1363 r||s attendue par ES256.
+  const signature=new Uint8Array(await crypto.subtle.sign(
+    {name:"ECDSA",hash:"SHA-256"},privateKey,codec.encode(body),
+  ));
+  if(signature.length!==64)throw Error("Signature VAPID inattendue");
+  return body+"."+b64url(signature);
+}
+
+/** M87 / RFC8291 + RFC8188 · Chiffrement AES128GCM Web Push.
+ * Le contenu reste minimal (test ou identifiant de rappel) ; aucune donnée
+ * d'agenda ni clé privée ne passe dans la réponse au navigateur.
+ * Une unique trame finale de 4096 octets maximum est construite.
+ */
+async function encryptWebPush(
+  payload:PushPayload,subscription:PushSubscriptionRecord,
+):Promise<Uint8Array> {
+  if(!subscription || typeof subscription.p256dh!=="string"
+    || typeof subscription.auth!=="string")throw Error("Abonnement incomplet");
+  const receiver=unb64(subscription.p256dh);
+  const auth=unb64(subscription.auth);
+  if(receiver.length!==65 || receiver[0]!==4 || auth.length!==16)
+    throw Error("Clés d'abonnement invalides");
+  let cleanPayload:PushPayload;
+  if(payload.kind==="test")cleanPayload={kind:"test"};
+  else if(payload.kind==="reminder" &&
+    typeof payload.reminderId==="string" &&
+    /^[a-zA-Z0-9_-]{1,150}$/.test(payload.reminderId))
+    cleanPayload={kind:"reminder",reminderId:payload.reminderId};
+  else throw Error("Charge Push interdite");
+  const plaintext=codec.encode(JSON.stringify(cleanPayload));
+  if(plaintext.length+1+16>4096)throw Error("Message Push trop volumineux");
+  const remoteKey=await crypto.subtle.importKey(
+    "raw",receiver,{name:"ECDH",namedCurve:"P-256"},false,[],
+  );
+  const localKey=await crypto.subtle.generateKey(
+    {name:"ECDH",namedCurve:"P-256"},true,["deriveBits"],
+  );
+  const sender=new Uint8Array(await crypto.subtle.exportKey("raw",localKey.publicKey));
+  if(sender.length!==65 || sender[0]!==4)throw Error("Clé ECDH invalide");
+  const secret=new Uint8Array(await crypto.subtle.deriveBits(
+    {name:"ECDH",public:remoteKey},localKey.privateKey,256,
+  ));
+  // RFC8291 : HKDF-Extract(auth_secret, ECDH) puis
+  // HKDF-Expand(PRK, "WebPush: info\0" || ua_public || as_public, 32).
+  const keyInfo=new Uint8Array(codec.encode("WebPush: info\0").length+
+    receiver.length+sender.length);
+  keyInfo.set(codec.encode("WebPush: info\0"));
+  keyInfo.set(receiver,codec.encode("WebPush: info\0").length);
+  keyInfo.set(sender,codec.encode("WebPush: info\0").length+receiver.length);
+  const initial=await crypto.subtle.importKey("raw",secret,"HKDF",false,["deriveBits"]);
+  const ikm=new Uint8Array(await crypto.subtle.deriveBits({
+    name:"HKDF",hash:"SHA-256",salt:auth,info:keyInfo,
+  },initial,256));
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const material=await crypto.subtle.importKey("raw",ikm,"HKDF",false,["deriveBits"]);
+  const cek=new Uint8Array(await crypto.subtle.deriveBits({
+    name:"HKDF",hash:"SHA-256",salt,
+    info:codec.encode("Content-Encoding: aes128gcm\0"),
+  },material,128));
+  const nonce=new Uint8Array(await crypto.subtle.deriveBits({
+    name:"HKDF",hash:"SHA-256",salt,
+    info:codec.encode("Content-Encoding: nonce\0"),
+  },material,96));
+  const padded=new Uint8Array(plaintext.length+1);
+  padded.set(plaintext);padded[padded.length-1]=2; // RFC8188 : fin du record.
+  const aes=await crypto.subtle.importKey("raw",cek,"AES-GCM",false,["encrypt"]);
+  const sealed=new Uint8Array(await crypto.subtle.encrypt(
+    {name:"AES-GCM",iv:nonce,tagLength:128},aes,padded,
+  ));
+  // RFC8188 : salt(16) + rs(4 BE) + idlen(1) + keyid(65) + ciphertext.
+  const output=new Uint8Array(21+sender.length+sealed.length);
+  output.set(salt);
+  new DataView(output.buffer).setUint32(16,4096,false);
+  output[20]=sender.length;
+  output.set(sender,21);
+  output.set(sealed,21+sender.length);
+  return output;
 }
 
 /** D25 / O27 · Grant chiffré AES-256-GCM, UID lié cryptographiquement. */
