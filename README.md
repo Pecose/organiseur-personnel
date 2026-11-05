@@ -50,6 +50,8 @@ Le cache Firestore persistant est **soumis à la confirmation que l'appareil est
 
 **S9B, moteur Cron du 5 novembre 2026 :** les fonctions M84–M88 sont préparées dans le Worker pour sélectionner les rappels, les réserver avec un reçu Firestore anti-doublon, envoyer un Web Push chiffré et journaliser le résultat. Le scan est borné à 80 rappels au total et trois candidats par passage. Les notifications restent **totalement désactivées dans le code** (`CRON_SECURITY_APPROVED=false`), sans déploiement, secret ou facturation ; leur sécurité et compatibilité iPhone doivent être éprouvées pendant la recette finale.
 
+**Durcissement S9 (5 novembre 2026) :** relecture des rappels et abonnements avant Push, précondition de version sur le reçu du test et sur le curseur Google Agenda pour limiter les écrasements concurrents. Ces garde-fous ne garantissent pas encore une transaction atomique entre l'annulation d'un rappel et son envoi. Le développement de M114 (Google Agenda en PWA fermée) reste différé ; aucune permission, facturation, activation ni recette finale n'a été engagée.
+
 Le fichier `tests/security.test.ts` contient le scénario T05 : deux UID distincts, refus de lecture/écriture croisée, blocage des jetons Google et des reçus serveur. Il **n'est pas exécuté automatiquement** et n'utilise **que les émulateurs locaux Firebase**, avec `FIREBASE_EMULATOR_TEST=1`. Un test ignoré ne constitue pas une validation. Aucun paquet Firebase CLI additionnel n'a été ajouté au projet par cet accord.
 
 **Propriétaire :** `Pecose`. Indépendant de tout dépôt `T-C-Umbral`.
