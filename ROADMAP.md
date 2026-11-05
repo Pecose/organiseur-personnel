@@ -436,6 +436,8 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **S9B, 5 novembre 2026 (code non testé) :** F37 prépare la signature VAPID ES256 et le chiffrement ECDH/HKDF/AES128GCM (RFC8291/8188). M100 prépare le test par appareil avec reçu O19 `test@{deviceId}`, précondition Firestore et délai de dix minutes. `PUSH_TEST_SECURITY_APPROVED=false` interdit toujours tout envoi ; Cron demeure désactivé ; M84–M88 et T07 restent à réaliser. Aucun déploiement ni secret configuré.
 
+**S9B, deuxième progression du 5 novembre 2026 (code préparatoire, non testé) :** F37 contient désormais M84–M88 dans le Worker : recherche des O06 par requête de groupe Firestore non filtrée et bornée (80 documents maximum, arrêt si saturation), sélection de trois candidats au plus par passage, relecture du rappel et verrou O19 avec précondition atomique, envoi chiffré aux abonnements O14, puis reçu d'envoi. Les issues de transport ambiguës ne provoquent aucune répétition automatique ; une réponse HTTP acceptée par le fournisseur n'est pas une preuve d'affichage iOS. **`CRON_SECURITY_APPROVED=false` interdit toute exécution réelle**, même si `ENABLE_CRON` est défini ; aucun déclencheur F38 n'est actif. Le scan borné, le coût Cloudflare Free, l'annulation concurrente, les statuts et la délivrabilité doivent être vérifiés lors de la recette T05/T07. S9 reste **non opérationnelle** sans secrets/configuration/recette, et aucun paiement ou déploiement n'a eu lieu.
+
 ### S10 — Restauration, versionnement et recette finale
 
 **Prérequis : S8 validée et branches S9 livrées ou explicitement différées.**
