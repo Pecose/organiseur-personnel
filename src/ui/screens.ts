@@ -792,8 +792,8 @@ export function renderMusic(): void {
     } else if (!playlists.value.length) {
       playlistList.textContent = "Aucune playlist créée.";
     } else {
-      const known = new Map(
-        (tracks.ok ? tracks.value : []).map(track => [track.id, track.title]),
+      const known = new Map<string, string>(
+        (tracks.ok ? tracks.value : []).map(track => [track.id, track.title] as const),
       );
       for (const playlist of playlists.value) {
         const item = document.createElement("article");
