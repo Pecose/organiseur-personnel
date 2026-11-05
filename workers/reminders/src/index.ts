@@ -811,7 +811,10 @@ async function syncGoogleCalendar(uid:string,
     ...(gathered.token?{nextSyncToken:gathered.token}:{}),
     ...(cursor.nextSyncToken?{}:{lastFullSyncAt:finishedAt}),
     lastIncrementalSyncAt:finishedAt,
-  },env);
+  },env,cursorDoc?.__updateTime
+    ?{updateTime:cursorDoc.__updateTime}:{exists:false});
+  // Précondition optimiste sur O25 : une autre synchronisation ayant avancé
+  // le curseur interdit toute écriture d'un état périmé (pas de rollback).
   await writeDocument("users/"+uid+"/googleCalendarConnection/status",{
     uid,calendarId:"primary",status:"active",lastSyncAt:finishedAt,
   },env);
