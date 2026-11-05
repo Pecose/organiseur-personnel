@@ -442,6 +442,8 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 **Avancement de développement du 5 novembre 2026, sans tests D23 :** F37/M86 réserve désormais les reçus O19 dans une transaction Firestore après lecture de O06, de sorte qu'une modification intervenue pendant le claim invalide la transaction. Ce n'est pas une garantie d'annulation après commit ou envoi externe. F24 ajoute M92 (supprimer une playlist en gardant toutes les pistes/fichiers) et M94 (réordonner seulement les membres existants). F19/M08 propose les commandes correspondantes et ajoute/retire des titres via M55. **M93/M49/M69**, les décors M96–M98, les sauvegardes S10 et M114 restent incomplets ; schémas `BackupScope`, `RestoreReport`, `CropRect`, `DecorLayer` à préciser dans le registre avant tout code les utilisant. `CRON_SECURITY_APPROVED=false`, `PUSH_TEST_SECURITY_APPROVED=false`, aucun déploiement ou recette. Sécurité, coût réel et compilations à vérifier à la fin.
 
+**S9A, progression du 5 novembre 2026 (code non testé) :** M113 inscrit désormais la résolution d'un conflit O26 et les mutations O31 dans un même commit Firestore conditionnel, afin d'éviter les décisions à moitié appliquées. `keepBoth` n'ajoute plus un doublon supplémentaire et conserve une unique liaison Google en détachant la version locale si nécessaire ; `keepLocal` relit le dernier ETag. Les synchronisations multi-utilisateurs fermées M114, limites OAuth/quotas et cas Google complexes restent à traiter. Aucun Google Agenda réel connecté, aucun test ni déploiement.
+
 ### S10 — Restauration, versionnement et recette finale
 
 **Prérequis : S8 validée et branches S9 livrées ou explicitement différées.**
