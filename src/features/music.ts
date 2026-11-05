@@ -4,7 +4,7 @@
  */
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { fetchCloudRecords, putCloudRecord } from "../services/cloudRepository";
+import { fetchCloudRecords, putCloudRecord, removeCloudRecord } from "../services/cloudRepository";
 import { storeMedia } from "../storage/mediaDb";
 import { loadBundledCatalog } from "../storage/catalog";
 import type { Playlist, Result, TrackMetadata } from "../domain/types";
@@ -168,4 +168,70 @@ export async function setTrackFavorite(
   return await saveTrackMetadata({
     ...original, favorite, updatedAt: new Date().toISOString(),
   });
+}
+
+
+/** M92 · Supprimer seulement la liste O09, jamais les fichiers ni O08.
+ * La confirmation est réalisée par l'écran appelant avant cette opération.
+ */
+export async function deletePlaylist(playlistId: string): Promise<Result<void>> {
+  if (typeof playlistId !== "string"
+    || !/^[A-Za-z0-9_-]{1,150}$/.test(playlistId)) {
+    return {ok: false, error: {
+      code: "INVALID_PLAYLIST", message: "Identifiant de playlist invalide.",
+    }};
+  }
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user) return {ok: false, error: {
+      code: "AUTH_REQUIRED", message: "Connexion requise pour supprimer une playlist.",
+    }};
+    const existing = await listPlaylists();
+    if (!existing.ok) return existing;
+    if (!existing.value.some(item => item.id === playlistId)) {
+      return {ok: false, error: {
+        code: "PLAYLIST_NOT_FOUND", message: "Playlist introuvable.",
+      }};
+    }
+    return await removeCloudRecord(user.uid, "playlists", playlistId);
+  } catch {
+    return {ok: false, error: {
+      code: "DELETE_PLAYLIST_FAILED", message: "Suppression de playlist indisponible.",
+    }};
+  }
+}
+
+/** M94 · Réordonner O09 uniquement, sans ajout ou retrait accidentel.
+ * Les références des fichiers personnels manquants sont conservées :
+ * l'absence d'un Blob sur ce téléphone n'efface pas le morceau du compte.
+ */
+export async function reorderPlaylist(
+  playlistId: string, trackIds: string[],
+): Promise<Result<void>> {
+  if (typeof playlistId !== "string"
+    || !/^[A-Za-z0-9_-]{1,150}$/.test(playlistId)
+    || !Array.isArray(trackIds) || trackIds.length > 500
+    || trackIds.some(id => typeof id !== "string" || !id || id.includes("/"))
+    || new Set(trackIds).size !== trackIds.length) {
+    return {ok: false, error: {
+      code: "INVALID_PLAYLIST_ORDER", message: "Ordre de playlist invalide.",
+    }};
+  }
+  const data = await listPlaylists();
+  if (!data.ok) return data;
+  const playlist = data.value.find(item => item.id === playlistId);
+  if (!playlist) return {ok: false, error: {
+    code: "PLAYLIST_NOT_FOUND", message: "Playlist introuvable.",
+  }};
+  if (trackIds.length !== playlist.trackIds.length
+    || trackIds.some(id => !playlist.trackIds.includes(id))) {
+    return {ok: false, error: {
+      code: "PLAYLIST_MEMBERSHIP_CHANGED",
+      message: "Réordonner ne doit ni ajouter ni retirer de morceaux.",
+    }};
+  }
+  if (trackIds.every((id, index) => id === playlist.trackIds[index])) {
+    return {ok: true, value: undefined};
+  }
+  return savePlaylist({...playlist, trackIds});
 }
