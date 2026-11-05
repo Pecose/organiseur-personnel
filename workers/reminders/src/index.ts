@@ -1101,6 +1101,23 @@ async function handlePushTestRequest(
   // pas tous les deux réserver le même créneau de dix minutes.
   await writeDocument(receiptPath,receipt,env,previous
     ?{updateTime:previous.__updateTime}:{exists:false});
+  const claim=await readDocument(receiptPath,env);
+  if(!claim||!claim.__updateTime
+    ||claim.reminderId!=="test" ||claim.occurrenceKey!==deviceId
+    ||claim.attemptedAt!==attemptedAt)
+    throw Error("Réservation de test Push non confirmée");
+  // Le retrait depuis ce téléphone est prioritaire : abonnement revérifié
+  // juste avant l'appel au fournisseur, après la signature/chiffrement.
+  const live=await readDocument(
+    "users/"+uid+"/pushSubscriptions/"+deviceId,env);
+  if(!live ||live.id!==deviceId
+    ||live.endpoint!==subscription.endpoint
+    ||live.p256dh!==subscription.p256dh
+    ||live.auth!==subscription.auth)
+    return {ok:false,error:{
+      code:"PUSH_DEVICE_NOT_FOUND",
+      message:"Cet appareil n'est plus abonné. Aucun test envoyé.",
+    }};
   const accepted=await fetch(subscription.endpoint,{
     method:"POST",redirect:"error",cache:"no-store",
     headers:{
@@ -1116,7 +1133,7 @@ async function handlePushTestRequest(
   // disponible dans la même fenêtre (sécurité anti-doublon avant confort).
   await writeDocument(receiptPath,{
     ...receipt,outcome:accepted.ok?"accepted":"rejected",
-  },env);
+  },env,{updateTime:claim.__updateTime});
   if(!accepted.ok)return {ok:false,error:{
     code:"PUSH_PROVIDER_REJECTED",
     message:"Le fournisseur n'a pas accepté le test de notification.",
