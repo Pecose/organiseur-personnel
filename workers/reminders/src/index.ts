@@ -1291,6 +1291,27 @@ async function handleWorkerCron(now:string,env:WorkerEnv):Promise<void> {
     let mayRetry=false;
     for(const subscription of candidate.subscriptions){
       try{
+        // M87 : après le claim O19, relire le rappel ET l'abonnement
+        // juste avant le réseau. Un rappel supprimé, déplacé ou désactivé
+        // entre M86 et M87 ne doit pas être envoyé à partir d'un snapshot.
+        const fresh=await readDocument(
+          "users/"+candidate.uid+"/reminders/"+candidate.reminder.id,env);
+        if(!fresh || fresh.enabled!==true
+          || fresh.dispatchStatus==="cancelled" || fresh.dispatchStatus==="sent"
+          || fresh.activityId!==candidate.reminder.activityId
+          || fresh.occurrenceKey!==candidate.reminder.occurrenceKey
+          || fresh.scheduledFor!==candidate.reminder.scheduledFor
+          || fresh.leadMinutes!==candidate.reminder.leadMinutes){
+          return {ok:true,value:{
+            ok:accepted>0,status:accepted>0?202:0,retryable:false,
+          }};
+        }
+        const liveDevice=await readDocument(
+          "users/"+candidate.uid+"/pushSubscriptions/"+subscription.id,env);
+        if(!liveDevice || liveDevice.id!==subscription.id
+          || liveDevice.endpoint!==subscription.endpoint
+          || liveDevice.p256dh!==subscription.p256dh
+          || liveDevice.auth!==subscription.auth)continue;
         const token=await createVapidJWT(subscription.endpoint,env);
         const message=await encryptWebPush({
           kind:"reminder",reminderId:candidate.reminder.id,
