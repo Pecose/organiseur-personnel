@@ -1260,8 +1260,7 @@ async function handleWorkerCron(now:string,env:WorkerEnv):Promise<void> {
       || !/^[A-Za-z0-9_-]{1,150}$/.test(reminder.id)
       || !/^[A-Za-z0-9_-]{1,150}@\d{4}-\d{2}-\d{2}$/.test(reminder.occurrenceKey)
       || !/^[A-Za-z0-9_-]{1,150}$/.test(reminder.activityId)
-      || reminder.occurrenceKey!==reminder.activityId+"@"+
-        reminder.occurrenceKey.slice(reminder.activityId.length+1))
+      || !reminder.occurrenceKey.startsWith(reminder.activityId+"@"))
       return {ok:false,error:{code:"INVALID_REMINDER",
         message:"Identifiants de rappel invalides."}};
     const receiptPath="users/"+uid+"/dispatchReceipts/"+
@@ -1304,9 +1303,11 @@ async function handleWorkerCron(now:string,env:WorkerEnv):Promise<void> {
         ||fresh.leadMinutes!==reminder.leadMinutes)
         return {ok:true,value:false};
       const when=Date.parse(String(fresh.scheduledFor));
-      if(!Number.isFinite(when)||!Number.isSafeInteger(fresh.leadMinutes)
-        || fresh.leadMinutes<0 || fresh.leadMinutes>10080
-        ||when-Number(fresh.leadMinutes)*60_000>Date.parse(now))
+      const leadMinutes=typeof fresh.leadMinutes==="number"
+        ?fresh.leadMinutes:NaN;
+      if(!Number.isFinite(when)||!Number.isSafeInteger(leadMinutes)
+        || leadMinutes<0 || leadMinutes>10080
+        ||when-leadMinutes*60_000>Date.parse(now))
         return {ok:true,value:false};
 
       const receiptUrl=firestoreUrl(receiptPath,env);
