@@ -6,7 +6,7 @@ import type {
   Activity, CalendarSyncConflict, CalendarSyncRun, GoogleCalendarChange,
   GoogleCalendarSyncError, GoogleEventLink, GoogleSyncCursor, Reminder,
   PushSubscriptionRecord, NotificationTestResult, DispatchSummary,
-  ReminderDispatchCandidate, PushDeliveryResult, PushPayload,
+  ReminderDispatchCandidate, PushDeliveryResult, PushPayload, Result,
 } from "../../../src/domain/types";
 
 /** M118 · Parser uniquement le statut HTTP et une catégorie contrôlée.
@@ -1124,6 +1124,271 @@ async function handlePushTestRequest(
   }};
 }
 
+/** M84–M88 · S9B / D25 : moteur de rappels préparé mais INACTIF.
+ * Aucun envoi tant que T05/T07 et les vérifications de quotas ne sont pas
+ * terminés. La lecture de collection group sans filtre évite un index
+ * supplémentaire : plafond strict de 80 rappels, sinon erreur fermée.
+ */
+const CRON_SECURITY_APPROVED=false;
+async function handleWorkerCron(now:string,env:WorkerEnv):Promise<void> {
+  // Cette double barrière protège même si un Cron était publié par erreur.
+  if(!CRON_SECURITY_APPROVED || env.ENABLE_CRON!=="true")
+    throw Error("CRON_NOT_VALIDATED");
+
+  /** M85 : accès serveur, jamais de liste d'UID fournie par le navigateur.
+   * Le query group non filtré se limite à 81 documents (81e = saturation).
+   * Ne jamais traiter un sous-ensemble arbitraire comme complet à la limite.
+   */
+  async function fetchDueReminders(
+    current:string,
+  ):Promise<Result<ReminderDispatchCandidate[]>> {
+    const timestamp=Date.parse(current);
+    if(!Number.isFinite(timestamp))return {ok:false,error:{
+      code:"INVALID_INSTANT",message:"Date Cron invalide.",
+    }};
+    try {
+      const url=new URL("https://firestore.googleapis.com/v1/projects/"+
+        encodeURIComponent(env.FIREBASE_PROJECT_ID)+
+        "/databases/(default)/documents:runQuery");
+      const response=await fetch(url,{
+        method:"POST",
+        headers:{
+          "Authorization":"Bearer "+await serviceAccessToken(env),
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({structuredQuery:{
+          from:[{collectionId:"reminders",allDescendants:true}],
+          limit:81,
+        }}),
+        redirect:"error",cache:"no-store",
+      });
+      if(!response.ok)throw Error("Lecture Firestore refusée");
+      const raw:unknown=await response.json();
+      if(!Array.isArray(raw))throw Error("Format Firestore inattendu");
+      const found=raw.filter(entry=>entry&&typeof entry==="object"
+        &&"document" in entry).map(entry=>
+          unpackDocument((entry as {document:unknown}).document));
+      if(found.length>80)return {ok:false,error:{
+        code:"REMINDER_SCAN_LIMIT",
+        message:"Trop de rappels : arrêt sécurisé de la collecte.",
+      }};
+      const due:{uid:string;reminder:Reminder;dueAt:number}[]=[];
+      for(const document of found){
+        const name=document.__name??"";
+        const match=/\/documents\/users\/([A-Za-z0-9_-]{1,128})\/reminders\/([A-Za-z0-9_-]{1,150})$/.exec(name);
+        if(!match || document.id!==match[2])continue;
+        const item=document as unknown as Reminder;
+        const when=Date.parse(item.scheduledFor);
+        if(!item.enabled || item.dispatchStatus==="sent"
+          || item.dispatchStatus==="cancelled"
+          || !Number.isFinite(when)
+          || !Number.isSafeInteger(item.leadMinutes)
+          || item.leadMinutes<0 || item.leadMinutes>10080
+          || typeof item.activityId!=="string"
+          || !/^[A-Za-z0-9_-]{1,150}$/.test(item.activityId)
+          || typeof item.occurrenceKey!=="string"
+          || !/^[A-Za-z0-9_-]{1,150}@\d{4}-\d{2}-\d{2}$/.test(item.occurrenceKey)
+          || !item.occurrenceKey.startsWith(item.activityId+"@"))continue;
+        const dueAt=when-item.leadMinutes*60_000;
+        if(dueAt<=timestamp)due.push({uid:match[1],reminder:item,dueAt});
+      }
+      due.sort((a,b)=>a.dueAt-b.dueAt||a.reminder.id.localeCompare(b.reminder.id));
+      const candidates:ReminderDispatchCandidate[]=[];
+      // Limite par Cron compatible avec les budgets de requêtes gratuits.
+      for(const entry of due){
+        if(candidates.length>=3)break;
+        const subscriptions=await listDocuments(
+          "users/"+entry.uid+"/pushSubscriptions",env);
+        if(subscriptions.length>4)return {ok:false,error:{
+          code:"PUSH_DEVICE_LIMIT",
+          message:"Trop d'appareils abonnés : aucun envoi lancé.",
+        }};
+        const devices:PushSubscriptionRecord[]=[];
+        for(const rawDevice of subscriptions){
+          if(typeof rawDevice.id!=="string"
+            || !/^[A-Za-z0-9_-]{1,150}$/.test(rawDevice.id)
+            || typeof rawDevice.endpoint!=="string"
+            || typeof rawDevice.p256dh!=="string"
+            || typeof rawDevice.auth!=="string")continue;
+          devices.push({
+            id:rawDevice.id,endpoint:rawDevice.endpoint,
+            p256dh:rawDevice.p256dh,auth:rawDevice.auth,
+            updatedAt:String(rawDevice.updatedAt??""),
+          });
+        }
+        if(devices.length)candidates.push({
+          uid:entry.uid,reminder:entry.reminder,subscriptions:devices,
+        });
+      }
+      return {ok:true,value:candidates};
+    }catch{return {ok:false,error:{
+      code:"REMINDER_SCAN_FAILED",
+      message:"Collecte des rappels non confirmée.",
+    }};}
+  }
+
+  /** M86 : idempotence par occurrence, création atomique O19.
+   * Un reçu existant n'est pas relancé, même si l'acceptation du fournisseur
+   * est inconnue. Pas de double envoi après timeout ou crash Worker.
+   */
+  async function claimReminderOccurrence(
+    candidate:ReminderDispatchCandidate,
+  ):Promise<Result<boolean>> {
+    const {uid,reminder}=candidate;
+    if(!/^[A-Za-z0-9_-]{1,128}$/.test(uid)
+      || !/^[A-Za-z0-9_-]{1,150}$/.test(reminder.id)
+      || !/^[A-Za-z0-9_-]{1,150}@\d{4}-\d{2}-\d{2}$/.test(reminder.occurrenceKey))
+      return {ok:false,error:{code:"INVALID_REMINDER",
+        message:"Identifiants de rappel invalides."}};
+    try{
+      // Relecture au dernier moment pour éviter un rappel déjà désactivé.
+      const fresh=await readDocument("users/"+uid+"/reminders/"+reminder.id,env);
+      if(!fresh||fresh.enabled!==true ||fresh.dispatchStatus==="cancelled"
+        ||fresh.dispatchStatus==="sent"
+        ||fresh.occurrenceKey!==reminder.occurrenceKey
+        ||fresh.scheduledFor!==reminder.scheduledFor
+        ||fresh.leadMinutes!==reminder.leadMinutes)
+        return {ok:true,value:false};
+      const when=Date.parse(String(fresh.scheduledFor));
+      if(!Number.isFinite(when)||!Number.isSafeInteger(fresh.leadMinutes)
+        || when-Number(fresh.leadMinutes)*60_000>Date.parse(now))
+        return {ok:true,value:false};
+      const receiptPath="users/"+uid+"/dispatchReceipts/"+
+        reminder.id+"@"+reminder.occurrenceKey;
+      try {
+        await writeDocument(receiptPath,{
+          reminderId:reminder.id,occurrenceKey:reminder.occurrenceKey,
+          attemptedAt:new Date().toISOString(),outcome:"attempted",
+        },env,{exists:false});
+        return {ok:true,value:true};
+      }catch{
+        // Une contention se distingue d'une panne serveur par relecture.
+        if(await readDocument(receiptPath,env))
+          return {ok:true,value:false};
+        throw Error("Réservation non confirmée");
+      }
+    }catch{return {ok:false,error:{
+      code:"REMINDER_CLAIM_FAILED",
+      message:"Réservation atomique du rappel non confirmée.",
+    }};}
+  }
+
+  /** M87 : uniquement des endpoints Push HTTPS approuvés par VAPID.
+   * Accepter au moins un appareil => aucune relance automatique globale.
+   */
+  async function sendWebPush(
+    candidate:ReminderDispatchCandidate,
+  ):Promise<Result<PushDeliveryResult>> {
+    if(!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY
+      || !env.VAPID_CONTACT
+      || candidate.subscriptions.length<1
+      || candidate.subscriptions.length>4)return {ok:false,error:{
+        code:"PUSH_NOT_CONFIGURED",
+        message:"Envoi Web Push non configuré ou nombre d'appareils invalide.",
+      }};
+    let accepted=0;
+    let lastStatus=0;
+    let mayRetry=false;
+    for(const subscription of candidate.subscriptions){
+      try{
+        const token=await createVapidJWT(subscription.endpoint,env);
+        const message=await encryptWebPush({
+          kind:"reminder",reminderId:candidate.reminder.id,
+        },subscription);
+        const response=await fetch(subscription.endpoint,{
+          method:"POST",redirect:"error",cache:"no-store",
+          headers:{
+            "Authorization":"vapid t="+token+", k="+env.VAPID_PUBLIC_KEY,
+            "Content-Encoding":"aes128gcm",
+            "Content-Type":"application/octet-stream",
+            "TTL":"300",
+            "Urgency":"normal",
+          },body:message,
+        });
+        lastStatus=response.status;
+        if(response.ok)accepted++;
+        else if(response.status===429||response.status>=500)mayRetry=true;
+      }catch{
+        // Le fournisseur a peut-être accepté l'envoi avant la coupure.
+        // Ne pas retenter aveuglément une issue réseau ambiguë.
+        lastStatus=0;
+      }
+    }
+    return {ok:true,value:{
+      ok:accepted>0,status:accepted>0?202:lastStatus,
+      retryable:accepted===0 && mayRetry,
+    }};
+  }
+
+  /** M88 : le reçu initial reste présent en cas de panne.
+   * Le résultat ne peut modifier que l'occurrence réclamée par ce Worker.
+   */
+  async function recordDispatchResult(
+    candidate:ReminderDispatchCandidate,result:PushDeliveryResult,
+  ):Promise<Result<void>> {
+    const receiptPath="users/"+candidate.uid+"/dispatchReceipts/"+
+      candidate.reminder.id+"@"+candidate.reminder.occurrenceKey;
+    try{
+      const receipt=await readDocument(receiptPath,env);
+      if(!receipt||!receipt.__updateTime
+        ||receipt.reminderId!==candidate.reminder.id
+        ||receipt.occurrenceKey!==candidate.reminder.occurrenceKey
+        ||receipt.outcome!=="attempted")
+        return {ok:false,error:{
+          code:"DISPATCH_RECEIPT_INVALID",
+          message:"Reçu d'envoi absent, périmé ou déjà finalisé.",
+        }};
+      await writeDocument(receiptPath,{
+        reminderId:candidate.reminder.id,
+        occurrenceKey:candidate.reminder.occurrenceKey,
+        attemptedAt:receipt.attemptedAt,
+        outcome:result.ok?"accepted":"failed",
+        ...(result.retryable
+          ?{retryAfter:new Date(Date.now()+15*60_000).toISOString()} : {}),
+      },env,{updateTime:receipt.__updateTime});
+      return {ok:true,value:undefined};
+    }catch{return {ok:false,error:{
+      code:"DISPATCH_RECEIPT_WRITE_FAILED",
+      message:"Journalisation sécurisée non confirmée.",
+    }};}
+  }
+
+  /** M84 : un rappel réclamé ne sera jamais expédié une seconde fois.
+   * Un retour fournisseur 2xx ne garantit PAS une notification iPhone.
+   */
+  async function runReminderCron(
+    current:string,
+  ):Promise<Result<DispatchSummary>> {
+    const summary:DispatchSummary={scanned:0,claimed:0,sent:0,failed:0};
+    const fetched=await fetchDueReminders(current);
+    if(!fetched.ok)return fetched;
+    summary.scanned=fetched.value.length;
+    for(const candidate of fetched.value){
+      const claimed=await claimReminderOccurrence(candidate);
+      if(!claimed.ok)return claimed;
+      if(!claimed.value)continue;
+      summary.claimed++;
+      const result=await sendWebPush(candidate);
+      if(!result.ok){
+        summary.failed++;
+        const recorded=await recordDispatchResult(candidate,{
+          ok:false,status:0,retryable:false,
+        });
+        if(!recorded.ok)return recorded;
+        continue;
+      }
+      if(result.value.ok)summary.sent++;
+      else summary.failed++;
+      const recorded=await recordDispatchResult(candidate,result.value);
+      if(!recorded.ok)return recorded;
+    }
+    return {ok:true,value:summary};
+  }
+
+  const outcome=await runReminderCron(now);
+  if(!outcome.ok)throw Error(outcome.error.code);
+}
+
 /** F37 · Worker sans activation implicite. Aucun job Cron dans F38. */
 export default {
   fetch(request:Request,env:WorkerEnv):Promise<Response> {
@@ -1133,6 +1398,7 @@ export default {
     // Même en cas de configuration accidentelle d'un déclencheur,
     // aucune notification ni mutation distante n'a lieu sans recette.
     if(env.ENABLE_CRON!=="true")return;
-    throw Error("CRON_NOT_VALIDATED");
+    if(!CRON_SECURITY_APPROVED)throw Error("CRON_NOT_VALIDATED");
+    await handleWorkerCron(new Date().toISOString(),env);
   },
 };
