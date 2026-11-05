@@ -52,6 +52,8 @@ Le cache Firestore persistant est **soumis à la confirmation que l'appareil est
 
 **Durcissement S9 (5 novembre 2026) :** relecture des rappels et abonnements avant Push, précondition de version sur le reçu du test et sur le curseur Google Agenda pour limiter les écrasements concurrents. Ces garde-fous ne garantissent pas encore une transaction atomique entre l'annulation d'un rappel et son envoi. Le développement de M114 (Google Agenda en PWA fermée) reste différé ; aucune permission, facturation, activation ni recette finale n'a été engagée.
 
+**Développement S9B/S7, 5 novembre 2026 :** une transaction Firestore relie désormais la relecture du rappel O06 à la réservation anti-doublon O19 ; les playlists peuvent recevoir, perdre et réordonner des titres et être supprimées sans supprimer les MP3. L'écran « Ma musique » expose ces commandes avec confirmation de suppression. La synchronisation Google fermée, la suppression définitive de médias et les sauvegardes restent à traiter, sans inventer des schémas non approuvés. Tout demeure non testé, sans Cron actif, sans déploiement ni facturation.
+
 Le fichier `tests/security.test.ts` contient le scénario T05 : deux UID distincts, refus de lecture/écriture croisée, blocage des jetons Google et des reçus serveur. Il **n'est pas exécuté automatiquement** et n'utilise **que les émulateurs locaux Firebase**, avec `FIREBASE_EMULATOR_TEST=1`. Un test ignoré ne constitue pas une validation. Aucun paquet Firebase CLI additionnel n'a été ajouté au projet par cet accord.
 
 **Propriétaire :** `Pecose`. Indépendant de tout dépôt `T-C-Umbral`.
