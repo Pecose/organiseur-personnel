@@ -46,6 +46,8 @@ Le cache Firestore persistant est **soumis à la confirmation que l'appareil est
 
 ### Contrôles de sécurité restants
 
+**Dernier lot S9B (5 novembre 2026) :** le Worker inclut maintenant une implémentation préparatoire de VAPID ES256 et du chiffrement Web Push RFC8291, ainsi que le verrou Firestore destiné à éviter les tests de notification répétés. **Les notifications distantes restent désactivées dans le code**, et aucun test, Cron, déploiement, secret ni coût n'a été engagé.
+
 Le fichier `tests/security.test.ts` contient le scénario T05 : deux UID distincts, refus de lecture/écriture croisée, blocage des jetons Google et des reçus serveur. Il **n'est pas exécuté automatiquement** et n'utilise **que les émulateurs locaux Firebase**, avec `FIREBASE_EMULATOR_TEST=1`. Un test ignoré ne constitue pas une validation. Aucun paquet Firebase CLI additionnel n'a été ajouté au projet par cet accord.
 
 **Propriétaire :** `Pecose`. Indépendant de tout dépôt `T-C-Umbral`.
