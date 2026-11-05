@@ -1247,9 +1247,10 @@ async function handleWorkerCron(now:string,env:WorkerEnv):Promise<void> {
     }};}
   }
 
-  /** M86 : idempotence par occurrence, création atomique O19.
-   * Un reçu existant n'est pas relancé, même si l'acceptation du fournisseur
-   * est inconnue. Pas de double envoi après timeout ou crash Worker.
+  /** M86 · FL05/O06/O19 : réservation Firestore dans une transaction
+   * lecture O06 + création O19. Le commit échoue si O06 a été modifié
+   * entre la lecture transactionnelle et l'écriture de la réservation.
+   * Une occurrence ayant déjà un reçu n'est jamais expédiée deux fois.
    */
   async function claimReminderOccurrence(
     candidate:ReminderDispatchCandidate,
@@ -1257,13 +1258,46 @@ async function handleWorkerCron(now:string,env:WorkerEnv):Promise<void> {
     const {uid,reminder}=candidate;
     if(!/^[A-Za-z0-9_-]{1,128}$/.test(uid)
       || !/^[A-Za-z0-9_-]{1,150}$/.test(reminder.id)
-      || !/^[A-Za-z0-9_-]{1,150}@\d{4}-\d{2}-\d{2}$/.test(reminder.occurrenceKey))
+      || !/^[A-Za-z0-9_-]{1,150}@\d{4}-\d{2}-\d{2}$/.test(reminder.occurrenceKey)
+      || !/^[A-Za-z0-9_-]{1,150}$/.test(reminder.activityId)
+      || reminder.occurrenceKey!==reminder.activityId+"@"+
+        reminder.occurrenceKey.slice(reminder.activityId.length+1))
       return {ok:false,error:{code:"INVALID_REMINDER",
         message:"Identifiants de rappel invalides."}};
+    const receiptPath="users/"+uid+"/dispatchReceipts/"+
+      reminder.id+"@"+reminder.occurrenceKey;
     try{
-      // Relecture au dernier moment pour éviter un rappel déjà désactivé.
-      const fresh=await readDocument("users/"+uid+"/reminders/"+reminder.id,env);
-      if(!fresh||fresh.enabled!==true ||fresh.dispatchStatus==="cancelled"
+      const accountToken=await serviceAccessToken(env);
+      const docPath="users/"+uid+"/reminders/"+reminder.id;
+      const documentUrl=firestoreUrl(docPath,env);
+      const transactionUrl=new URL("https://firestore.googleapis.com/v1/projects/"+
+        encodeURIComponent(env.FIREBASE_PROJECT_ID)+
+        "/databases/(default)/documents:beginTransaction");
+      const headers={
+        "Authorization":"Bearer "+accountToken,
+        "Content-Type":"application/json",
+      };
+      const begin=await fetch(transactionUrl,{
+        method:"POST",headers,body:JSON.stringify({options:{readWrite:{}}}),
+        redirect:"error",cache:"no-store",
+      });
+      if(!begin.ok)throw Error("Transaction Firestore indisponible");
+      const opened=await begin.json() as {transaction?:string};
+      if(typeof opened.transaction!=="string"||opened.transaction.length<1
+        ||opened.transaction.length>4096)throw Error("Transaction Firestore invalide");
+
+      // Cette lecture appartient à la transaction : si l'utilisateur
+      // désactive, déplace ou supprime O06 avant commit, celui-ci échoue.
+      documentUrl.searchParams.set("transaction",opened.transaction);
+      const snapshot=await fetch(documentUrl,{
+        headers:{"Authorization":"Bearer "+accountToken},
+        redirect:"error",cache:"no-store",
+      });
+      if(snapshot.status===404)return {ok:true,value:false};
+      if(!snapshot.ok)throw Error("Lecture transactionnelle refusée");
+      const fresh=unpackDocument(await snapshot.json());
+      if(fresh.id!==reminder.id||fresh.activityId!==reminder.activityId
+        ||fresh.enabled!==true||fresh.dispatchStatus==="cancelled"
         ||fresh.dispatchStatus==="sent"
         ||fresh.occurrenceKey!==reminder.occurrenceKey
         ||fresh.scheduledFor!==reminder.scheduledFor
@@ -1271,25 +1305,42 @@ async function handleWorkerCron(now:string,env:WorkerEnv):Promise<void> {
         return {ok:true,value:false};
       const when=Date.parse(String(fresh.scheduledFor));
       if(!Number.isFinite(when)||!Number.isSafeInteger(fresh.leadMinutes)
-        || when-Number(fresh.leadMinutes)*60_000>Date.parse(now))
+        || fresh.leadMinutes<0 || fresh.leadMinutes>10080
+        ||when-Number(fresh.leadMinutes)*60_000>Date.parse(now))
         return {ok:true,value:false};
-      const receiptPath="users/"+uid+"/dispatchReceipts/"+
-        reminder.id+"@"+reminder.occurrenceKey;
-      try {
-        await writeDocument(receiptPath,{
-          reminderId:reminder.id,occurrenceKey:reminder.occurrenceKey,
-          attemptedAt:new Date().toISOString(),outcome:"attempted",
-        },env,{exists:false});
-        return {ok:true,value:true};
-      }catch{
-        // Une contention se distingue d'une panne serveur par relecture.
-        if(await readDocument(receiptPath,env))
-          return {ok:true,value:false};
-        throw Error("Réservation non confirmée");
-      }
+
+      const receiptUrl=firestoreUrl(receiptPath,env);
+      const receiptFields={
+        reminderId:firestoreField(reminder.id),
+        occurrenceKey:firestoreField(reminder.occurrenceKey),
+        attemptedAt:firestoreField(new Date().toISOString()),
+        outcome:firestoreField("attempted"),
+      };
+      transactionUrl.pathname=transactionUrl.pathname.replace(
+        ":beginTransaction",":commit");
+      const committed=await fetch(transactionUrl,{
+        method:"POST",headers,redirect:"error",cache:"no-store",
+        body:JSON.stringify({
+          transaction:opened.transaction,
+          writes:[{
+            update:{
+              name:receiptUrl.pathname.replace(/^\/v1\//,""),
+              fields:receiptFields,
+            },
+            currentDocument:{exists:false},
+          }],
+        }),
+      });
+      if(committed.ok)return {ok:true,value:true};
+      // En concurrence : un reçu déjà présent signifie « déjà réservé ».
+      // Une modification O06 ou panne serveur sans reçu reste une erreur
+      // explicite ; jamais un prétexte pour envoyer quand même.
+      if(await readDocument(receiptPath,env))
+        return {ok:true,value:false};
+      throw Error("Réservation transactionnelle non confirmée");
     }catch{return {ok:false,error:{
       code:"REMINDER_CLAIM_FAILED",
-      message:"Réservation atomique du rappel non confirmée.",
+      message:"La réservation atomique du rappel n'a pas été confirmée.",
     }};}
   }
 
