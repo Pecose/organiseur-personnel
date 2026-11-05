@@ -1,6 +1,6 @@
 # Roadmap — Application personnelle iPhone (PWA)
 
-> **Statut :** implémentation des strates S0–S8 avancée, **non testée et non déployée** ; S9/S10 planifiées.  
+> **Statut :** implémentation des strates S0–S8 avancée, **non testée et non déployée** ; S9 partiellement codée, S10 planifiée.  
 > **GitHub cible :** compte **`Pecose`**, **jamais** l'organisation `T-C-Umbral`.  
 > **Dépôt créé :** `Pecose/organiseur-personnel` (public, branche `main`).  
 > **Utilisatrice cible :** une personne, sur iPhone.  
@@ -10,7 +10,7 @@
 
 ## Tableau de bord des objectifs (lecture humaine)
 
-**Ce tableau est le suivi des objectifs officiel.** Il sert à comparer ce que nous voulons obtenir avec les contrats techniques de [l'architecture](docs/ARCHITECTURE.md). **Validation du périmètre ≠ fonctionnalité validée** : les strates S0–S8 comportent désormais du code **non testé**. S9–S10 restent planifiées. L'agent doit actualiser cette correspondance à chaque évolution approuvée.
+**Ce tableau est le suivi des objectifs officiel.** Il sert à comparer ce que nous voulons obtenir avec les contrats techniques de [l'architecture](docs/ARCHITECTURE.md). **Validation du périmètre ≠ fonctionnalité validée** : les strates S0–S8 comportent désormais du code **non testé**. S9 dispose d'un code préparatoire non testé ; S10 reste à développer. L'agent doit actualiser cette correspondance à chaque évolution approuvée.
 
 | ID objectif | Résultat attendu | Architecture à consulter | Test / jalon | Statut |
 |---|---|---|---|---|
@@ -209,7 +209,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 > **Règle d'exécution (D23, 3 novembre 2026) :** construire les objets et fonctions par **dépendances documentées** ; les **tests de toutes les strates sont regroupés à la recette finale** à la demande de l'utilisateur. Une strate peut être **codée** avant validation technique de la précédente, si ses contrats et dépendances existent dans le code. Son statut reste **NON TESTÉ / NON VALIDÉ**. Aucune activation de Firebase réel, aucune donnée privée, aucun déploiement ou facturation avant validation de sécurité et d'iPhone. Ce chapitre conserve le périmètre initial.
 >
-> **Statut :** architecture **PLANIFIÉE**, application **non développée**. Les identifiants **O/F/M/C/T/D** sont ceux du [registre architectural](docs/ARCHITECTURE.md) ; **aucun nouveau contrat n'est introduit ici**. Seules les entités **O01, O05–O38 sauf O02–O04**, soit **35 objets actifs**, doivent être réalisées. **O02, O03 et O04 sont SUPERSEDED**, ne jamais les coder.
+> **Statut :** architecture enregistrée ; S0–S9 partiellement codées, non validées sur iPhone et non déployées. Les identifiants **O/F/M/C/T/D** sont ceux du [registre architectural](docs/ARCHITECTURE.md) ; **aucun nouveau contrat n'est introduit ici**. Seules les entités **O01, O05–O38 sauf O02–O04**, soit **35 objets actifs**, doivent être réalisées. **O02, O03 et O04 sont SUPERSEDED**, ne jamais les coder.
 >
 > Un « objet autonome » veut dire **autonome vis-à-vis des autres objets métier**. Déclarer le type `AuthUser` (O01) ne signifie pas que Firebase Authentication est opérationnel. De même, une interface type ne nécessite pas que Firestore, Cloudflare ou Safari soient déjà configurés.
 
@@ -224,10 +224,10 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 | **S4** | **MODÈLES COMPLETS, VALIDATION PARTIELLE** | O19 et O38 dans F17, `MonthlyAchievement` basé sur O31/O32/O33, tests T19 publiés dans F56 ; **35/35 objets métier** | Contrat/tri vérifiés avec `tsc --strict` et Node sur copie autonome ; **F56 et toutes les suites du dépôt restent à exécuter sur clone**. M147/Firestore prévu en S8, aucun bilan opérationnel |
 | **S5** | **EN COURS : dépendances et services codés, non validés sur appareil** | Accord D10 et commit préalable ; F06 Vite/TS/Firebase ; F14 entrée ; F17 types SDK ; F27 M16 ; F28 M17–M20/M90 ; F29 M21–M24/M89 ; F30 M25–M27 ; F35 M79/M80 ; F42 scénarios T05 pour émulateurs ; F39 toujours non déployé | **Restant :** `npm install`, `npm run build`/tests réels, paramètres Firebase Web du projet, tests UID à l'émulateur, autorisation puis déploiement contrôlé des règles, icônes F10 et test réel iPhone Safari. Sans ces étapes S5 ne peut pas être déclarée validée |
 | **S6** | **LARGEMENT CODÉE, NON TESTÉE (D23)** | M121–M126/M132–M134/M138–M146/M155/M157–M160 (M133 et M157 antérieurs) ; M41–M44 ; M47/M48 ; M52–M57 ; M64/M65/M95. Activités, listes archivables, coches, rappels locaux, import musique/image et métadonnées | Restent M49/M69 (suppression média et contrôle des références), sécurisation concurrence M158, recette de toutes les fonctions. **Aucun test ni déploiement** |
-| **S7** | **CINQ VUES CODÉES, NON TESTÉES (D23)** | F14 M01 ; F15 M02–M04 ; F16 M13–M15/M148 ; F17 CalendarDaySummary ; F19 M05–M11/M149–M152 ; F20 M12 ; F21 M127/M128/M156 ; F51 M129 ; F53 M153 ; F08 habillage mobile pastel | Lecture et édition des données réelles, iPhone/VoiceOver, build Vite, cache des chunks différés et corrections finales restent **à tester en recette** ; Musique/Décoration encore basiques, Bilan S8 absent |
+| **S7** | **CINQ VUES + PLAYLISTS AVANCÉES CODÉES, NON TESTÉES (D23)** | F14/F15/F16/F19/F20/F21/F51/F53 et F08 : navigation, Jour, calendrier, cinq onglets ; F24 M92/M94 : suppression non destructive et ordre strict des playlists ; F19 : ajouter/retirer/réordonner des titres, suppression avec confirmation | Décoration et sauvegardes incomplètes, M93 et suppression média différés ; iPhone/VoiceOver, build Vite, accès aux données réelles et cache à vérifier en recette. Bilan S8 codé mais non testé |
 | **S8** | **CONTRATS D24 CODÉS, NON TESTÉS** | M135–M137, M132/M134/M154/M158 transactionnels, fenêtre groupée Jour et bilan M147/F15 | Recette complète différée D23, aucune utilisation de Firebase réel |
 | **S9A** | **CODE D'INTÉGRATION AVANCÉ, NON TESTÉ** | F45/F46 façade PWA + transport de JWT ; F37 routes privées Google OAuth, grant chiffré, statut, sync incrémentale et conflits ; F38 Worker Free sans Cron | Worker, identités, Google OAuth, règles Firestore et scénarios bidirectionnels à valider avant toute activation |
-| **S9B** | **CLIENT PUSH CODÉ, SERVEUR D'ENVOI BLOQUÉ** | F33 M75–M78 : autorisation, inscription VAPID publique, révocation, demande de test ; F19 commandes manuelles ; F35 M81 réception générique ; F37 M100 refuse explicitement tout envoi | Chiffrement Web Push RFC8291, M84–M88, reçus idempotents et tests iPhone restent à réaliser ; aucun Cron actif |
+| **S9B** | **CLIENT ET MOTEUR WEB PUSH PRÉPARÉS, ENVOI BLOQUÉ** | F33 M75–M78, F35 M81, F37 M100 RFC8291/VAPID et M84–M88 dans Worker ; M86 lit O06 et réserve O19 en transaction Firestore ; relecture O06/O14 avant envoi | `PUSH_TEST_SECURITY_APPROVED=false` et `CRON_SECURITY_APPROVED=false`, F38 sans Cron ; quotas, races résiduelles, chiffrement et livraison iPhone à éprouver. Aucun envoi/déploiement |
 | **S10** | NON DÉMARRÉE | Sauvegardes, mise à jour et recette non engagées | Respecter D23 ; 0 € |
 
 **Commande de reproduction des tests S0 :** exécutée avec succès sur une copie locale contrôlée du code (TypeScript strict + Node). À relancer sur un clone direct du dépôt pour enregistrer un résultat CI de référence.
@@ -510,7 +510,7 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 
 ## 10. Ordre de démarrage et discipline des dépendances
 
-**Priorité absolue : S0**, puis **S1, S2, S3 et S4** pour construire et tester le graphe complet des **35 objets actifs**. **Aucun travail de code n'a commencé à ce jour.** Après validation des contrats : **S5** (persistence/auth/PWA), **S6** (CRUD), **S7** (les cinq onglets), **S8** (autovalidation, reports, bilans), **S9A/S9B** (Google Agenda et notifications), **S10** (sauvegardes et recette). La branche médias peut débuter à S6 en parallèle du cœur quotidien.
+**Priorité absolue : S0**, puis **S1, S2, S3 et S4** pour construire et tester le graphe complet des **35 objets actifs**. **Ce paragraphe décrivait l'ordre initial : le code S0–S9 est désormais largement présent mais non validé en production.** Après validation des contrats : **S5** (persistence/auth/PWA), **S6** (CRUD), **S7** (les cinq onglets), **S8** (autovalidation, reports, bilans), **S9A/S9B** (Google Agenda et notifications), **S10** (sauvegardes et recette). La branche médias peut débuter à S6 en parallèle du cœur quotidien.
 
 **La progression est conditionnelle**, pas calendaire : si une dépendance manque ou si un test échoue, la strate suivante attend. Une difficulté de faisabilité iPhone (musique verrouillée ou Web Push) peut être testée tôt en prototype sans prétendre que les services métier aval sont développés.
 
