@@ -25,7 +25,7 @@ import {
 } from "../features/player";
 import { readMedia } from "../storage/mediaDb";
 import { resolveCatalogAsset } from "../storage/catalog";
-import { listImages, importImage } from "../features/decor";
+import { listImages, importImage, cropImage, composeDecorImage } from "../features/decor";
 import {
   exportDataJson, validateBackup, restoreData,
   exportMediaArchive, importMediaArchive,
@@ -39,7 +39,7 @@ import {
 } from "../features/googleCalendar";
 import { openActivityEditor } from "./dayComponents";
 import { formatZonedTime } from "../domain/dates";
-import type { ActivityOccurrenceView, LocalDate } from "../domain/types";
+import type { ActivityOccurrenceView, DecorLayer, LocalDate } from "../domain/types";
 
 /** M05 · Le vrai écran d'accueil est Jour, pas une sixième page. */
 export function renderHome(): void {
@@ -1005,6 +1005,8 @@ export function renderDecor(): void {
     "<button type='submit' class='primary-button compact'>Importer</button></form>" +
     "<p id='image-feedback' class='muted' role='status' aria-live='polite'></p></section>" +
     "<section class='day-section'><h3>Ma galerie</h3>" +
+    "<label class='muted'>Texte facultatif sur le fond portrait" +
+    "<input id='decor-caption' type='text' maxlength='160' placeholder='Une phrase, un rappel…'></label>" +
     "<div id='decor-list' class='image-gallery'></div></section>";
   root.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => navigate({name:"day"});
   const feedback = root.querySelector<HTMLElement>("#image-feedback")!;
@@ -1042,6 +1044,91 @@ export function renderDecor(): void {
       const caption = document.createElement("figcaption");
       caption.textContent = image.name;
       tile.append(preview, caption);
+      const actions=document.createElement("div");
+      actions.className="header-actions";
+      const portrait=document.createElement("button");
+      portrait.type="button";
+      portrait.className="soft-button compact";
+      portrait.textContent="Créer un fond portrait";
+      portrait.setAttribute("aria-label","Créer un fond portrait avec "+image.name);
+      portrait.onclick=()=>{
+        portrait.disabled=true;
+        feedback.textContent="Composition locale du fond portrait…";
+        const text=root.querySelector<HTMLInputElement>("#decor-caption")?.value.trim()??"";
+        const layers:DecorLayer[]=[{
+          kind:"image",imageId:image.id,
+          x:0,y:0,width:1080,height:1920,opacity:1,
+        }];
+        if(text)layers.push({
+          kind:"text",text,
+          x:80,y:1560,width:920,height:200,
+          fontSize:64,color:"#FFFFFF",opacity:1,
+        });
+        void composeDecorImage(layers).then(result=>{
+          portrait.disabled=false;
+          if(!result.ok){feedback.textContent=result.error.message;return;}
+          const url=URL.createObjectURL(result.value);
+          const link=document.createElement("a");
+          link.href=url;
+          link.download="mon-fond-"+new Date().toISOString().slice(0,10)+".png";
+          link.textContent="Enregistrer le fond PNG";
+          feedback.replaceChildren(link);
+          // PNG privé : le téléchargement est un nouveau geste explicite.
+        }).catch(()=>{
+          portrait.disabled=false;
+          feedback.textContent="Création du fond indisponible.";
+        });
+      };
+      const square=document.createElement("button");
+      square.type="button";
+      square.className="soft-button compact";
+      square.textContent="Recadrer au carré";
+      square.setAttribute("aria-label","Exporter une copie carrée de "+image.name);
+      square.onclick=()=>{
+        square.disabled=true;
+        feedback.textContent="Recadrage local de l'image…";
+        void (async()=>{
+          let binary:Blob;
+          if(image.source==="imported"&&image.mediaId){
+            const local=await readMedia(image.mediaId);
+            if(!local.ok)throw Error(local.error.message);
+            binary=local.value;
+          }else if(image.source==="bundled"&&image.catalogId){
+            const asset=resolveCatalogAsset(image.catalogId);
+            if(!asset.ok)throw Error(asset.error.message);
+            const url=new URL(asset.value);
+            if(url.origin!==location.origin)throw Error("Origine d'image interdite");
+            const response=await fetch(url.toString(),{
+              credentials:"same-origin",redirect:"error",
+            });
+            if(!response.ok)throw Error("Image du catalogue indisponible");
+            binary=await response.blob();
+          }else throw Error("Image sans fichier accessible");
+          const bitmap=await createImageBitmap(binary);
+          const side=Math.min(bitmap.width,bitmap.height);
+          const rect={
+            x:Math.floor((bitmap.width-side)/2),
+            y:Math.floor((bitmap.height-side)/2),
+            width:side,height:side,
+          };
+          bitmap.close();
+          return await cropImage(binary,rect);
+        })().then(result=>{
+          square.disabled=false;
+          if(!result.ok){feedback.textContent=result.error.message;return;}
+          const url=URL.createObjectURL(result.value);
+          const link=document.createElement("a");
+          link.href=url;
+          link.download="image-carree-"+new Date().toISOString().slice(0,10)+".png";
+          link.textContent="Enregistrer le recadrage PNG";
+          feedback.replaceChildren(link);
+        }).catch(()=>{
+          square.disabled=false;
+          feedback.textContent="Recadrage indisponible sur cet appareil.";
+        });
+      };
+      actions.append(portrait,square);
+      tile.append(actions);
       target.append(tile);
       if (image.source === "imported" && image.mediaId) {
         void readMedia(image.mediaId).then(binary => {
