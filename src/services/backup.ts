@@ -4,7 +4,8 @@
  */
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { fetchCloudRecords, putCloudRecord } from "./cloudRepository";
+import { doc, getFirestore, runTransaction } from "firebase/firestore";
+import { fetchCloudRecords, getUserCollection } from "./cloudRepository";
 import { openMediaDb } from "../storage/mediaDb";
 import type {
   BackupEnvelope, BackupScope, CloudCollection, RestoreReport, Result,
@@ -168,10 +169,10 @@ export async function validateBackup(
   }};}
 }
 
-/** M72 · Restaurer uniquement des documents légers autorisés.
- * merge ne touche jamais à un ID existant ; replace remplace les ID
- * listés mais ne purge jamais ceux absents de la sauvegarde.
- * Le geste explicite de confirmation 'replace' appartient à F19/M10.
+/** M72 / D26 · Restauration par ID sous transaction Firebase.
+ * merge ne touche jamais à un document existant, même créé entre deux
+ * lectures. replace nécessite la confirmation explicite du panneau F19 ;
+ * aucun document absent de l'archive ne peut être supprimé.
  */
 export async function restoreData(
   backup:BackupEnvelope,mode:"merge"|"replace",
@@ -179,77 +180,75 @@ export async function restoreData(
   if(mode!=="merge"&&mode!=="replace")return {ok:false,error:{
     code:"INVALID_RESTORE_MODE",message:"Mode de restauration non reconnu.",
   }};
+  let serialized:string;
+  try{serialized=JSON.stringify(backup);}catch{return {ok:false,error:{
+    code:"INVALID_BACKUP",message:"Cette archive ne peut pas être validée.",
+  }};}
   const checked=await validateBackup(new File(
-    [JSON.stringify(backup)],"organiseur-data.json",{type:"application/json"}));
+    [serialized],"organiseur-data.json",{type:"application/json"}));
   if(!checked.ok)return checked;
-  try {
+  try{
     const user=getAuth(getApp("organiseur-personnel")).currentUser;
     if(!user||checked.value.ownerUid!==user.uid)
       return {ok:false,error:{
         code:"RESTORE_ACCOUNT_MISMATCH",
         message:"Cette archive appartient à un autre compte ou la session est absente.",
       }};
-    // La présence d'un réseau ne prouve pas un ACK serveur, mais son
-    // absence connue interdit de promettre une restauration distante.
     if(typeof navigator!=="undefined"&&navigator.onLine===false)
       return {ok:false,error:{
         code:"RESTORE_OFFLINE",
         message:"Reconnecte l'appareil avant de restaurer des données cloud.",
       }};
-    const collections=new Map<string,Map<string,Record<string,unknown>>>();
-    for(const kind of permittedKinds){
-      if(!checked.value.records.some(item=>
-        (item as {kind?:unknown}).kind===kind))continue;
-      const current=await fetchCloudRecords<Record<string,unknown>>(
-        user.uid,kind as CloudCollection);
-      if(!current.ok)return {ok:false,error:{
-        code:"RESTORE_READ_FAILED",
-        message:"Impossible de vérifier les données existantes ; aucune écriture lancée.",
-      }};
-      const map=new Map<string,Record<string,unknown>>();
-      for(const row of current.value){
-        const id=kind==="preferences"?"profile":row.id;
-        if(typeof id!=="string")return {ok:false,error:{
-          code:"RESTORE_READ_FAILED",message:"Enregistrement distant sans ID fiable.",
-        }};
-        map.set(id,row);
-      }
-      collections.set(kind,map);
-    }
+    const db=getFirestore(getApp("organiseur-personnel"));
     const report:RestoreReport={
       mode,created:0,updated:0,skipped:0,warnings:[],
     };
     for(const raw of checked.value.records){
       const entry=raw as {kind:BackupKind;id:string;data:Record<string,unknown>};
-      const present=collections.get(entry.kind)?.get(entry.id);
-      if(present&&(mode==="merge"
-        ||entry.kind==="activityCompletions"
-          &&present.status==="manually_undone"
-          &&entry.data.status!=="manually_undone"
-        ||entry.kind==="carryOverDecisions"&&present.decision!==entry.data.decision)){
-        report.skipped++;
-        continue;
-      }
-      const written=await putCloudRecord(user.uid,entry.kind,entry.id,entry.data);
-      if(!written.ok)return {ok:false,error:{
+      let action:"created"|"updated"|"skipped";
+      try{
+        action=await runTransaction(db,async transaction=>{
+          const target=doc(getUserCollection(user.uid,entry.kind),entry.id);
+          const snapshot=await transaction.get(target);
+          const present=snapshot.exists()
+            ?snapshot.data() as Record<string,unknown>:undefined;
+          if(present){
+            if(mode==="merge"
+              ||entry.kind==="activityCompletions"
+                &&present.status==="manually_undone"
+                &&entry.data.status!=="manually_undone"
+              ||entry.kind==="carryOverDecisions"
+                &&present.decision!==entry.data.decision)
+              return "skipped" as const;
+            // Éviter de réécrire une ancienne décision d'historique avec
+            // une copie antérieure même sous confirmation « replace ».
+            if(entry.kind==="carryOverDecisions"
+              &&typeof present.updatedAt==="string"
+              &&typeof entry.data.updatedAt==="string"
+              &&Date.parse(present.updatedAt)>Date.parse(entry.data.updatedAt))
+              return "skipped" as const;
+          }
+          transaction.set(target,entry.data);
+          return present?"updated" as const:"created" as const;
+        },{maxAttempts:3});
+      }catch{return {ok:false,error:{
         code:"RESTORE_PARTIAL",
-        message:"Restauration interrompue : "+(report.created+report.updated)+
-          " écritures précédentes ont pu être enregistrées. Aucun autre élément effacé.",
-      }};
-      if(present)report.updated++;
-      else report.created++;
-      collections.get(entry.kind)?.set(entry.id,entry.data);
+        message:"Restauration arrêtée après "+(report.created+report.updated)+
+          " écriture(s). Vérifie la synchronisation avant de réessayer ; "+
+          "aucun autre document n'a été supprimé.",
+      }};}
+      if(action==="created")report.created++;
+      else if(action==="updated")report.updated++;
+      else report.skipped++;
     }
-    // L'ACK Firebase hors-ligne/cache doit être validé en recette D23.
     report.warnings.push(
-      "Vérifie la synchronisation Firebase après restauration ; les médias utilisent une archive distincte.");
+      "Les fichiers personnels nécessitent leur archive multimédia distincte.");
     return {ok:true,value:report};
   }catch{return {ok:false,error:{
     code:"RESTORE_FAILED",
-    message:"Restauration interrompue : des écritures antérieures sont possibles. Aucun document absent n'est purgé.",
+    message:"Restauration non terminée. Certaines écritures précédentes sont possibles.",
   }};}
 }
-
 
 /** M73 · Archive binaire indépendante O21, aucun encodage base64.
  * En-tête "OPMEDIA1\n" + 8 chiffres hex de la taille du manifeste + "\n".
