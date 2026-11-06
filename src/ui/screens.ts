@@ -26,6 +26,10 @@ import {
 import { readMedia } from "../storage/mediaDb";
 import { resolveCatalogAsset } from "../storage/catalog";
 import { listImages, importImage } from "../features/decor";
+import {
+  exportDataJson, validateBackup, restoreData,
+  exportMediaArchive, importMediaArchive,
+} from "../services/backup";
 import { signIn, signOut, sendPasswordReset, registerAccount } from "../services/auth";
 import { configurePersistence } from "../services/sync";
 import { requestPushPermission, subscribeToPush, testPushSubscription, unsubscribeFromPush } from "../services/push";
@@ -1093,9 +1097,117 @@ export function renderSettings(): void {
     <button type="button" class="soft-button" id="google-unlink">Délier Google Agenda</button>
     <div id="google-conflict-list" class="entry-list"></div>
     <p class="muted" id="google-feedback" role="status" aria-live="polite">Google Agenda n'est pas configuré.</p>
-    <p class="muted">Sauvegardes indépendantes : prévues pour S10. Aucun service payant.</p></section>`;
+    <h3>Sauvegardes indépendantes</h3>
+    <p class="muted">Les données de l'agenda et les fichiers personnels sont deux archives différentes. Les exports ne sont pas chiffrés : conserve-les dans un endroit privé. La restauration n'efface pas les données absentes d'une archive.</p>
+    <button type="button" class="soft-button" id="backup-export-json">Exporter mes données (JSON)</button>
+    <label class="muted">Archive de données
+      <input id="backup-import-json" type="file" accept=".json,application/json">
+    </label>
+    <label class="muted">Restauration
+      <select id="backup-json-mode">
+        <option value="merge">Ajouter sans modifier l'existant</option>
+        <option value="replace">Remplacer les ID présents dans l'archive (confirmation)</option>
+      </select>
+    </label>
+    <button type="button" class="soft-button" id="backup-restore-json">Restaurer les données</button>
+    <button type="button" class="soft-button" id="backup-export-media">Exporter mes musiques et images</button>
+    <label class="muted">Archive multimédia de l'ancien iPhone
+      <input id="backup-import-media" type="file" accept=".opmedia,application/octet-stream">
+    </label>
+    <button type="button" class="soft-button" id="backup-restore-media">Restaurer les médias locaux</button>
+    <p id="backup-feedback" role="status" aria-live="polite" class="muted">Aucune sauvegarde déclenchée automatiquement.</p></section>`;
   root.querySelector<HTMLElement>("#account-label")!.textContent =
     state.user?.email || "Aucun compte connecté.";
+
+  // M10 / S10 : seules les actions explicites de l'utilisatrice accèdent
+  // au contenu du compte ou aux archives locales. Pas d'upload de fichier.
+  const backupFeedback=root.querySelector<HTMLElement>("#backup-feedback")!;
+  const backupExport=root.querySelector<HTMLButtonElement>("#backup-export-json")!;
+  const backupRestore=root.querySelector<HTMLButtonElement>("#backup-restore-json")!;
+  const backupExportMedia=root.querySelector<HTMLButtonElement>("#backup-export-media")!;
+  const backupRestoreMedia=root.querySelector<HTMLButtonElement>("#backup-restore-media")!;
+  backupExport.disabled=!state.user;
+  backupRestore.disabled=!state.user;
+
+  backupExport.onclick=()=>{
+    backupExport.disabled=true;
+    backupFeedback.textContent="Préparation de la sauvegarde des données…";
+    void exportDataJson("all").then(result=>{
+      backupExport.disabled=false;
+      if(!result.ok){backupFeedback.textContent=result.error.message;return;}
+      const url=URL.createObjectURL(result.value);
+      const link=document.createElement("a");
+      link.href=url;
+      link.download="organiseur-donnees-"+new Date().toISOString().slice(0,10)+".json";
+      link.textContent="Enregistrer la sauvegarde JSON dans Fichiers";
+      backupFeedback.replaceChildren(link);
+      // Le téléchargement exige un nouveau geste sur iPhone Safari.
+      // Le lien reste disponible sur l'écran ; il n'y a pas de sauvegarde auto.
+    }).catch(()=>{
+      backupExport.disabled=false;
+      backupFeedback.textContent="Export des données indisponible.";
+    });
+  };
+  backupRestore.onclick=()=>{
+    const file=root.querySelector<HTMLInputElement>("#backup-import-json")!.files?.[0];
+    if(!file){backupFeedback.textContent="Choisis d'abord ton fichier JSON.";return;}
+    backupRestore.disabled=true;
+    backupFeedback.textContent="Contrôle d'intégrité de l'archive…";
+    void validateBackup(file).then(async checked=>{
+      if(!checked.ok){backupFeedback.textContent=checked.error.message;return;}
+      const selected=root.querySelector<HTMLSelectElement>("#backup-json-mode")!.value;
+      const mode=selected==="replace"?"replace":"merge";
+      const question=mode==="replace"
+        ?"Confirmer le remplacement des documents aux mêmes ID ? Les autres documents seront conservés."
+        :"Ajouter seulement les documents absents du compte ? Rien ne sera effacé.";
+      if(!window.confirm(question)){
+        backupFeedback.textContent="Restauration annulée : aucune écriture.";
+        return;
+      }
+      backupFeedback.textContent="Restauration des données sélectionnées…";
+      const result=await restoreData(checked.value,mode);
+      backupFeedback.textContent=result.ok
+        ?"Restauration préparée : "+result.value.created+" ajouté(s), "+
+          result.value.updated+" remplacé(s), "+result.value.skipped+
+          " conservé(s). Vérifie la synchronisation cloud."
+        :result.error.message;
+    }).catch(()=>{
+      backupFeedback.textContent="Restauration interrompue : vérifie la synchronisation avant de recommencer.";
+    }).finally(()=>{backupRestore.disabled=!getAppState().user;});
+  };
+  backupExportMedia.onclick=()=>{
+    backupExportMedia.disabled=true;
+    backupFeedback.textContent="Lecture et vérification des fichiers locaux…";
+    void exportMediaArchive().then(result=>{
+      backupExportMedia.disabled=false;
+      if(!result.ok){backupFeedback.textContent=result.error.message;return;}
+      const url=URL.createObjectURL(result.value);
+      const link=document.createElement("a");
+      link.href=url;
+      link.download="organiseur-medias-"+new Date().toISOString().slice(0,10)+".opmedia";
+      link.textContent="Enregistrer l'archive multimédia dans Fichiers";
+      backupFeedback.replaceChildren(link);
+    }).catch(()=>{
+      backupExportMedia.disabled=false;
+      backupFeedback.textContent="Export des médias indisponible.";
+    });
+  };
+  backupRestoreMedia.onclick=()=>{
+    const file=root.querySelector<HTMLInputElement>("#backup-import-media")!.files?.[0];
+    if(!file){backupFeedback.textContent="Choisis une archive multimédia.";return;}
+    if(!window.confirm("Importer les médias dans cet appareil ? Les fichiers existants resteront intacts."))
+      return;
+    backupRestoreMedia.disabled=true;
+    backupFeedback.textContent="Vérification des empreintes avant restauration…";
+    void importMediaArchive(file).then(result=>{
+      backupFeedback.textContent=result.ok
+        ?"Import local : "+result.value.created+" éléments ajoutés, "+
+          result.value.skipped+" déjà présents. Les playlists se récupèrent avec le compte et l'archive JSON."
+        :result.error.message;
+    }).catch(()=>{
+      backupFeedback.textContent="Restauration des fichiers locaux impossible.";
+    }).finally(()=>{backupRestoreMedia.disabled=false;});
+  };
   const cache = root.querySelector<HTMLButtonElement>("#settings-cache")!;
   const logout = root.querySelector<HTMLButtonElement>("#settings-signout")!;
   cache.disabled = !state.user;
