@@ -95,6 +95,33 @@ export interface SyncStatus {
   message?: string;
 }
 
+/** D26 / F34 / M70 : périmètres de sauvegarde légers du propriétaire. */
+export type BackupScope = "all" | "agenda" | "lists" | "music" | "preferences";
+
+/** D26 / F34 / M72–M74 : état explicite de chaque restauration. */
+export interface RestoreReport {
+  mode: "merge" | "replace";
+  created: number;
+  updated: number;
+  skipped: number;
+  warnings: string[];
+}
+
+/** D26 / F26 / M97 : unités = pixels entiers de l'image d'origine. */
+export interface CropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** D26 / F26 / M98 : couches d'un canevas portrait 1080×1920. */
+export type DecorLayer =
+  | {kind: "image"; imageId: string;
+      x: number; y: number; width: number; height: number; opacity: number}
+  | {kind: "text"; text: string; color: string; fontSize: number;
+      x: number; y: number; width: number; height: number; opacity: number};
+
 /** O16 — le contenu est inconnu avant validation (M71, S10). */
 export interface BackupEnvelope {
   schemaVersion: number;
