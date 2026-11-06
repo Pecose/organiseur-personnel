@@ -449,7 +449,7 @@ export async function importMediaArchive(file:File):Promise<Result<RestoreReport
     for(const entry of meta.images){
       if(!entry||typeof entry!=="object"||Array.isArray(entry))
         throw Error("Métadonnée image malformée");
-      const image=entry as ImageMetadata;
+      const image=entry as unknown as ImageMetadata;
       if(typeof image.id!=="string"
         ||!/^[A-Za-z0-9_.@-]{1,150}$/.test(image.id)
         ||imageIds.has(image.id)
