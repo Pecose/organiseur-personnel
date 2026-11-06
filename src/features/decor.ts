@@ -2,9 +2,9 @@
  * F26 · M67 (saisons), M64/M65/M95 (images personnelles locales).
  * Les opérations sensibles non testées restent réservées à la recette D23.
  */
-import { openMediaDb, storeMedia } from "../storage/mediaDb";
-import { loadBundledCatalog } from "../storage/catalog";
-import type { ImageMetadata, Result, Season } from "../domain/types";
+import { openMediaDb, storeMedia, readMedia } from "../storage/mediaDb";
+import { loadBundledCatalog, resolveCatalogAsset } from "../storage/catalog";
+import type { CropRect, DecorLayer, ImageMetadata, Result, Season } from "../domain/types";
 
 /**
  * M67 — Saison météorologique de l'hémisphère Nord :
@@ -208,4 +208,163 @@ export async function updateImageMetadata(image: ImageMetadata): Promise<Result<
   } finally {
     opened.value.close();
   }
+}
+
+
+
+/** M97 / D26 · Recadrage local en pixels source, export PNG uniquement.
+ * Les originaux ne sont jamais modifiés ; sans permission iOS supplémentaire.
+ */
+export async function cropImage(
+  blob:Blob,rect:CropRect,
+):Promise<Result<Blob>> {
+  if(!(blob instanceof Blob)||blob.size<1||blob.size>20*1024*1024
+    ||!blob.type.startsWith("image/")
+    ||!rect||![rect.x,rect.y,rect.width,rect.height].every(
+      value=>Number.isSafeInteger(value))
+    ||rect.x<0||rect.y<0||rect.width<1||rect.height<1
+    ||typeof createImageBitmap!=="function"
+    ||typeof document==="undefined")
+    return {ok:false,error:{
+      code:"INVALID_CROP",
+      message:"Le fichier ou le rectangle de recadrage est invalide.",
+    }};
+  try{
+    const bitmap=await createImageBitmap(blob);
+    try{
+      if(bitmap.width<1||bitmap.height<1
+        ||bitmap.width>8192||bitmap.height>8192
+        ||rect.x+rect.width>bitmap.width
+        ||rect.y+rect.height>bitmap.height)
+        return {ok:false,error:{
+          code:"CROP_OUT_OF_BOUNDS",
+          message:"Le recadrage dépasse les dimensions de l'image.",
+        }};
+      const canvas=document.createElement("canvas");
+      canvas.width=rect.width;
+      canvas.height=rect.height;
+      const ctx=canvas.getContext("2d");
+      if(!ctx)return {ok:false,error:{
+        code:"CANVAS_UNAVAILABLE",message:"Canevas de recadrage indisponible.",
+      }};
+      ctx.drawImage(bitmap,rect.x,rect.y,rect.width,rect.height,
+        0,0,rect.width,rect.height);
+      const result=await new Promise<Blob|null>(resolve=>
+        canvas.toBlob(resolve,"image/png"));
+      return result&&result.size>0
+        ?{ok:true,value:result}
+        :{ok:false,error:{code:"IMAGE_ENCODE_FAILED",
+          message:"Impossible d'encoder l'image recadrée."}};
+    }finally{bitmap.close();}
+  }catch{return {ok:false,error:{
+    code:"CROP_FAILED",message:"Impossible de décoder ou recadrer ce fichier sur cet appareil.",
+  }};}
+}
+
+/** M98 / D26 · Composition privée portrait 1080×1920 en couches O11/O13.
+ * Ni URL fournie par l'appelant ni texte HTML ne sont interprétés.
+ */
+export async function composeDecorImage(
+  layers:DecorLayer[],
+):Promise<Result<Blob>> {
+  if(!Array.isArray(layers)||layers.length<1||layers.length>12
+    ||typeof document==="undefined"
+    ||typeof createImageBitmap!=="function")
+    return {ok:false,error:{
+      code:"INVALID_DECOR_LAYERS",
+      message:"Une composition nécessite entre une et douze couches.",
+    }};
+  const width=1080,height=1920;
+  for(const layer of layers){
+    if(!layer||(layer.kind!=="image"&&layer.kind!=="text")
+      ||![layer.x,layer.y,layer.width,layer.height].every(
+        value=>Number.isSafeInteger(value))
+      ||layer.x<0||layer.y<0||layer.width<1||layer.height<1
+      ||layer.x+layer.width>width||layer.y+layer.height>height
+      ||!Number.isFinite(layer.opacity)||layer.opacity<0||layer.opacity>1
+      ||(layer.kind==="image"&&(
+        typeof layer.imageId!=="string"
+        ||!/^[A-Za-z0-9_.@-]{1,150}$/.test(layer.imageId)))
+      ||(layer.kind==="text"&&(
+        typeof layer.text!=="string"||!layer.text.trim()
+        ||layer.text.length>160
+        ||!Number.isSafeInteger(layer.fontSize)
+        ||layer.fontSize<8||layer.fontSize>160
+        ||!/^#[a-fA-F0-9]{6}$/.test(layer.color))))
+      return {ok:false,error:{
+        code:"INVALID_DECOR_LAYER",
+        message:"Une couche contient des coordonnées ou un contenu non autorisé.",
+      }};
+  }
+  try{
+    const canvas=document.createElement("canvas");
+    canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext("2d");
+    if(!ctx)return {ok:false,error:{
+      code:"CANVAS_UNAVAILABLE",message:"Canevas de décoration indisponible.",
+    }};
+    const images=await listImages();
+    if(!images.ok)return images;
+    const byId=new Map(images.value.map(image=>[image.id,image]));
+    for(const layer of layers){
+      ctx.save();
+      try{
+        ctx.globalAlpha=layer.opacity;
+        if(layer.kind==="text"){
+          ctx.beginPath();
+          ctx.rect(layer.x,layer.y,layer.width,layer.height);
+          ctx.clip();
+          ctx.font=layer.fontSize+"px system-ui, sans-serif";
+          ctx.textAlign="left";
+          ctx.textBaseline="top";
+          ctx.fillStyle=layer.color;
+          ctx.fillText(layer.text,layer.x,layer.y,layer.width);
+        }else{
+          const selected=byId.get(layer.imageId);
+          if(!selected)return {ok:false,error:{
+            code:"DECOR_IMAGE_NOT_FOUND",
+            message:"Une image de la composition n'existe plus.",
+          }};
+          let binary:Blob;
+          if(selected.source==="imported"&&selected.mediaId){
+            const local=await readMedia(selected.mediaId);
+            if(!local.ok)return local;
+            binary=local.value;
+          }else if(selected.source==="bundled"&&selected.catalogId){
+            const asset=resolveCatalogAsset(selected.catalogId);
+            if(!asset.ok)return asset;
+            const url=new URL(asset.value);
+            if(url.origin!==location.origin)throw Error("Origine d'image non autorisée");
+            const fetched=await fetch(url.toString(),{
+              credentials:"same-origin",redirect:"error",
+            });
+            if(!fetched.ok)throw Error("Image du catalogue indisponible");
+            binary=await fetched.blob();
+          }else{return {ok:false,error:{
+            code:"DECOR_IMAGE_INVALID",
+            message:"Image de composition non référencée localement.",
+          }};}
+          if(binary.size<1||binary.size>20*1024*1024
+            ||!binary.type.startsWith("image/"))
+            throw Error("Image de composition invalide");
+          const bitmap=await createImageBitmap(binary);
+          try{
+            if(bitmap.width<1||bitmap.height<1
+              ||bitmap.width>8192||bitmap.height>8192)
+              throw Error("Image de composition trop grande");
+            ctx.drawImage(bitmap,layer.x,layer.y,layer.width,layer.height);
+          }finally{bitmap.close();}
+        }
+      }finally{ctx.restore();}
+    }
+    const output=await new Promise<Blob|null>(resolve=>
+      canvas.toBlob(resolve,"image/png"));
+    if(!output||output.size<1)return {ok:false,error:{
+      code:"DECOR_EXPORT_FAILED",message:"Impossible d'encoder le décor.",
+    }};
+    return {ok:true,value:output};
+  }catch{return {ok:false,error:{
+    code:"DECOR_COMPOSE_FAILED",
+    message:"Composition impossible sur cet iPhone ou image inaccessible.",
+  }};}
 }
