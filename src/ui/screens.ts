@@ -18,7 +18,7 @@ import {
   saveChecklistItem, setChecklistItemChecked, deleteChecklist,
 } from "../features/checklists";
 import {
-  listTracks, importAudio, setTrackFavorite, listPlaylists, savePlaylist, deletePlaylist, reorderPlaylist,
+  listTracks, importAudio, setTrackFavorite, listPlaylists, savePlaylist, deletePlaylist, reorderPlaylist, removeTrack,
 } from "../features/music";
 import {
   playTrack, pausePlayback, nextTrack, previousTrack, setPlaybackMode, setPlaybackQueue,
@@ -983,6 +983,29 @@ export function renderMusic(): void {
           else feedback.textContent = saved.error.message;
         });
       };
+      if (track.source === "imported") {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "text-button destructive";
+        remove.textContent = "Retirer";
+        remove.setAttribute("aria-label", "Retirer " + track.title + " du catalogue, sans effacer son fichier");
+        remove.onclick = () => {
+          if (!window.confirm("Retirer « " + track.title +
+            " » de la bibliothèque et des playlists ? Le fichier local sera conservé pour éviter toute perte.")) return;
+          remove.disabled = true;
+          void removeTrack(track.id, false).then(result => {
+            if (result.ok) renderMusic();
+            else {
+              remove.disabled = false;
+              feedback.textContent = result.error.message;
+            }
+          }).catch(() => {
+            remove.disabled = false;
+            feedback.textContent = "Retrait de la bibliothèque indisponible.";
+          });
+        };
+        row.append(remove);
+      }
       row.append(play, name, favorite);
       list.append(row);
     }
