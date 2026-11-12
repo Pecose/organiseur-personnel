@@ -2,7 +2,7 @@
 import type { PushPayload, Result } from "../domain/types";
 
 const appScope = "/organiseur-personnel/";
-const shellRevision = "s5-1";
+const shellRevision = "s10-1";
 const cachePrefix = "organiseur-shell-";
 
 /** M79 · Enregistrer uniquement en contexte HTTPS / Pages. */
@@ -108,8 +108,18 @@ if (typeof document === "undefined" && "registration" in globalThis && "clients"
     const e = event as { waitUntil(promise: Promise<unknown>): void };
     e.waitUntil(cacheAppShell(shellRevision).then(async result => {
       if (!result.ok) throw new Error("Mise en cache initiale non réalisée.");
-      await worker.skipWaiting();
+      // Une mise à jour attend le consentement depuis F36/M83.
+      // La première installation sans worker actif peut s'activer normalement.
     }));
+  });
+
+  // FL06 / M83 : seul le bouton explicite de mise à jour active un worker en attente.
+  worker.addEventListener("message", (event: unknown) => {
+    const e = event as {data?: {type?: unknown};waitUntil?(promise: Promise<unknown>): void};
+    if (e.data?.type === "APPLY_APP_UPDATE") {
+      const activation = worker.skipWaiting();
+      e.waitUntil?.(activation);
+    }
   });
 
   worker.addEventListener("activate", (event: unknown) => {
