@@ -32,6 +32,7 @@ import {
 } from "../services/backup";
 import { signIn, signOut, sendPasswordReset, registerAccount } from "../services/auth";
 import { configurePersistence } from "../services/sync";
+import { checkAppUpdate, applyAppUpdate } from "../pwa/update";
 import { requestPushPermission, subscribeToPush, testPushSubscription, unsubscribeFromPush } from "../services/push";
 import {
   startGoogleCalendarLink, requestGoogleCalendarSync, readGoogleCalendarStatus,
@@ -1165,6 +1166,10 @@ export function renderSettings(): void {
     <section class="day-section settings-list">
     <button type="button" class="soft-button" id="settings-monthly">Voir mon bilan mensuel</button>
     <button type="button" class="soft-button" id="settings-cache">Activer le mode hors ligne sur appareil de confiance</button>
+    <h3>Mises à jour de l'application</h3>
+    <button type="button" class="soft-button" id="settings-check-update">Vérifier les mises à jour</button>
+    <button type="button" class="soft-button" id="settings-apply-update" disabled>Installer la version proposée</button>
+    <p class="muted" id="settings-update-status" role="status" aria-live="polite">Aucune mise à jour demandée.</p>
     <h3>Notifications sur cet iPhone</h3>
     <p class="muted">Demander l'autorisation ne déclenche aucun rappel : l'abonnement et le serveur gratuit doivent encore être configurés.</p>
     <button type="button" class="soft-button" id="settings-push-permission">Autoriser les notifications</button>
@@ -1205,6 +1210,43 @@ export function renderSettings(): void {
     <p id="backup-feedback" role="status" aria-live="polite" class="muted">Aucune sauvegarde déclenchée automatiquement.</p></section>`;
   root.querySelector<HTMLElement>("#account-label")!.textContent =
     state.user?.email || "Aucun compte connecté.";
+
+  // F36/M82/M83 : vérifier sans écrire ; activer uniquement après confirmation.
+  const checkUpdate = root.querySelector<HTMLButtonElement>("#settings-check-update")!;
+  const applyUpdate = root.querySelector<HTMLButtonElement>("#settings-apply-update")!;
+  const updateStatus = root.querySelector<HTMLElement>("#settings-update-status")!;
+  checkUpdate.onclick = () => {
+    checkUpdate.disabled = true;
+    applyUpdate.disabled = true;
+    updateStatus.textContent = "Recherche d'une nouvelle version…";
+    void checkAppUpdate().then(result => {
+      checkUpdate.disabled = false;
+      if (!result.ok) {updateStatus.textContent = result.error.message; return;}
+      if (!result.value) {updateStatus.textContent = "L'application est à jour."; return;}
+      updateStatus.textContent = "Version " + result.value.version +
+        " disponible. L'installation conserve tes données et médias personnels.";
+      applyUpdate.disabled = false;
+    }).catch(() => {
+      checkUpdate.disabled = false;
+      updateStatus.textContent = "Vérification indisponible, réessaie en ligne.";
+    });
+  };
+  applyUpdate.onclick = () => {
+    if (!window.confirm("Installer la mise à jour et recharger l'application ? Les imports et données personnelles sont conservés."))
+      return;
+    checkUpdate.disabled = true;
+    applyUpdate.disabled = true;
+    updateStatus.textContent = "Préparation du nouveau cache public…";
+    void applyAppUpdate().then(result => {
+      if (!result.ok) {
+        updateStatus.textContent = result.error.message;
+        checkUpdate.disabled = false;
+      } else updateStatus.textContent = "Activation confirmée. Rechargement…";
+    }).catch(() => {
+      updateStatus.textContent = "Mise à jour interrompue, réessaie.";
+      checkUpdate.disabled = false;
+    });
+  };
 
   // M10 / S10 : seules les actions explicites de l'utilisatrice accèdent
   // au contenu du compte ou aux archives locales. Pas d'upload de fichier.
