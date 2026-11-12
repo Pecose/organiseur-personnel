@@ -201,6 +201,65 @@ export async function deletePlaylist(playlistId: string): Promise<Result<void>> 
   }
 }
 
+/** M93 · Retirer une piste importée de la bibliothèque du compte.
+ * On retire d'abord les références des playlists puis O08 ; l'ID des
+ * playlists et tous les médias locaux restent inchangés.
+ * L'effacement physique demandé est refusé tant que M49 ne peut pas
+ * prouver l'absence de références sur tous les appareils/comptes.
+ * D23 : cette séquence multi-documents doit être testée en recette.
+ */
+export async function removeTrack(
+  trackId: string, deleteLocalFile: boolean,
+): Promise<Result<void>> {
+  if (typeof trackId !== "string" || !/^[A-Za-z0-9_-]{1,150}$/.test(trackId)
+    || typeof deleteLocalFile !== "boolean") return {ok:false,error:{
+    code:"INVALID_TRACK",message:"Morceau ou option de suppression invalide.",
+  }};
+  try {
+    const user = getAuth(getApp("organiseur-personnel")).currentUser;
+    if (!user) return {ok:false,error:{
+      code:"AUTH_REQUIRED",message:"Connexion requise pour retirer un morceau.",
+    }};
+    const cloud = await fetchCloudRecords<TrackMetadata>(user.uid,"tracks");
+    if (!cloud.ok) return cloud;
+    const track = cloud.value.find(item => item.id === trackId);
+    if (!track) return {ok:false,error:{
+      code:"TRACK_NOT_FOUND",message:"Morceau personnel introuvable.",
+    }};
+    if (track.source !== "imported") return {ok:false,error:{
+      code:"BUNDLED_TRACK_READ_ONLY",
+      message:"Un morceau du catalogue public ne peut pas être supprimé.",
+    }};
+    if (deleteLocalFile) return {ok:false,error:{
+      code:"MEDIA_DELETE_UNVERIFIED",
+      message:"Effacement du fichier bloqué : références croisées non vérifiées. Retire seulement le morceau en conservant le fichier.",
+    }};
+    const playlists = await listPlaylists();
+    if (!playlists.ok) return playlists;
+    for (const playlist of playlists.value) {
+      if (!playlist.trackIds.includes(trackId)) continue;
+      const saved = await savePlaylist({
+        ...playlist, trackIds:playlist.trackIds.filter(id => id !== trackId),
+      });
+      if (!saved.ok) return {ok:false,error:{
+        code:"TRACK_REMOVE_PARTIAL",
+        message:"Une playlist n'a pas pu être mise à jour. Le morceau est conservé ; réessaie lorsque le réseau revient.",
+      }};
+    }
+    const removed = await removeCloudRecord(user.uid,"tracks",trackId);
+    if (!removed.ok) return {ok:false,error:{
+      code:"TRACK_REMOVE_PARTIAL",
+      message:"Le morceau est conservé dans le compte, mais certaines playlists ont été modifiées. Réessaie.",
+    }};
+    return {ok:true,value:undefined};
+  } catch {
+    return {ok:false,error:{
+      code:"TRACK_REMOVE_FAILED",
+      message:"Suppression des références indisponible, aucun fichier local effacé.",
+    }};
+  }
+}
+
 /** M94 · Réordonner O09 uniquement, sans ajout ou retrait accidentel.
  * Les références des fichiers personnels manquants sont conservées :
  * l'absence d'un Blob sur ce téléphone n'efface pas le morceau du compte.
