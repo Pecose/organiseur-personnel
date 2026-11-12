@@ -983,6 +983,7 @@ export function renderMusic(): void {
           else feedback.textContent = saved.error.message;
         });
       };
+      row.append(play, name, favorite);
       if (track.source === "imported") {
         const remove = document.createElement("button");
         remove.type = "button";
@@ -1006,7 +1007,6 @@ export function renderMusic(): void {
         };
         row.append(remove);
       }
-      row.append(play, name, favorite);
       list.append(row);
     }
   }).catch(() => {
