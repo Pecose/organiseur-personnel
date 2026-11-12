@@ -1,7 +1,7 @@
 {
   "name": "organiseur-personnel",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "PWA personnelle iPhone, socle technique S5",
   "scripts": {
