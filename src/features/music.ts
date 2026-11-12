@@ -52,13 +52,15 @@ export async function importAudio(
   if (!file || !metadata || typeof metadata !== "object") return {ok: false, error: {
     code: "INVALID_AUDIO", message: "Fichier ou informations musicales invalides.",
   }};
-  const local = await storeMedia(file, "audio");
-  if (!local.ok) return local;
+  // Vérifier les métadonnées AVANT de stocker un binaire : un titre invalide
+  // ne doit pas laisser un fichier orphelin dans IndexedDB.
   const title = typeof metadata.title === "string" && metadata.title.trim()
     ? metadata.title.trim() : file.name.replace(/\.[^/.]+$/, "").trim();
   if (!title || title.length > 300) return {ok: false, error: {
     code: "INVALID_TRACK", message: "Le titre musical est invalide.",
   }};
+  const local = await storeMedia(file, "audio");
+  if (!local.ok) return local;
   const track: TrackMetadata = {
     id: crypto.randomUUID(), title, source: "imported", mediaId: local.value.id,
     favorite: metadata.favorite === true, updatedAt: new Date().toISOString(),
