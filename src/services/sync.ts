@@ -1,14 +1,8 @@
 /** F30 · Cache Firestore conscient du consentement, statut de synchronisation fiable. */
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import {
-  initializeFirestore, memoryLocalCache, persistentLocalCache,
-  persistentMultipleTabManager,
-} from "firebase/firestore";
 import { subscribeCloudRecords } from "./cloudRepository";
 import type { Connectivity, Result, SnapshotMeta, SyncStatus, Unsubscribe } from "../domain/types";
-
-let persistenceConfigured = false;
 
 /**
  * M25 · Consentement explicite requis pour le cache persistant sur appareil de confiance.
@@ -16,9 +10,8 @@ let persistenceConfigured = false;
  * Appel uniquement après initialisation M16 et à partir d'une interaction utilisateur.
  */
 export async function configurePersistence(): Promise<Result<void>> {
-  if (persistenceConfigured) return { ok: true, value: undefined };
   try {
-    const app = getApp("organiseur-personnel");
+    getApp("organiseur-personnel");
     if (typeof window === "undefined" || typeof window.confirm !== "function") {
       return { ok: false, error: {
         code: "PERSISTENCE_BROWSER_ONLY", message: "La persistance nécessite un navigateur.",
@@ -27,14 +20,12 @@ export async function configurePersistence(): Promise<Result<void>> {
     const trusted = window.confirm(
       "Cet iPhone est-il un appareil personnel de confiance ?\n" +
       "Si oui, les activités pourront être conservées hors ligne, même après fermeture. " +
-      "Sur un appareil partagé, choisis Annuler pour éviter ce stockage durable.",
+      "L’application se rechargera après ton accord. Sur un appareil partagé, choisis Annuler.",
     );
-    initializeFirestore(app, {
-      localCache: trusted
-        ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-        : memoryLocalCache(),
-    });
-    persistenceConfigured = true;
+    if (!trusted) return {ok: false, error: {
+      code: "PERSISTENCE_NOT_CONFIRMED", message: "Le choix de l’appareil n’a pas été modifié.",
+    }};
+    window.localStorage.setItem("organiseur-trusted-device", "1");
     return { ok: true, value: undefined };
   } catch {
     return { ok: false, error: {

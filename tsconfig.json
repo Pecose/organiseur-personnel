@@ -5,9 +5,11 @@
     "moduleResolution": "Bundler",
     "lib": [
       "ES2022",
+      "ESNext.Temporal",
       "DOM",
       "DOM.Iterable"
     ],
+    "types": ["vite/client"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": false,
@@ -18,7 +20,8 @@
   },
   "include": [
     "src/**/*.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "workers/**/*.ts"
   ],
   "exclude": [
     "dist",

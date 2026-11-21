@@ -21,8 +21,8 @@ let state: AppState = {
   user: null,
   sync: { state: "local", pendingCount: 0, message: "Connexion non configurée." },
   version: {
-    version: "0.1.1", cacheRevision: "s10-1", catalogRevision: "0",
-    releasedAt: "2026-11-12T18:40:00.000Z",
+    version: "0.1.2", cacheRevision: "s10-2", catalogRevision: "0",
+    releasedAt: "2026-11-21T12:00:00.000Z",
   },
   preferences: {
     themeId: "sage", autoSeason: false, locale: "fr-FR",

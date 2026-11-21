@@ -9,6 +9,7 @@ import { setSelectedDay } from "../app/state";
 import { getCalendarWeek, selectCalendarDate } from "../features/agenda";
 import { listTasks } from "../features/tasks";
 import { listHabits } from "../features/habits";
+import { getDueReminders } from "../features/reminders";
 import { groupDayEntries, getDayEntries, getCarryOverPrompt, applyCarryOver } from "../features/day";
 import {
   getOccurrenceCompletion, setOccurrenceCompletion, undoOccurrenceCompletion,
@@ -25,7 +26,10 @@ import {
 } from "../features/player";
 import { readMedia } from "../storage/mediaDb";
 import { resolveCatalogAsset } from "../storage/catalog";
-import { listImages, importImage, cropImage, composeDecorImage } from "../features/decor";
+import {
+  listImages, importImage, selectTheme, setBackground, updateImageMetadata,
+  removeImportedImage, cropImage, composeDecorImage,
+} from "../features/decor";
 import {
   exportDataJson, validateBackup, restoreData,
   exportMediaArchive, importMediaArchive,
@@ -237,7 +241,9 @@ export function renderDay(date: LocalDate): void {
     });
   }
 
-  void getDayEntries(date).then(result => {
+  void Promise.all([
+    getDayEntries(date), date === realToday ? getDueReminders(new Date().toISOString()) : undefined,
+  ]).then(([result, reminders]) => {
     if (!root.isConnected || getAppState().route.name !== "day"
       || getAppState().daySelection.selectedDate !== date) return;
     if (!result.ok) {
@@ -248,6 +254,7 @@ export function renderDay(date: LocalDate): void {
       return;
     }
     const grouped = groupDayEntries(result.value);
+    const due = new Set(reminders?.ok ? reminders.value.map(item => item.occurrenceKey) : []);
     for (const [id, items] of [
       ["untimed", grouped.withoutTime],
       ["timed", grouped.withTime],
@@ -289,6 +296,10 @@ export function renderDay(date: LocalDate): void {
           }
         }
         if (item.activity.stars) chunks.push("★".repeat(item.activity.stars));
+        if (due.has(item.occurrence.occurrenceKey)
+          && item.completion?.status !== "manual_done" && item.completion?.status !== "auto_assumed") {
+          chunks.push("Rappel arrivé");
+        }
         if (item.completion?.status === "auto_assumed") chunks.push("Présumé terminé");
         if (item.completion?.status === "manually_undone") chunks.push("Annulation conservée");
         meta.textContent = chunks.join(" · ");
@@ -454,9 +465,11 @@ export function renderTasks(): void {
   root.innerHTML = `<section class="page-intro"><p class="eyebrow">L'ESPRIT LÉGER</p>
     <h2>Mes tâches</h2><p class="muted">Tout ce que tu veux faire, sans être pressée.</p>
     <button type="button" class="primary-button compact" id="new-task">+ Tâche</button></section>
-    <section class="day-section"><h3>À faire</h3><div id="task-list" class="entry-list"></div></section>`;
+    <section class="day-section"><h3>À faire</h3><p id="task-status" role="status"></p>
+    <div id="task-list" class="entry-list"></div></section>`;
   root.querySelector<HTMLButtonElement>("#new-task")!.onclick = () => openActivityEditor("");
   const list = root.querySelector<HTMLElement>("#task-list")!;
+  const feedback = root.querySelector<HTMLElement>("#task-status")!;
   if (!getAppState().user) {
     list.textContent = "Connecte-toi pour voir tes tâches.";
     return;
@@ -490,9 +503,19 @@ export function renderTasks(): void {
       check.className = "check-control";
       check.textContent = "○";
       if (!task.plannedOn) {
-        check.disabled = true;
-        check.title = "Ajoute une date pour valider une occurrence.";
-        check.setAttribute("aria-label", "Ajoute une date pour terminer " + task.title);
+        check.title = "Cocher et dater d’aujourd’hui";
+        check.setAttribute("aria-label", "Cocher et dater d’aujourd’hui : " + task.title);
+        check.onclick = async () => {
+          check.disabled = true;
+          const today = new Date().toLocaleDateString("sv-SE", {timeZone: task.timeZone});
+          const checked = await setOccurrenceCompletion(task.id + "@" + today, "manual_done");
+          if (!check.isConnected) return;
+          if (checked.ok) renderTasks();
+          else {
+            check.disabled = false;
+            feedback.textContent = checked.error.message;
+          }
+        };
       } else {
         const key = task.id + "@" + task.plannedOn;
         check.setAttribute("aria-label", "Terminer " + task.title);
@@ -510,7 +533,7 @@ export function renderTasks(): void {
                 check.setAttribute("aria-label",
                   (checked ? "Terminer " : "Annuler la validation de ") + task.title);
               } else {
-                check.title = result.error.message;
+                feedback.textContent = result.error.message;
               }
             });
         };
@@ -991,11 +1014,17 @@ export function renderMusic(): void {
         remove.textContent = "Retirer";
         remove.setAttribute("aria-label", "Retirer " + track.title + " du catalogue, sans effacer son fichier");
         remove.onclick = () => {
-          if (!window.confirm("Retirer « " + track.title +
-            " » de la bibliothèque et des playlists ? Le fichier local sera conservé pour éviter toute perte.")) return;
+          if (!window.confirm("Retirer « " + track.title + " » de la bibliothèque et des playlists ?")) return;
+          const deleteLocalFile = Boolean(track.mediaId) && window.confirm(
+            "Effacer aussi le fichier sur cet iPhone ? Choisis Annuler pour conserver le fichier.",
+          );
           remove.disabled = true;
-          void removeTrack(track.id, false).then(result => {
+          void removeTrack(track.id, deleteLocalFile).then(result => {
             if (result.ok) renderMusic();
+            else if (result.error.code === "TRACK_REMOVED_FILE_KEPT") {
+              row.remove();
+              feedback.textContent = result.error.message;
+            }
             else {
               remove.disabled = false;
               feedback.textContent = result.error.message;
@@ -1023,6 +1052,13 @@ export function renderDecor(): void {
     "<section class='page-intro'><p class='eyebrow'>UNE TOUCHE PERSONNELLE</p>" +
     "<h2>Mes décors</h2><p class='muted'>Les images importées restent sur ce téléphone.</p>" +
     "<button type='button' class='soft-button' data-back>← Revenir à Jour</button></section>" +
+    "<section class='day-section'><h3>Apparence</h3>" +
+    "<label>Thème <select id='decor-theme'>" +
+    "<option value='sage'>Vert sauge</option><option value='cream'>Crème</option>" +
+    "<option value='lavender'>Lavande</option><option value='blue'>Bleu poudré</option>" +
+    "<option value='seasonal'>Selon la saison</option></select></label> " +
+    "<button type='button' class='soft-button' id='decor-reset'>Retirer le fond</button>" +
+    "<p id='decor-theme-status' class='muted' role='status'></p></section>" +
     "<section class='day-section'><h3>Importer une image</h3>" +
     "<form id='image-import' class='media-import'><label>Image de ton appareil" +
     "<input type='file' name='file' accept='image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif' required></label>" +
@@ -1033,6 +1069,29 @@ export function renderDecor(): void {
     "<input id='decor-caption' type='text' maxlength='160' placeholder='Une phrase, un rappel…'></label>" +
     "<div id='decor-list' class='image-gallery'></div></section>";
   root.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => navigate({name:"day"});
+  const themeSelect = root.querySelector<HTMLSelectElement>("#decor-theme")!;
+  const reset = root.querySelector<HTMLButtonElement>("#decor-reset")!;
+  const themeStatus = root.querySelector<HTMLElement>("#decor-theme-status")!;
+  const {preferences, user} = getAppState();
+  themeSelect.value = preferences.autoSeason ? "seasonal" : preferences.themeId;
+  if (!themeSelect.value) themeSelect.value = "sage";
+  themeSelect.disabled = !user;
+  reset.disabled = !user || !preferences.backgroundImageId;
+  if (!user) themeStatus.textContent = "Connecte-toi pour personnaliser l’apparence.";
+  themeSelect.onchange = async () => {
+    themeSelect.disabled = true;
+    const result = await selectTheme(themeSelect.value);
+    themeSelect.disabled = false;
+    themeStatus.textContent = result.ok ? "Thème enregistré." : result.error.message;
+    const current = getAppState().preferences;
+    themeSelect.value = current.autoSeason ? "seasonal" : current.themeId;
+  };
+  reset.onclick = async () => {
+    reset.disabled = true;
+    const result = await setBackground("");
+    reset.disabled = result.ok;
+    themeStatus.textContent = result.ok ? "Fond retiré." : result.error.message;
+  };
   const feedback = root.querySelector<HTMLElement>("#image-feedback")!;
   const target = root.querySelector<HTMLElement>("#decor-list")!;
   const form = root.querySelector<HTMLFormElement>("#image-import")!;
@@ -1151,7 +1210,55 @@ export function renderDecor(): void {
           feedback.textContent="Recadrage indisponible sur cet appareil.";
         });
       };
-      actions.append(portrait,square);
+      const background = document.createElement("button");
+      background.type = "button";
+      background.className = "soft-button compact";
+      background.textContent = "Utiliser comme fond";
+      background.setAttribute("aria-label", "Utiliser " + image.name + " comme fond");
+      background.disabled = !user;
+      background.onclick = async () => {
+        background.disabled = true;
+        const result = await setBackground(image.id);
+        background.disabled = false;
+        if (result.ok) reset.disabled = false;
+        feedback.textContent = result.ok ? "Fond appliqué." : result.error.message;
+      };
+      actions.append(background, portrait, square);
+      if (image.source === "imported") {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "soft-button compact";
+        edit.textContent = "Modifier le nom et les étiquettes";
+        edit.onclick = async () => {
+          const name = window.prompt("Nom de l’image", image.name);
+          if (name === null) return;
+          const tags = window.prompt("Étiquettes séparées par des virgules", image.tags.join(", "));
+          if (tags === null) return;
+          edit.disabled = true;
+          const result = await updateImageMetadata({
+            ...image, name, tags: tags.split(",").map(tag => tag.trim()).filter(Boolean),
+          });
+          edit.disabled = false;
+          if (result.ok && tile.isConnected) renderDecor();
+          else if (!result.ok) feedback.textContent = result.error.message;
+        };
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "soft-button compact destructive";
+        remove.textContent = "Effacer de cet iPhone";
+        remove.disabled = !user;
+        remove.onclick = async () => {
+          if (!window.confirm("Effacer définitivement « " + image.name + " » de cet iPhone ?")) return;
+          remove.disabled = true;
+          const result = await removeImportedImage(image.id);
+          if (result.ok && tile.isConnected) renderDecor();
+          else if (!result.ok) {
+            remove.disabled = false;
+            feedback.textContent = result.error.message;
+          }
+        };
+        actions.append(edit, remove);
+      }
       tile.append(actions);
       target.append(tile);
       if (image.source === "imported" && image.mediaId) {
@@ -1510,9 +1617,8 @@ export function renderSettings(): void {
 
   cache.onclick = () => {
     void configurePersistence().then(result => {
-      feedback.textContent = result.ok
-        ? "Mode local configuré. Vérifie le comportement sur iPhone lors de la recette."
-        : result.error.message;
+      if (result.ok) location.reload();
+      else feedback.textContent = result.error.message;
     });
   };
   logout.onclick = () => {

@@ -2,7 +2,7 @@
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import {
-  collection, deleteDoc, doc, getDocs, getFirestore, onSnapshot, setDoc,
+  collection, deleteDoc, doc, documentId, getDocs, getFirestore, onSnapshot, query, setDoc, where,
 } from "firebase/firestore";
 import type { DocumentData } from "firebase/firestore";
 import type {
@@ -71,7 +71,9 @@ export function subscribeCloudRecords<T>(
   cb: (records: T[], metadata: SnapshotMeta) => void,
 ): Unsubscribe {
   let lastKnownRecords: T[] = [];
-  return onSnapshot(getUserCollection(uid, kind), { includeMetadataChanges: true },
+  const source = getUserCollection(uid, kind);
+  const reference = kind === "preferences" ? query(source, where(documentId(), "==", "profile")) : source;
+  return onSnapshot(reference, { includeMetadataChanges: true },
     snapshot => {
       lastKnownRecords = snapshot.docs.map(item => item.data() as T);
       cb(lastKnownRecords, {
@@ -90,7 +92,9 @@ export async function fetchCloudRecords<T>(
   uid: string, kind: CloudCollection,
 ): Promise<Result<T[]>> {
   try {
-    const snapshot = await getDocs(getUserCollection(uid, kind));
+    const source = getUserCollection(uid, kind);
+    const snapshot = await getDocs(kind === "preferences"
+      ? query(source, where(documentId(), "==", "profile")) : source);
     return { ok: true, value: snapshot.docs.map(item => item.data() as T) };
   } catch {
     return { ok: false, error: { code: "CLOUD_READ_FAILED", message: "Lecture indisponible ou refusée." } };

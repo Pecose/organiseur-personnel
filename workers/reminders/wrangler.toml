@@ -6,9 +6,10 @@ compatibility_date = "2026-11-04"
 workers_dev = true
 
 # Aucun Cron pour l'instant. Après T07/T10–T14 et consentement explicite
-# de mise en service, envisager un déclencheur limité (ex. toutes les 30 min).
+# de mise en service, les deux passages peuvent avoir leur budget séparé
+# (rappels chaque 5 min, Google chaque 30 min).
 # [triggers]
-# crons = ["*/30 * * * *"]
+# crons = ["*/5 * * * *", "0,30 * * * *"]
 
 # Bindings à fournir PLUS TARD via les secrets du Worker,
 # jamais dans ce fichier ni dans le dépôt public :

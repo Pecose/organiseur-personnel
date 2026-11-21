@@ -2,9 +2,98 @@
  * F26 · M67 (saisons), M64/M65/M95 (images personnelles locales).
  * Les opérations sensibles non testées restent réservées à la recette D23.
  */
-import { openMediaDb, storeMedia, readMedia } from "../storage/mediaDb";
+import { openMediaDb, storeMedia, readMedia, removeMedia } from "../storage/mediaDb";
 import { loadBundledCatalog, resolveCatalogAsset } from "../storage/catalog";
-import type { CropRect, DecorLayer, ImageMetadata, Result, Season } from "../domain/types";
+import { getAppState, setAppState } from "../app/state";
+import { putCloudRecord } from "../services/cloudRepository";
+import type {
+  CropRect, DecorLayer, ImageMetadata, ProfilePreferences, Result, Season, ThemeDefinition,
+} from "../domain/types";
+
+const themes: readonly ThemeDefinition[] = [
+  { id: "sage", name: "Vert sauge", season: "spring", colors: {
+    accent: "#476c59", tint: "#e5eee6", highlight: "#b5d0bd", backdrop: "#f7f5f0",
+  }},
+  { id: "cream", name: "Crème", season: "summer", colors: {
+    accent: "#765630", tint: "#f5ead5", highlight: "#e8d2a8", backdrop: "#faf5ea",
+  }},
+  { id: "lavender", name: "Lavande", season: "autumn", colors: {
+    accent: "#644e79", tint: "#eee6f4", highlight: "#dbcae9", backdrop: "#f8f4fa",
+  }},
+  { id: "blue", name: "Bleu poudré", season: "winter", colors: {
+    accent: "#385d7a", tint: "#e4eff7", highlight: "#bed6e8", backdrop: "#f2f7fa",
+  }},
+];
+
+/** M66 · Choisir une palette fixe ou suivre les saisons. */
+export async function selectTheme(themeId: string): Promise<Result<void>> {
+  const {user, preferences} = getAppState();
+  if (!user) return {ok: false, error: {
+    code: "AUTH_REQUIRED", message: "Connecte-toi pour enregistrer ton thème.",
+  }};
+  const autoSeason = themeId === "seasonal";
+  if (!autoSeason && !themes.some(theme => theme.id === themeId)) {
+    return {ok: false, error: {
+      code: "UNKNOWN_THEME", message: "Ce thème est indisponible.",
+    }};
+  }
+  const revised: ProfilePreferences = {
+    ...preferences, themeId: autoSeason ? preferences.themeId : themeId,
+    autoSeason, updatedAt: new Date().toISOString(),
+  };
+  const saved = await putCloudRecord(user.uid, "preferences", "profile", revised);
+  if (saved.ok && getAppState().user?.uid === user.uid && getAppState().preferences === preferences) {
+    setAppState({preferences: revised});
+  }
+  return saved;
+}
+
+/** M68 · Calculer la palette active avec un repli sur la palette d'origine. */
+export function getActiveTheme(date: string, preferences: ProfilePreferences): ThemeDefinition {
+  let season: Season | undefined;
+  if (preferences.autoSeason) {
+    try {
+      season = resolveSeason(date, preferences.timeZone);
+    } catch {
+      // Un ancien profil mal configuré conserve son thème fixe.
+    }
+  }
+  const theme = (season ? themes.find(item => item.season === season)
+    : themes.find(item => item.id === preferences.themeId)) ?? themes[0];
+  return { ...theme, backgroundImageId: preferences.backgroundImageId };
+}
+
+/** M96 · Enregistrer seulement l'identifiant du fond, le fichier reste local. */
+export async function setBackground(imageId: string): Promise<Result<void>> {
+  const {user, preferences} = getAppState();
+  if (!user) return {ok: false, error: {
+    code: "AUTH_REQUIRED", message: "Connecte-toi pour enregistrer ton fond.",
+  }};
+  if (imageId) {
+    const images = await listImages();
+    if (!images.ok) return images;
+    const image = images.value.find(entry => entry.id === imageId);
+    if (!image) return {ok: false, error: {
+      code: "IMAGE_NOT_FOUND", message: "Cette image est indisponible.",
+    }};
+    if (image.mediaId) {
+      const binary = await readMedia(image.mediaId);
+      if (!binary.ok) return binary;
+    }
+  }
+  if (getAppState().user?.uid !== user.uid) return {ok: false, error: {
+    code: "AUTH_REQUIRED", message: "La session a changé. Réessaie après connexion.",
+  }};
+  const current = getAppState().preferences;
+  const revised = {...current, updatedAt: new Date().toISOString()};
+  if (imageId) revised.backgroundImageId = imageId;
+  else delete revised.backgroundImageId;
+  const saved = await putCloudRecord(user.uid, "preferences", "profile", revised);
+  if (saved.ok && getAppState().user?.uid === user.uid && getAppState().preferences === current) {
+    setAppState({preferences: revised});
+  }
+  return saved;
+}
 
 /**
  * M67 — Saison météorologique de l'hémisphère Nord :
@@ -152,6 +241,17 @@ export async function listImages(): Promise<Result<ImageMetadata[]>> {
   } finally {
     opened.value.close();
   }
+}
+
+/** M69 · Effacer uniquement une image personnelle dont le fichier est vérifié. */
+export async function removeImportedImage(imageId: string): Promise<Result<void>> {
+  const images = await listImages();
+  if (!images.ok) return images;
+  const image = images.value.find(entry => entry.id === imageId);
+  if (image?.source !== "imported" || !image.mediaId) return {ok: false, error: {
+    code: "IMAGE_READ_ONLY", message: "Cette image ne peut pas être supprimée de la galerie.",
+  }};
+  return removeMedia(image.mediaId);
 }
 
 /** M95 · Renommer/classer une image personnelle sans réécrire le binaire. */

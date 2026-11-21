@@ -4,11 +4,16 @@
 import { initFirebase } from "./services/firebase";
 import { observeAuth } from "./services/auth";
 import { observeSyncStatus } from "./services/sync";
+import { subscribeCloudRecords } from "./services/cloudRepository";
 import { registerServiceWorker } from "./pwa/service-worker";
-import { getAppState, setAppState } from "./app/state";
+import { getAppState, setAppState, watchAppState } from "./app/state";
+import { getActiveTheme, listImages } from "./features/decor";
+import { readMedia } from "./storage/mediaDb";
+import { resolveCatalogAsset } from "./storage/catalog";
+import { requestGoogleCalendarSync } from "./features/googleCalendar";
 import { renderRoute, resolveRoute } from "./app/router";
 import { renderCommonStatus } from "./ui/components";
-import type { PublicFirebaseConfig, Result, Unsubscribe } from "./domain/types";
+import type { ProfilePreferences, PublicFirebaseConfig, Result, Unsubscribe } from "./domain/types";
 
 /** M01 · Monter Jour même sans Firebase, sans afficher de données factices. */
 export async function bootstrapApp(): Promise<Result<void>> {
@@ -22,6 +27,52 @@ export async function bootstrapApp(): Promise<Result<void>> {
   };
 
   const route = resolveRoute(window.location.hash);
+  const defaultPreferences = getAppState().preferences;
+  let backgroundUrl: string | undefined;
+  let backgroundUid: string | undefined;
+  let backgroundId: string | undefined;
+  let backgroundRequest = 0;
+  watchAppState(({preferences, user}) => {
+    const theme = getActiveTheme(new Date().toISOString(), preferences);
+    for (const [name, color] of Object.entries(theme.colors)) {
+      document.documentElement.style.setProperty("--theme-" + name, color);
+    }
+    const uid = user?.uid;
+    const imageId = theme.backgroundImageId;
+    if (backgroundUid === uid && backgroundId === imageId) return;
+    backgroundUid = uid;
+    backgroundId = imageId;
+    const request = ++backgroundRequest;
+    if (backgroundUrl) URL.revokeObjectURL(backgroundUrl);
+    backgroundUrl = undefined;
+    document.body.style.removeProperty("--personal-background");
+    if (!uid || !imageId) return;
+    void (async () => {
+      const images = await listImages();
+      if (!images.ok || request !== backgroundRequest) return;
+      const image = images.value.find(entry => entry.id === imageId);
+      let url: string;
+      if (image?.source === "imported" && image.mediaId) {
+        const media = await readMedia(image.mediaId);
+        if (!media.ok || request !== backgroundRequest) {
+          if (request === backgroundRequest) backgroundId = undefined;
+          return;
+        }
+        backgroundUrl = URL.createObjectURL(media.value);
+        url = backgroundUrl;
+      } else if (image?.source === "bundled" && image.catalogId) {
+        const asset = resolveCatalogAsset(image.catalogId);
+        if (!asset.ok || new URL(asset.value).origin !== location.origin) return;
+        url = asset.value;
+      } else {
+        backgroundId = undefined;
+        return;
+      }
+      document.body.style.setProperty("--personal-background", "url(" + JSON.stringify(url) + ")");
+    })().catch(() => {
+      if (request === backgroundRequest) backgroundId = undefined;
+    });
+  });
   setAppState({route});
   renderRoute(route);
 
@@ -49,17 +100,34 @@ export async function bootstrapApp(): Promise<Result<void>> {
       return initialized;
     }
     let stopSync: Unsubscribe = () => undefined;
+    let stopPreferences: Unsubscribe = () => undefined;
     observeAuth(user => {
       stopSync();
+      stopPreferences();
       stopSync = () => undefined;
+      stopPreferences = () => undefined;
       setAppState({
         user,
+        preferences: defaultPreferences,
         sync: {
           state: "local", pendingCount: 0,
           message: user ? "Vérification des données synchronisées…" : "Compte non connecté.",
         },
       });
       if (user) {
+        void requestGoogleCalendarSync("startup").then(result => {
+          if (result.ok && result.value.pulled > 0 && getAppState().user?.uid === user.uid
+            && ["day", "calendar", "habits"].includes(getAppState().route.name)) {
+            renderRoute(getAppState().route);
+          }
+        });
+        stopPreferences = subscribeCloudRecords<ProfilePreferences>(
+          user.uid, "preferences", ([preferences], metadata) => {
+            if (getAppState().user?.uid !== user.uid) return;
+            if (!preferences && metadata.fromCache) return;
+            setAppState({preferences: preferences ?? defaultPreferences});
+          },
+        );
         stopSync = observeSyncStatus(sync => {
           setAppState({sync});
           renderCommonStatus(sync);

@@ -164,7 +164,8 @@ export async function reconcileReminders(
             from: new Date(center - 2 * 86_400_000).toISOString(),
             to: new Date(center + 3 * 86_400_000).toISOString(),
           });
-          disable = !occurrences.some(item => item.occurrenceKey === reminder.occurrenceKey);
+          disable = !occurrences.some(item => item.occurrenceKey === reminder.occurrenceKey
+            && (!item.startsAt || Date.parse(item.startsAt) === Date.parse(reminder.scheduledFor)));
         }
       }
       if (disable) {

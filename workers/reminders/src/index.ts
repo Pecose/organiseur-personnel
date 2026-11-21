@@ -4,7 +4,7 @@
  */
 import type {
   Activity, CalendarSyncConflict, CalendarSyncRun, GoogleCalendarChange,
-  GoogleCalendarSyncError, GoogleEventLink, GoogleSyncCursor, Reminder,
+  GoogleCalendarSyncError, GoogleEventLink, GoogleSyncCursor, RecurrenceRule, Reminder,
   PushSubscriptionRecord, NotificationTestResult, DispatchSummary,
   ReminderDispatchCandidate, PushDeliveryResult, PushPayload, Result,
 } from "../../../src/domain/types";
@@ -95,6 +95,8 @@ interface WorkerEnv {
   VAPID_CONTACT: string;
   APP_ORIGIN: string;
   ENABLE_CRON?: string;
+  syncSignal?: AbortSignal;
+  syncToken?: Promise<string>;
 }
 
 const codec = new TextEncoder();
@@ -107,7 +109,7 @@ function b64url(input:Uint8Array):string {
   for(const value of input)ascii+=String.fromCharCode(value);
   return btoa(ascii).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-function unb64(input:string):Uint8Array {
+function unb64(input:string):Uint8Array<ArrayBuffer> {
   if(!/^[a-zA-Z0-9_-]+$/.test(input)||input.length>100000)throw Error("Invalid encoding");
   const pad=input.replace(/-/g,"+").replace(/_/g,"/");
   return Uint8Array.from(atob(pad+"=".repeat((4-pad.length%4)%4)),value=>value.charCodeAt(0));
@@ -133,7 +135,7 @@ function respond(value:unknown,origin:string,status=200):Response {
 }
 
 /** D25 · Contrôle cryptographique Firebase SecureToken, UID serveur fiable. */
-let secureKeys: {until:number;keys:JsonWebKey[]} | undefined;
+let secureKeys: {until:number;keys:Array<JsonWebKey & {kid?:string}>} | undefined;
 async function verifyFirebaseToken(token:string,env:WorkerEnv):Promise<string> {
   const segments=token.split(".");
   if(segments.length!==3||token.length>9000)throw Error("Token invalide");
@@ -154,7 +156,7 @@ async function verifyFirebaseToken(token:string,env:WorkerEnv):Promise<string> {
       {redirect:"error"},
     );
     if(!response.ok)throw Error("Clés publiques Firebase indisponibles");
-    const data=await response.json() as {keys?:JsonWebKey[]};
+    const data=await response.json() as {keys?:Array<JsonWebKey & {kid?:string}>};
     if(!Array.isArray(data.keys))throw Error("Clés publiques incorrectes");
     secureKeys={keys:data.keys,until:Date.now()+20*60*1000};
   }
@@ -264,7 +266,7 @@ function firestoreUrl(path:string,env:WorkerEnv):URL {
 async function readDocument(path:string,env:WorkerEnv):Promise<RecordDoc|null> {
   const response=await fetch(firestoreUrl(path,env),{
     headers:{Authorization:"Bearer "+await serviceAccessToken(env)},
-    redirect:"error",cache:"no-store",
+    redirect:"error",cache:"no-store",signal:env.syncSignal,
   });
   if(response.status===404)return null;
   if(!response.ok)throw Error("Lecture Firestore refusée");
@@ -283,7 +285,7 @@ async function writeDocument(path:string,data:Record<string,unknown>,env:WorkerE
   const response=await fetch(url,{method:"PATCH",headers:{
     Authorization:"Bearer "+await serviceAccessToken(env),
     "Content-Type":"application/json",
-  },body:JSON.stringify({fields}),redirect:"error",cache:"no-store"});
+  },body:JSON.stringify({fields}),redirect:"error",cache:"no-store",signal:env.syncSignal});
   if(!response.ok)throw Error("Écriture Firestore refusée ou périmée");
 }
 async function listDocuments(path:string,env:WorkerEnv):Promise<RecordDoc[]> {
@@ -294,7 +296,7 @@ async function listDocuments(path:string,env:WorkerEnv):Promise<RecordDoc[]> {
     if(cursor)url.searchParams.set("pageToken",cursor);
     const response=await fetch(url,{headers:{
       Authorization:"Bearer "+await serviceAccessToken(env),
-    },redirect:"error",cache:"no-store"});
+    },redirect:"error",cache:"no-store",signal:env.syncSignal});
     if(response.status===404)return results;
     if(!response.ok)throw Error("Consultation Firestore indisponible");
     const data=await response.json() as {
@@ -305,6 +307,35 @@ async function listDocuments(path:string,env:WorkerEnv):Promise<RecordDoc[]> {
     cursor=data.nextPageToken;
   }
   throw Error("Pagination au-delà du budget sécurisé de cette opération");
+}
+
+/** D27 : le même bail protège les écritures Google et la liaison du compte. */
+async function withGoogleCalendarLock<T>(
+  uid: string, env: WorkerEnv, action: (lockedEnv: WorkerEnv) => Promise<T>,
+): Promise<T> {
+  const path = "users/" + uid + "/googleCalendarSync/lock";
+  const current = await readDocument(path, env);
+  if (current && (!current.__updateTime || !Number.isFinite(Date.parse(String(current.expiresAt)))
+    || Date.parse(String(current.expiresAt)) > Date.now())) {
+    throw Error("GOOGLE_SYNC_BUSY");
+  }
+  const owner = randomId();
+  const expires = Date.now() + 120_000;
+  await writeDocument(path, {owner, expiresAt: new Date(expires).toISOString()}, env,
+    current?.__updateTime ? {updateTime: current.__updateTime} : {exists: false});
+  try {
+    const signal = AbortSignal.timeout(Math.max(0, expires - Date.now() - 15_000));
+    return await action({...env, syncSignal: signal});
+  } finally {
+    // En cas de panne le bail expire. La comparaison protège le bail suivant.
+    try {
+      const held = await readDocument(path, env);
+      if (held?.owner === owner && held.__updateTime) {
+        await writeDocument(path, {owner, expiresAt: new Date().toISOString()},
+          env, {updateTime: held.__updateTime});
+      }
+    } catch { /* Le prochain passage attend l'expiration du bail existant. */ }
+  }
 }
 
 /** M87 / D25 · Signature VAPID ES256, jamais exposée au navigateur.
@@ -355,7 +386,7 @@ async function createVapidJWT(endpoint:string,env:WorkerEnv):Promise<string> {
  */
 async function encryptWebPush(
   payload:PushPayload,subscription:PushSubscriptionRecord,
-):Promise<Uint8Array> {
+):Promise<Uint8Array<ArrayBuffer>> {
   if(!subscription || typeof subscription.p256dh!=="string"
     || typeof subscription.auth!=="string")throw Error("Abonnement incomplet");
   const receiver=unb64(subscription.p256dh);
@@ -458,9 +489,25 @@ async function googleAccessToken(uid:string,env:WorkerEnv):Promise<string> {
       client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,
       refresh_token:data.refresh_token!,
       grant_type:"refresh_token",
-    }),redirect:"error",
+    }),redirect:"error",signal:env.syncSignal,
   });
-  if(!response.ok)throw Error("Réautorisation Google nécessaire");
+  if(!response.ok){
+    if(response.status===400){
+      const failure=await response.json().catch(()=>null) as {error?:string}|null;
+      if(failure?.error==="invalid_grant"){
+        const path="users/"+uid+"/googleCalendarConnection/status";
+        const previous=await readDocument(path,env);
+        if(previous?.status==="active"&&previous.__updateTime){
+          const issue=parseGoogleSyncError({status:401});
+          await writeDocument(path,{
+            ...previous,status:"reauthorization_required",lastError:issue.code,
+          },env,{updateTime:previous.__updateTime});
+        }
+        throw Object.assign(Error("Réautorisation Google nécessaire"),{status:401});
+      }
+    }
+    throw Object.assign(Error("Renouvellement Google indisponible"),{status:response.status});
+  }
   const token=await response.json() as {access_token?:string};
   if(!token.access_token)throw Error("Jeton Google absent");
   return token.access_token;
@@ -470,8 +517,9 @@ async function googleRequest(path:string,init:RequestInit,uid:string,env:WorkerE
   if(url.hostname!=="www.googleapis.com"||!url.pathname.startsWith("/calendar/v3/")
     ||url.protocol!=="https:")throw Error("Destination Google refusée");
   return fetch(url,{
-    ...init,headers:{...init.headers,Authorization:"Bearer "+await googleAccessToken(uid,env)},
-    redirect:"error",cache:"no-store",
+    ...init,headers:{...init.headers,Authorization:"Bearer "+await (env.syncSignal
+      ? (env.syncToken ??= googleAccessToken(uid,env)) : googleAccessToken(uid,env))},
+    redirect:"error",cache:"no-store",signal:env.syncSignal,
   });
 }
 
@@ -526,33 +574,35 @@ async function completeGoogleOAuthCallback(
   if(!code||code.length>4096)throw Error("Code OAuth invalide");
   const stored=await validateGoogleOAuthState(state,env);
   const uid=stored.uid as string;
-  const {__updateTime:revision,...original}=stored;
-  delete original.__name;
-  await writeDocument("serverOAuthStates/"+state,{
-    ...original,consumedAt:new Date().toISOString(),
-  },env,{updateTime:revision});
-  const response=await fetch("https://oauth2.googleapis.com/token",{
-    method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
-    body:new URLSearchParams({
-      code,client_id:env.GOOGLE_CLIENT_ID,
-      client_secret:env.GOOGLE_CLIENT_SECRET,
-      redirect_uri:env.GOOGLE_REDIRECT_URI,
-      grant_type:"authorization_code",
-    }),redirect:"error",
+  return withGoogleCalendarLock(uid,env,async env=>{
+    const {__updateTime:revision,...original}=stored;
+    delete original.__name;
+    await writeDocument("serverOAuthStates/"+state,{
+      ...original,consumedAt:new Date().toISOString(),
+    },env,{updateTime:revision});
+    const response=await fetch("https://oauth2.googleapis.com/token",{
+      method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:new URLSearchParams({
+        code,client_id:env.GOOGLE_CLIENT_ID,
+        client_secret:env.GOOGLE_CLIENT_SECRET,
+        redirect_uri:env.GOOGLE_REDIRECT_URI,
+        grant_type:"authorization_code",
+      }),redirect:"error",signal:env.syncSignal,
+    });
+    if(!response.ok)throw Error("Code OAuth non accepté");
+    const token=await response.json() as TokenResponse;
+    if(!token.refresh_token||!token.access_token
+      ||!token.scope?.split(" ").includes(calendarScope))
+      throw Error("Consentement Google insuffisant");
+    const ciphertext=await sealGoogleGrant(uid,token,env);
+    await writeDocument("users/"+uid+"/googleOAuthGrant/primary",{
+      uid,calendarId:"primary",ciphertext,keyVersion:"v1",
+      scopes:[calendarScope],issuedAt:new Date().toISOString(),
+    },env);
+    const status={uid,calendarId:"primary" as const,status:"active" as const};
+    await writeDocument("users/"+uid+"/googleCalendarConnection/status",status,env);
+    return status;
   });
-  if(!response.ok)throw Error("Code OAuth non accepté");
-  const token=await response.json() as TokenResponse;
-  if(!token.refresh_token||!token.access_token
-    ||!token.scope?.split(" ").includes(calendarScope))
-    throw Error("Consentement Google insuffisant");
-  const ciphertext=await sealGoogleGrant(uid,token,env);
-  await writeDocument("users/"+uid+"/googleOAuthGrant/primary",{
-    uid,calendarId:"primary",ciphertext,keyVersion:"v1",
-    scopes:[calendarScope],issuedAt:new Date().toISOString(),
-  },env);
-  const status={uid,calendarId:"primary" as const,status:"active" as const};
-  await writeDocument("users/"+uid+"/googleCalendarConnection/status",status,env);
-  return status;
 }
 
 /** M109 · Pagination et syncToken Google, sans destruction si 410 Gone. */
@@ -573,7 +623,7 @@ async function pullGoogleCalendarChanges(uid:string,cursor:GoogleSyncCursor,
       cursor.nextSyncToken=undefined;resetOnce=true;page=undefined;count=-1;all.length=0;
       continue;
     }
-    if(!response.ok)throw Error("Google Calendar pull failed");
+    if(!response.ok)throw Object.assign(Error("Google Calendar pull failed"),{status:response.status});
     const data=await response.json() as {
       items?:Array<Record<string,unknown>>;
       nextPageToken?:string;nextSyncToken?:string;
@@ -602,19 +652,18 @@ async function pullGoogleCalendarChanges(uid:string,cursor:GoogleSyncCursor,
   throw Error("Google Calendar pagination exceeds bounded free batch");
 }
 
-/** M111 · Transformation prudente d'un événement horaire non récurrent.
- * Cas complexes : résultat d'erreur, à traiter comme conflit explicite.
- */
+/** M111 · Projection des événements horaires et règles O05 représentables. */
 async function mapGoogleEvent(change:GoogleCalendarChange,uid:string,
   local?:Activity):Promise<{ok:true;value:Activity}|{ok:false;error:{code:string;message:string}}> {
   const start=change.start as {dateTime?:string;timeZone?:string}|undefined;
   const end=change.end as {dateTime?:string;timeZone?:string}|undefined;
   const payload=change.payload as {summary?:string;recurringEventId?:string};
-  if(change.status==="cancelled"||!start?.dateTime||!end?.dateTime
-    ||change.recurrence||payload?.recurringEventId) return {ok:false,error:{
+  const unsupported={ok:false as const,error:{
       code:"UNSUPPORTED_GOOGLE_EVENT",
       message:"Récurrence, exception ou événement sans horaire : résolution manuelle nécessaire.",
-    }};
+  }};
+  if(change.status==="cancelled"||!start?.dateTime||!end?.dateTime
+    ||payload?.recurringEventId)return unsupported;
   const t1=Date.parse(start.dateTime),t2=Date.parse(end.dateTime);
   if(!Number.isFinite(t1)||!Number.isFinite(t2)||t2<t1) return {ok:false,error:{
     code:"INVALID_GOOGLE_DATES",message:"Horaires de l'événement non reconnus.",
@@ -626,6 +675,46 @@ async function mapGoogleEvent(change:GoogleCalendarChange,uid:string,
   try{new Intl.DateTimeFormat("fr-FR",{timeZone:zone});}catch{
     return {ok:false,error:{code:"GOOGLE_ZONE_INVALID",message:"Fuseau horaire non reconnu."}};
   }
+  let recurrence: RecurrenceRule | undefined;
+  const rules=change.recurrence;
+  if(rules!==undefined && !(Array.isArray(rules)&&rules.length===0)){
+    if(!Array.isArray(rules)||rules.length!==1||typeof rules[0]!=="string"
+      ||!rules[0].startsWith("RRULE:")||!start.timeZone)return unsupported;
+    const raw=rules[0].slice(6).split(";");
+    const fields=new Map<string,string>();
+    for(const entry of raw){
+      const [name,value,...extra]=entry.split("=");
+      if(!["FREQ","INTERVAL","COUNT","UNTIL","BYDAY","WKST"].includes(name)
+        ||!value||extra.length||fields.has(name))return unsupported;
+      fields.set(name,value);
+    }
+    const frequency=fields.get("FREQ")?.toLowerCase() as RecurrenceRule["frequency"]|undefined;
+    const interval=Number(fields.get("INTERVAL")??"1");
+    const count=fields.has("COUNT")?Number(fields.get("COUNT")):undefined;
+    const until=fields.get("UNTIL");
+    const untilParts=until?.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+    const untilIso=untilParts
+      ? untilParts[1]+"-"+untilParts[2]+"-"+untilParts[3]+"T"+
+        untilParts[4]+":"+untilParts[5]+":"+untilParts[6]+"Z" : undefined;
+    const isoDays=["MO","TU","WE","TH","FR","SA","SU"];
+    const weekdays=fields.get("BYDAY")?.split(",").map(day=>isoDays.indexOf(day)+1);
+    if(!frequency||!["daily","weekly","monthly","yearly"].includes(frequency)
+      ||!Number.isInteger(interval)||interval<1||interval>365
+      ||count!==undefined&&(!Number.isSafeInteger(count)||count<1||count>10_000||Boolean(until))
+      ||Boolean(until)&&(!untilIso||!Number.isFinite(Date.parse(untilIso))||Date.parse(untilIso)<t1)
+      ||(fields.get("WKST")??"MO")!=="MO"
+      ||weekdays&&(frequency!=="weekly"||weekdays.includes(0)))return unsupported;
+    if(weekdays){
+      const firstWeekday=new Intl.DateTimeFormat("en",{timeZone:zone,weekday:"short"})
+        .format(t1).slice(0,2).toUpperCase();
+      if(!weekdays.includes(isoDays.indexOf(firstWeekday)+1))return unsupported;
+    }
+    recurrence={frequency,interval,
+      ...(count===undefined?{}:{count}),
+      ...(untilIso?{until:untilIso}:{}),
+      ...(weekdays?{weekdays:[...new Set(weekdays)] as NonNullable<RecurrenceRule["weekdays"]>}:{}),
+    };
+  }
   const link:GoogleEventLink={
     calendarId:change.calendarId,googleEventId:change.eventId,etag:change.etag,
     remoteUpdatedAt:change.updatedAt,pending:"none",source:local?.googleLink?.source??"google",
@@ -634,6 +723,7 @@ async function mapGoogleEvent(change:GoogleCalendarChange,uid:string,
     ...(local??{}),id,uid,
     title:(payload.summary||"Sans titre").slice(0,500),
     startAt:new Date(t1).toISOString(),endAt:new Date(t2).toISOString(),
+    plannedOn:new Date(t1).toLocaleDateString("sv-SE",{timeZone:zone}),recurrence,
     timeZone:zone,autoComplete:local?.autoComplete??true,
     updatedAt:new Date().toISOString(),googleLink:link,
   };
@@ -654,31 +744,56 @@ async function pushGoogleCalendarEvent(uid:string,activity:Activity,
   if(link.pending==="delete" && !link.googleEventId) return {ok:false,error:{
     code:"GOOGLE_EVENT_ID_MISSING",message:"Suppression sans événement distant identifié.",
   }};
-  if(link.pending==="upsert"&&(!activity.startAt||!activity.endAt
-    ||activity.recurrence))return {ok:false,error:{
+  if(link.pending==="upsert"&&(!activity.startAt||!activity.endAt))return {ok:false,error:{
       code:"GOOGLE_EVENT_UNSUPPORTED",
-      message:"Seuls les événements horaires simples et complets peuvent être exportés.",
+    message:"Indique un début et une fin pour exporter un événement.",
     }};
   const base="/calendar/v3/calendars/primary/events";
-  const target=link.googleEventId
-    ?base+"/"+encodeURIComponent(link.googleEventId):base;
-  const method=link.pending==="delete"?"DELETE":link.googleEventId?"PATCH":"POST";
+  const isNew=link.source==="app"&&!link.etag&&!link.remoteUpdatedAt
+    && /^op[a-f0-9]{32}$/.test(link.googleEventId)
+    && link.googleEventId==="op"+activity.id.replaceAll("-","");
+  if(isNew&&link.pending==="delete"){
+    // Une création incertaine est vérifiée par lecture Google avant tout effacement.
+    const response=await googleRequest(base+"/"+encodeURIComponent(link.googleEventId),{},uid,env);
+    if(response.status===404||response.status===410)
+      return {ok:true,value:{...link,pending:"none"}};
+  }
+  const method=link.pending==="delete"?"DELETE":isNew?"POST":"PATCH";
+  const target=method==="POST"?base:base+"/"+encodeURIComponent(link.googleEventId);
   const headers:Record<string,string>={};
   if(method!=="DELETE")headers["Content-Type"]="application/json";
   if(link.googleEventId && link.etag)headers["If-Match"]=link.etag;
   // Sans ETag sur une cible existante, pas d'écrasement aveugle.
-  if(link.googleEventId&&!link.etag) return {ok:false,error:{
+  if(method!=="POST"&&!link.etag) return {ok:false,error:{
     code:"GOOGLE_ETAG_REQUIRED",message:"Version Google inconnue, synchronise avant modification.",
   }};
+  const rule=activity.recurrence;
+  const recurrence:string[]=[];
+  if(method!=="DELETE"&&rule){
+    const until=rule.until;
+    if((until&&(!until.includes("T")||!Number.isFinite(Date.parse(until))))||(until&&rule.count)){
+      return {ok:false,error:{code:"GOOGLE_RECURRENCE_UNSUPPORTED",
+        message:"La fin de cette série doit être ajustée avant la synchronisation."}};
+    }
+    const isoDays=["MO","TU","WE","TH","FR","SA","SU"];
+    const parts=["FREQ="+rule.frequency.toUpperCase(),"INTERVAL="+rule.interval];
+    if(rule.weekdays?.length)parts.push("BYDAY="+rule.weekdays.map(day=>isoDays[day-1]).join(","));
+    if(rule.count)parts.push("COUNT="+rule.count);
+    if(until)parts.push("UNTIL="+new Date(until).toISOString().replace(/[-:]|\.\d{3}/g,""));
+    recurrence.push("RRULE:"+parts.join(";"));
+  }
   const payload=method==="DELETE"?undefined:JSON.stringify({
+    ...(method==="POST"?{id:link.googleEventId}:{}),
     summary:activity.title,
     start:{dateTime:activity.startAt,timeZone:activity.timeZone},
     end:{dateTime:activity.endAt,timeZone:activity.timeZone},
+    recurrence,
   });
   const response=await googleRequest(target,{
     method,headers,...(payload?{body:payload}:{}),
   },uid,env);
-  if(!response.ok)return {ok:false,error:{
+  if(!response.ok&&!(method==="DELETE"&&(response.status===404||response.status===410)))
+    return {ok:false,error:{
     code:response.status===409||response.status===412?"GOOGLE_CONFLICT":"GOOGLE_PUSH_FAILED",
     message:"Google n'a pas confirmé la modification, les données locales sont conservées.",
   }};
@@ -701,29 +816,61 @@ async function pushGoogleCalendarEvent(uid:string,activity:Activity,
  * O26 matérialise chaque événement distant non pris en charge ou concurrent.
  */
 async function reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[],
-  env:WorkerEnv):Promise<{pulled:number;conflicts:number}> {
+  env:WorkerEnv):Promise<{pulled:number;conflicts:number;blocked:Set<string>;complete:boolean}> {
   const path="users/"+uid+"/activities";
-  const previous=await listDocuments(path,env);
+  const conflictsPath="users/"+uid+"/googleCalendarConflicts";
+  const [previous,issues]=await Promise.all([
+    listDocuments(path,env),listDocuments(conflictsPath,env),
+  ]);
   const byId=new Map(previous.map(item=>[item.id as string,item]));
+  const linkedEvents=new Map(previous.flatMap(item=>{
+    const link=item.googleLink as GoogleEventLink|undefined;
+    return link?.calendarId==="primary" ? [[link.googleEventId,item] as const] : [];
+  }));
+  const knownIssues=new Map(issues.map(issue=>[issue.id as string,issue]));
+  const blocked=new Set(issues.filter(issue=>issue.status==="open")
+    .map(issue=>issue.localEventId as string));
+  let pulled=0;
   let conflicts=0;
+  let writes=0;
+  let complete=true;
   for(const change of changes){
-    const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",
-      codec.encode(change.calendarId+":"+change.eventId)));
-    const id="g_"+b64url(digest).slice(0,30);
-    const existing=previous.find(record=>{
-      const link=record.googleLink as GoogleEventLink|undefined;
-      return link?.calendarId===change.calendarId&&link.googleEventId===change.eventId;
-    })??byId.get(id);
+    if(writes>=8){complete=false;break;}
+    const linkedRecord=linkedEvents.get(change.eventId);
+    const previousLink=linkedRecord?.googleLink as GoogleEventLink|undefined;
+    if(change.status!=="cancelled" && change.etag && previousLink?.etag===change.etag)continue;
+    const id=linkedRecord?.id as string|undefined ?? ("g_"+b64url(new Uint8Array(
+      await crypto.subtle.digest("SHA-256",codec.encode(change.calendarId+":"+change.eventId)),
+    )).slice(0,30));
+    const existing=linkedRecord??byId.get(id);
     const effectiveId=existing?.id as string|undefined ?? id;
     const stored=existing as unknown as Activity|undefined;
     const pending=stored?.googleLink?.pending;
     const mapped=await mapGoogleEvent(change,uid,stored);
+    const linked=stored?.googleLink?.googleEventId===change.eventId;
+    const exception=(change.payload as {recurringEventId?:string}|undefined)?.recurringEventId;
+    if(linked && change.status!=="cancelled" && pending==="upsert" && mapped.ok
+      && stored?.title===mapped.value.title && stored.startAt===mapped.value.startAt
+      && stored.endAt===mapped.value.endAt
+      && JSON.stringify(stored.recurrence)===JSON.stringify(mapped.value.recurrence)
+      && existing?.__updateTime){
+      await writeDocument(path+"/"+effectiveId,{
+        ...stored,googleLink:mapped.value.googleLink,
+      },env,{updateTime:existing.__updateTime});
+      writes++;
+      pulled++;
+      continue;
+    }
+    if(linked && change.status!=="cancelled" && change.etag
+      && stored?.googleLink?.etag===change.etag)continue;
+    if(change.status==="cancelled" && !linked && !exception)continue;
     const other= mapped.ok ? previous.find(local=>
       local.id!==effectiveId && !local.googleLink
       && local.title===mapped.value.title && local.startAt===mapped.value.startAt
       && !local.deletedAt) : undefined;
-    const mustResolve=(!mapped.ok && change.status!=="cancelled")
-      ||Boolean(pending&&pending!=="none")||Boolean(other);
+    const mustResolve=Boolean(exception)||(!mapped.ok && change.status!=="cancelled")
+      ||Boolean(pending&&pending!=="none"&&!(pending==="delete"&&change.status==="cancelled"))
+      ||Boolean(other)||Boolean(existing&&!linked);
     if(mustResolve){
       const conflictHash=new Uint8Array(await crypto.subtle.digest("SHA-256",
         codec.encode(uid+":"+change.eventId)));
@@ -731,34 +878,44 @@ async function reconcileGoogleCalendar(uid:string,changes:GoogleCalendarChange[]
       const conflict:CalendarSyncConflict={
         id:conflictId,uid,localEventId:(other?.id as string)||effectiveId,
         googleEventId:change.eventId,
-        kind:!mapped.ok ? "recurrence" : other ? "mapping" : "update",
+        kind:exception ? "recurrence" : change.status==="cancelled" ? "delete" : !mapped.ok ? "recurrence"
+          : other || !linked ? "mapping" : "update",
         localVersion:stored?.updatedAt??"",
         googleVersion:change.etag??change.updatedAt,
         detectedAt:new Date().toISOString(),status:"open",
       };
-      await writeDocument("users/"+uid+"/googleCalendarConflicts/"+conflictId,
-        conflict as unknown as Record<string,unknown>,env);
+      const known=knownIssues.get(conflictId);
+      if(known?.googleVersion!==conflict.googleVersion || known.localVersion!==conflict.localVersion){
+        await writeDocument(conflictsPath+"/"+conflictId,
+          conflict as unknown as Record<string,unknown>,env);
+        writes++;
+      }
+      if(known?.status==="resolved"&&known.googleVersion===conflict.googleVersion
+        && known.localVersion===conflict.localVersion)continue;
+      blocked.add(effectiveId);
       conflicts++;
       continue;
     }
     if(change.status==="cancelled"){
-      if(!stored||stored.deletedAt)continue;
+      if(!stored||(stored.deletedAt&&pending!=="delete"))continue;
       const {__updateTime:revision}=existing!;
       await writeDocument(path+"/"+effectiveId,{
-        ...stored,deletedAt:new Date().toISOString(),
+        ...stored,deletedAt:stored.deletedAt??new Date().toISOString(),
         updatedAt:new Date().toISOString(),
         googleLink:{...stored.googleLink,pending:"none",remoteUpdatedAt:change.updatedAt},
       },env,revision?{updateTime:revision}:undefined);
+      writes++;
+      pulled++;
       continue;
     }
     if(!mapped.ok)continue;
-    if(existing?.googleLink && (existing.googleLink as GoogleEventLink).etag===change.etag)
-      continue;
     await writeDocument(path+"/"+effectiveId,mapped.value as unknown as Record<string,unknown>,
       env,existing?.__updateTime
         ?{updateTime:existing.__updateTime}:{exists:false});
+    writes++;
+    pulled++;
   }
-  return {pulled:changes.length,conflicts};
+  return {pulled,conflicts,blocked,complete};
 }
 
 /** M108 · Synchronisation volontaire ou à l'ouverture, en petites tranches.
@@ -779,11 +936,16 @@ async function syncGoogleCalendar(uid:string,
   const merged=await reconcileGoogleCalendar(uid,gathered.changes,env);
   let pushed=0,conflicts=merged.conflicts;
   const activities=await listDocuments("users/"+uid+"/activities",env);
+  let outgoing=0;
+  let complete=merged.complete;
   // Les changements locaux doivent porter explicitement O24.pending.
   for(const item of activities){
     const local=item as unknown as Activity;
-    if(local.uid!==uid||!local.googleLink
+    if(!merged.complete)break;
+    if(local.uid!==uid||!local.googleLink||merged.blocked.has(local.id)
       ||local.googleLink.pending==="none")continue;
+    if(outgoing>=5){complete=false;break;}
+    outgoing++;
     const result=await pushGoogleCalendarEvent(uid,local,env);
     if(result.ok){
       await writeDocument("users/"+uid+"/activities/"+local.id,{
@@ -806,7 +968,7 @@ async function syncGoogleCalendar(uid:string,
     }
   }
   const finishedAt=new Date().toISOString();
-  await writeDocument(statePath,{
+  if(merged.complete)await writeDocument(statePath,{
     uid,calendarId:"primary",
     ...(gathered.token?{nextSyncToken:gathered.token}:{}),
     ...(cursor.nextSyncToken?{}:{lastFullSyncAt:finishedAt}),
@@ -821,8 +983,9 @@ async function syncGoogleCalendar(uid:string,
   return {
     uid,calendarId:"primary",startedAt,finishedAt,
     pulled:merged.pulled,pushed,conflicts,
-    status:conflicts?"partial":"ok",
-    details:conflicts?"Certains événements nécessitent une décision.":undefined,
+    status:conflicts||!complete?"partial":"ok",
+    details:!complete?"La synchronisation se poursuivra lors d’un prochain passage."
+      :conflicts?"Certains événements nécessitent une décision.":undefined,
   };
 }
 
@@ -984,7 +1147,7 @@ async function resolveGoogleCalendarConflict(uid:string,conflictId:string,
   const commit=new URL("https://firestore.googleapis.com/v1/"+
     database+"/documents:commit");
   const finished=await fetch(commit,{
-    method:"POST",redirect:"error",cache:"no-store",
+    method:"POST",redirect:"error",cache:"no-store",signal:env.syncSignal,
     headers:{
       "Authorization":"Bearer "+await serviceAccessToken(env),
       "Content-Type":"application/json",
@@ -1088,13 +1251,18 @@ async function handleWorkerRequest(req:Request,env:WorkerEnv):Promise<Response> 
       if(!["startup","edit","manual"].includes(String(input.reason)))
         return respond({ok:false,error:{code:"INVALID_REASON",
           message:"Motif de synchronisation inconnu."}},origin,400);
-      const status=await readDocument("users/"+uid+"/googleCalendarConnection/status",env);
-      if(status?.status!=="active")return respond({ok:false,error:{
+      const connection=await readDocument("users/"+uid+"/googleCalendarConnection/status",env);
+      if(connection?.status!=="active")return respond({ok:false,error:{
         code:"GOOGLE_NOT_CONNECTED",message:"Connecte d'abord Google Agenda.",
       }},origin,409);
-      const result=await syncGoogleCalendar(uid,
-        input.reason as "startup"|"edit"|"manual",env);
-      return respond({ok:true,value:result},origin);
+      return await withGoogleCalendarLock(uid,env,async env=>{
+        const status=await readDocument("users/"+uid+"/googleCalendarConnection/status",env);
+        if(status?.status!=="active")return respond({ok:false,error:{
+          code:"GOOGLE_NOT_CONNECTED",message:"Connecte d'abord Google Agenda.",
+        }},origin,409);
+        const result=await syncGoogleCalendar(uid,input.reason as "startup"|"edit"|"manual",env);
+        return respond({ok:true,value:result},origin);
+      });
     }
     if(path==="/api/google/conflicts"){
       const docs=await listDocuments("users/"+uid+"/googleCalendarConflicts",env);
@@ -1111,31 +1279,34 @@ async function handleWorkerRequest(req:Request,env:WorkerEnv):Promise<Response> 
         ||!["keepLocal","keepGoogle","keepBoth"].includes(String(input.choice)))
         return respond({ok:false,error:{code:"INVALID_CONFLICT",
           message:"Décision de conflit invalide."}},origin,400);
-      await resolveGoogleCalendarConflict(uid,input.conflictId,
-        input.choice as "keepLocal"|"keepGoogle"|"keepBoth",env);
+      const conflictId=input.conflictId;
+      await withGoogleCalendarLock(uid,env,env=>resolveGoogleCalendarConflict(uid,conflictId,
+        input.choice as "keepLocal"|"keepGoogle"|"keepBoth",env));
       return respond({ok:true,value:null},origin);
     }
     if(path==="/api/google/unlink"){
-      const grantPath="users/"+uid+"/googleOAuthGrant/primary";
-      const stored=await readDocument(grantPath,env);
-      if(stored&&!stored.revokedAt){
-        const token=await openGoogleGrant(uid,stored,env);
-        const response=await fetch("https://oauth2.googleapis.com/revoke",{
-          method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
-          body:new URLSearchParams({token:token.refresh_token??""}),
-          redirect:"error",
-        });
-        if(!response.ok&&response.status!==400)throw Error("Révocation non confirmée");
-        await writeDocument(grantPath,{
-          uid,calendarId:"primary",ciphertext:"",keyVersion:"v1",
-          scopes:[],issuedAt:stored.issuedAt,
-          revokedAt:new Date().toISOString(),
-        },env,stored.__updateTime?{updateTime:stored.__updateTime}:undefined);
-      }
-      await writeDocument("users/"+uid+"/googleCalendarConnection/status",{
-        uid,calendarId:"primary",status:"disconnected",
-      },env);
-      return respond({ok:true,value:null},origin);
+      return await withGoogleCalendarLock(uid,env,async env=>{
+        const grantPath="users/"+uid+"/googleOAuthGrant/primary";
+        const stored=await readDocument(grantPath,env);
+        if(stored&&!stored.revokedAt){
+          const token=await openGoogleGrant(uid,stored,env);
+          const response=await fetch("https://oauth2.googleapis.com/revoke",{
+            method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+            body:new URLSearchParams({token:token.refresh_token??""}),
+            redirect:"error",signal:env.syncSignal,
+          });
+          if(!response.ok&&response.status!==400)throw Error("Révocation non confirmée");
+          await writeDocument(grantPath,{
+            uid,calendarId:"primary",ciphertext:"",keyVersion:"v1",
+            scopes:[],issuedAt:stored.issuedAt,
+            revokedAt:new Date().toISOString(),
+          },env,stored.__updateTime?{updateTime:stored.__updateTime}:undefined);
+        }
+        await writeDocument("users/"+uid+"/googleCalendarConnection/status",{
+          uid,calendarId:"primary",status:"disconnected",
+        },env);
+        return respond({ok:true,value:null},origin);
+      });
     }
     if(path==="/api/push/test"){
       if(typeof input.deviceId!=="string")
@@ -1145,12 +1316,70 @@ async function handleWorkerRequest(req:Request,env:WorkerEnv):Promise<Response> 
       return respond(result,origin,result.ok?200:409);
     }
     return respond({ok:false,error:{code:"NOT_FOUND",message:"Route absente."}},origin,404);
-  }catch{
+  }catch(error){
     // Jamais de réponse brute Google, Firestore ou OAuth contenant un secret.
+    if(error instanceof Error && error.message==="GOOGLE_SYNC_BUSY"){
+      return respond({ok:false,error:{
+        code:"GOOGLE_SYNC_BUSY",message:"Une opération Google Agenda est déjà en cours. Réessaie dans un instant.",
+      }},origin,409);
+    }
+    const google=parseGoogleSyncError(error);
+    if(["GOOGLE_REAUTHORIZE","GOOGLE_RATE_LIMIT"].includes(google.code)){
+      return respond({ok:false,error:google},origin,google.code==="GOOGLE_RATE_LIMIT"?429:409);
+    }
     return respond({ok:false,error:{
       code:"REMOTE_OPERATION_FAILED",
       message:"Le serveur n'a pas confirmé l'opération. Réessaie sans risque.",
     }},origin,503);
+  }
+}
+
+/** M114 · Un compte actif par passage, avec une rotation sur la liste bornée. */
+async function runGoogleCalendarCron(now:string,env:WorkerEnv):Promise<Result<CalendarSyncRun[]>> {
+  const timestamp=Date.parse(now);
+  if(!Number.isFinite(timestamp))return {ok:false,error:{
+    code:"INVALID_INSTANT",message:"Date Cron invalide.",
+  }};
+  try {
+    const url=new URL("https://firestore.googleapis.com/v1/projects/"+
+      encodeURIComponent(env.FIREBASE_PROJECT_ID)+"/databases/(default)/documents:runQuery");
+    const response=await fetch(url,{
+      method:"POST",redirect:"error",cache:"no-store",
+      headers:{Authorization:"Bearer "+await serviceAccessToken(env),"Content-Type":"application/json"},
+      body:JSON.stringify({structuredQuery:{
+        from:[{collectionId:"googleCalendarConnection",allDescendants:true}],limit:21,
+      }}),
+    });
+    if(!response.ok)throw Error("Lecture Firestore refusée");
+    const rows:unknown=await response.json();
+    if(!Array.isArray(rows))throw Error("Format Firestore inattendu");
+    const documents=rows.filter(row=>row && typeof row==="object" && "document" in row)
+      .map(row=>unpackDocument(row.document));
+    if(documents.length>20)return {ok:false,error:{
+      code:"GOOGLE_SCAN_LIMIT",message:"Trop de comptes pour une synchronisation automatique bornée.",
+    }};
+    const accounts=documents.flatMap(row=>{
+      const path=/\/documents\/users\/([A-Za-z0-9_-]{1,128})\/googleCalendarConnection\/status$/
+        .exec(row.__name??"");
+      return path && row.uid===path[1] && row.status==="active" && row.calendarId==="primary"
+        ? [path[1]] : [];
+    }).sort();
+    // Un calendrier 30 min ne sélectionnerait qu'un sous-ensemble avec un modulo
+    // sur l'heure. La rotation utilise des tranches de 30 min (déclencheur F38).
+    if(!accounts.length)return {ok:true,value:[]};
+    const index=Math.floor(timestamp/1_800_000)%accounts.length;
+    const uid=accounts[index];
+    return await withGoogleCalendarLock(uid,env,async env=>{
+      const status=await readDocument("users/"+uid+"/googleCalendarConnection/status",env);
+      if(status?.status!=="active")return {ok:true,value:[]};
+      const result=await syncGoogleCalendar(uid,"startup",env);
+      return {ok:true,value:[result]};
+    });
+  } catch (error) {
+    if(error instanceof Error && error.message==="GOOGLE_SYNC_BUSY")return {ok:true,value:[]};
+    return {ok:false,error:{
+      code:"GOOGLE_CRON_FAILED",message:"Le passage automatique n'a pas pu être confirmé.",
+    }};
   }
 }
 
@@ -1598,11 +1827,17 @@ export default {
   fetch(request:Request,env:WorkerEnv):Promise<Response> {
     return handleWorkerRequest(request,env);
   },
-  async scheduled(_controller:unknown,env:WorkerEnv):Promise<void> {
+  async scheduled(controller:{scheduledTime?:number;cron?:string},env:WorkerEnv):Promise<void> {
     // Même en cas de configuration accidentelle d'un déclencheur,
     // aucune notification ni mutation distante n'a lieu sans recette.
     if(env.ENABLE_CRON!=="true")return;
     if(!CRON_SECURITY_APPROVED)throw Error("CRON_NOT_VALIDATED");
-    await handleWorkerCron(new Date().toISOString(),env);
+    const now=new Date(controller.scheduledTime??Date.now()).toISOString();
+    if(controller.cron==="0,30 * * * *"){
+      const google=await runGoogleCalendarCron(now,env);
+      if(!google.ok)throw Error(google.error.code);
+    }else if(controller.cron==="*/5 * * * *"){
+      await handleWorkerCron(now,env);
+    }
   },
 };

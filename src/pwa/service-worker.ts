@@ -2,8 +2,10 @@
 import type { PushPayload, Result } from "../domain/types";
 
 const appScope = "/organiseur-personnel/";
-const shellRevision = "s10-1";
+const shellRevision = "s10-2";
 const cachePrefix = "organiseur-shell-";
+// F06 remplace cette liste uniquement dans le worker généré par le build.
+const buildAssets: readonly string[] = [];
 
 /** M79 · Enregistrer uniquement en contexte HTTPS / Pages. */
 export async function registerServiceWorker(): Promise<Result<void>> {
@@ -41,25 +43,13 @@ export async function cacheAppShell(revision: string): Promise<Result<void>> {
   try {
     const cache = await caches.open(cachePrefix + revision);
     const homeUrl = new URL(appScope, location.origin).toString();
-    await cache.addAll([
+    const shell = [
       homeUrl,
       new URL(appScope + "manifest.webmanifest", location.origin).toString(),
-    ]);
-    // Après compilation Vite, précharger aussi les JS/CSS du shell.
-    // Sinon le HTML pourrait être disponible hors ligne, mais pas son code.
-    const home = await cache.match(homeUrl);
-    if (!home) throw new Error("Shell indisponible.");
-    const html = await home.text();
-    const scriptsAndStyles: string[] = [];
-    for (const match of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
-      const resource = new URL(match[1], homeUrl);
-      if (resource.origin === location.origin
-        && resource.pathname.startsWith(appScope)
-        && /\.(?:js|css)$/.test(resource.pathname)) {
-        scriptsAndStyles.push(resource.toString());
-      }
-    }
-    if (scriptsAndStyles.length) await cache.addAll([...new Set(scriptsAndStyles)]);
+      ...[180, 192, 512].map(size => new URL("icons/icon-" + size + ".png", homeUrl).toString()),
+      ...buildAssets.map(path => new URL(path, homeUrl).toString()),
+    ];
+    await cache.addAll(shell.map(url => new Request(url, {cache: "reload"})));
     return { ok: true, value: undefined };
   } catch {
     return { ok: false, error: {
@@ -187,25 +177,24 @@ if (typeof document === "undefined" && "registration" in globalThis && "clients"
       || relative === "manifest.webmanifest"
       || relative === "service-worker.js"
       || /^assets\/[a-zA-Z0-9._/-]+$/.test(relative)
+      || /^icons\/icon-(180|192|512)\.png$/.test(relative)
       || /^catalog\/[a-zA-Z0-9._/-]+$/.test(relative)
     );
     if (request.method !== "GET" || url.origin !== location.origin
-      || url.search !== "" || !publicAsset) return;
+      || url.search !== "" || request.cache === "no-store" || !publicAsset) return;
     e.respondWith((async (): Promise<Response> => {
+      const cache = await caches.open(cachePrefix + shellRevision);
+      const key = request.mode === "navigate"
+        ? new URL(appScope, location.origin).toString() : request;
+      const cached = await cache.match(key);
+      if (cached) return cached;
       try {
         const response = await fetch(request);
         if (response.ok && response.type === "basic") {
-          const cache = await caches.open(cachePrefix + shellRevision);
-          await cache.put(request, response.clone());
+          await cache.put(key, response.clone());
         }
         return response;
       } catch {
-        const cached = await caches.match(request);
-        if (cached) return cached;
-        if (request.mode === "navigate") {
-          const home = await caches.match(new URL(appScope, location.origin).toString());
-          if (home) return home;
-        }
         return new Response("Application indisponible hors connexion.", {
           status: 503,
           headers: { "Content-Type": "text/plain; charset=utf-8" },

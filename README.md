@@ -1,6 +1,15 @@
 # organiseur-personnel
 
-Application personnelle iPhone **PWA**, en cours de conception. Installation via GitHub Pages, sauvegardes légères prévues sur Firebase Spark, **synchronisation bidirectionnelle Google Agenda prévue**, bibliothèque multimédia locale. **Objectif : 0 €**.
+Organiseur personnel pour iPhone, conçu comme une PWA. Il réunit les activités, le calendrier, les listes, la musique et les décors. **Objectif de fonctionnement : 0 €**.
+
+## État de la version 0.1.2 · 21 novembre 2026
+
+- Thèmes fixes ou saisonniers, fond d'écran à partir de la galerie, trois icônes d'installation. Le choix d'un appareil de confiance peut être mémorisé pour le cache Firestore.
+- Cocher une tâche sans date la date d'aujourd'hui. Une fiche permet aussi de programmer un rappel par occurrence ou de partager un événement horaire avec Google Agenda après consentement.
+- Le Worker conserve les versions Google, sérialise les opérations d'un compte et prévoit une synchronisation en arrière-plan par petits lots. Les séries simples peuvent être synchronisées. Les exceptions et règles incompatibles sont signalées comme conflits.
+- La suppression physique se limite à cet appareil et vérifie d'abord la propriété et les références. Les anciens fichiers sans propriétaire vérifiable et les références actives sont protégés.
+
+La compilation du site et du Worker, six suites de tests locales et le contrôle de deux comptes dans les émulateurs Firebase réussissent. Le cache, le manifeste, les icônes et la réouverture hors ligne ont été vérifiés sur Chrome en format mobile. La recette sur iPhone reste à faire, notamment la restauration, l'audio avec écran verrouillé, le Web Push et la synchronisation Google réelle. Le site et les services sont en attente de mise en service.
 
 ## Documentation du projet
 
@@ -10,21 +19,18 @@ Application personnelle iPhone **PWA**, en cours de conception. Installation via
 
 > **Règle bloquante :** tout élément absent ou incompatible avec le registre d'architecture doit être soumis à l'utilisateur. Après accord explicite, la documentation d'architecture doit être mise à jour et committée **avant** le code. Pas d'ajout implicite.
 
-**État au 4 novembre 2026 :** 35 objets S0–S4 typés, fondations S5 et opérations S6 codées partiellement, cinq écrans et vues médias S7 en TypeScript natif, et **trois ajustements S8/D24 codés** : reports groupés de tâches oubliées, validation automatique par occurrence avec transactions Firestore, bilan mensuel filtrable accessible depuis Paramètres. L'interface ne remplace aucune donnée par défaut et les fichiers personnels restent locaux. **Code S5–S9 non testé et non déployé**, conformément à D23 : compilation du dépôt, émulateurs Firebase deux UID, transactions concurrentes, Safari iPhone, offline et VoiceOver à vérifier en recette finale. Aucune configuration Firebase réelle appliquée, aucune donnée privée modifiée, aucune facturation activée. **S9 en développement, non testée** : la décision D25 a autorisé les routes Worker et la protection des jetons. Le code F37/F45/F46 prépare OAuth Google distinct de Firebase, première synchronisation prudente des événements horaires et arbitrage des conflits. F33/F19 prépare les gestes de permission, abonnement et retrait Push ainsi que le test côté PWA. **L'envoi Web Push distant, l'ordonnanceur Cron et la synchronisation Google lorsque l'application est fermée ne sont PAS opérationnels**. F38 est non déployé, aucune clé VAPID réelle ni secret Google n'a été fourni ; aucune connexion externe ni paiement activé. **S10 reste à développer**.
-
 ## Organisation de l'interface (S7)
 
 L'application a désormais cinq onglets fixes, accessibles à une main : **Calendrier · Tâches · Jour · Habitudes · Listes**. Jour est l'accueil et présente uniquement **sans horaire** puis **avec horaire**. La semaine du calendrier affiche lundi à samedi (3×2) et un dimanche dépliable. L'icône gauche ouvre une fiche unique ; la validation à droite porte sur l'occurrence du jour.
 
-Sans configuration Firebase réelle, le shell montre uniquement des états vides et une invitation à se connecter, **jamais des données de démonstration présentées comme personnelles**. Les interfaces Musique, Décoration et Paramètres sont secondaires et encore incomplètes. La route Bilan mensuel attend la strate S8. La validation d'une tâche **sans date** nécessite une décision d'architecture complémentaire, puisqu'une coche O33 demande une occurrence datée.
-
-Les tests et la compilation sont **expressément remis à la recette finale D23** : les commandes ci-dessous décrivent comment les effectuer alors, et non des validations déjà réussies.
+Sans configuration Firebase réelle, l'application affiche des états vides et une invitation à se connecter. Le bilan mensuel est accessible dans Paramètres.
 
 ## Construire le projet (Node 22.12+ ou 24+)
 
 ```bash
 npm install
 npm run typecheck
+npm run test:core
 npm run build
 npm run preview
 ```
@@ -44,7 +50,7 @@ Options si fournies par Firebase : `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FI
 
 Le cache Firestore persistant est **soumis à la confirmation que l'appareil est personnel et fiable**. En cas de refus, cache mémoire seulement. La PWA et la musique en arrière-plan nécessitent toujours des essais sur un vrai iPhone.
 
-### Contrôles de sécurité restants
+### Historique des lots avant la version 0.1.2
 
 **Dernier lot S9B (5 novembre 2026) :** le Worker inclut maintenant une implémentation préparatoire de VAPID ES256 et du chiffrement Web Push RFC8291, ainsi que le verrou Firestore destiné à éviter les tests de notification répétés. **Les notifications distantes restent désactivées dans le code**, et aucun test, Cron, déploiement, secret ni coût n'a été engagé.
 
@@ -60,6 +66,6 @@ Le cache Firestore persistant est **soumis à la confirmation que l'appareil est
 
 **Lot de code du 12 novembre 2026 (NON TESTÉ / NON DÉPLOYÉ)** : F36 `src/pwa/update.ts` implémente M82/M83 pour consulter la version O17 publiée dans `manifest.webmanifest` puis activer une mise à jour seulement après confirmation dans Paramètres F19. F35 n'appelle plus `skipWaiting()` automatiquement au remplacement du worker ; seule une demande de mise à jour explicite active le worker en attente. Les caches supprimables restent exclusivement `organiseur-shell-*` : aucun IndexedDB ni Firestore n'est effacé. Les trois références de version (package, état embarqué, manifeste) sont alignées à 0.1.1 / s10-1. F24 ajoute M93 **uniquement pour le retrait des métadonnées d'un morceau importé** et le nettoyage de ses playlists ; le fichier reste local. M49/M69 et la branche d'effacement physique de M93 restent BLOQUÉES pour éviter toute suppression d'un média référencé sur un autre appareil ou compte. M52 vérifie désormais le titre avant de stocker le Blob. F19 rend les actions visibles, toujours sans exécuter de tests, installer la PWA, configurer Firebase ou publier Pages. **M66/M68/M96 (thèmes et fond appliqué), M114 (Google Agenda PWA fermée), les icônes PWA F10 et la recette D23 restent ouverts.** La version 0.1.1 désigne le **code**, pas une application livrée. Aucun paiement, secret, donnée personnelle ou service externe activé.
 
-Le fichier `tests/security.test.ts` contient le scénario T05 : deux UID distincts, refus de lecture/écriture croisée, blocage des jetons Google et des reçus serveur. Il **n'est pas exécuté automatiquement** et n'utilise **que les émulateurs locaux Firebase**, avec `FIREBASE_EMULATOR_TEST=1`. Un test ignoré ne constitue pas une validation. Aucun paquet Firebase CLI additionnel n'a été ajouté au projet par cet accord.
+Le scénario T05 dans `tests/security.test.ts` utilise exclusivement les émulateurs locaux Firebase Auth et Firestore avec `FIREBASE_EMULATOR_TEST=1`. Il couvre aussi le verrou Google, le profil du propriétaire et deux coches simultanées d'une tâche sans date. Les tests Google de `npm run test:core` utilisent des réponses simulées.
 
 **Propriétaire :** `Pecose`. Indépendant de tout dépôt `T-C-Umbral`.
