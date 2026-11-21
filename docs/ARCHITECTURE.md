@@ -59,6 +59,7 @@
 | D27 | **Accord explicite du 21 novembre 2026** : cataloguer les trois icônes d'installation F10, protéger M108/M114 par un verrou Google par UID et enregistrer la propriété des nouveaux fichiers locaux pour M49/M69/M93. Contrats ci-dessous avant le code. Budget 0 €, déploiement et activation des tâches planifiées soumis à D23/D25. |
 | D28 | **Accord explicite du 21 novembre 2026** : cocher une tâche sans date la date d'aujourd'hui ; l'appareil peut mémoriser son consentement au cache Firestore. Aucun nouveau type métier ni service. |
 | D29 | **Accord explicite du 21 novembre 2026** pour une illustration originale sur l’écran Jour. F57 est un WebP décoratif servi depuis la même origine. F08 l’utilise en fond de l’écran Jour et F35 le précache avec l’interface (C10, T06, T20). Le dégradé intégré sert de repli. |
+| D30 | **Essai d’installation demandé le 21 novembre 2026.** Le site statique peut être publié sur GitHub Pages pour effectuer FL01/T06/T20 sur iPhone. La branche de publication `gh-pages` sert les fichiers de compilation à sa racine avec un marqueur `.nojekyll`. L’aperçu est compilé sans paramètres Firebase ou Worker. La suite de D23 s’applique à l’activation des services réels. |
 
 **D27 · F10, M49/M69/M93 et M108/M114.**
 
