@@ -1,0 +1,23 @@
+{
+  "name": "Organiseur personnel",
+  "short_name": "Organiseur",
+  "description": "Organiseur personnel avec calendrier, tâches, jour, habitudes et listes.",
+  "id": "/organiseur-personnel/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FBF6ED",
+  "theme_color": "#FBF6ED",
+  "lang": "fr",
+  "dir": "ltr",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "app_version": {
+    "version": "0.1.4",
+    "cacheRevision": "s10-4",
+    "catalogRevision": "0",
+    "releasedAt": "2026-11-21T13:02:00.000Z"
+  }
+}
