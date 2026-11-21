@@ -58,6 +58,7 @@
 | D26 | **Accord explicite du 6 novembre 2026 : finaliser quatre contrats techniques manquants**, dans un commit architectural séparé avant le code : `BackupScope`, `RestoreReport`, `CropRect`, `DecorLayer` (§4.4bis). Les fonctions et fichiers **déjà inscrits** M70–M74/F34 et M97–M98/F26 peuvent ensuite être codés dans ces limites. Préserver toutes les données cloud et médias personnels ; la restauration n'efface jamais automatiquement les enregistrements absents de l'archive. Aucun nouveau store, paquet, fournisseur, frais ni test avant la recette D23. |
 | D27 | **Accord explicite du 21 novembre 2026** : cataloguer les trois icônes d'installation F10, protéger M108/M114 par un verrou Google par UID et enregistrer la propriété des nouveaux fichiers locaux pour M49/M69/M93. Contrats ci-dessous avant le code. Budget 0 €, déploiement et activation des tâches planifiées soumis à D23/D25. |
 | D28 | **Accord explicite du 21 novembre 2026** : cocher une tâche sans date la date d'aujourd'hui ; l'appareil peut mémoriser son consentement au cache Firestore. Aucun nouveau type métier ni service. |
+| D29 | **Accord explicite du 21 novembre 2026** pour une illustration originale sur l’écran Jour. F57 est un WebP décoratif servi depuis la même origine. F08 l’utilise en fond de l’écran Jour et F35 le précache avec l’interface (C10, T06, T20). Le dégradé intégré sert de repli. |
 
 **D27 · F10, M49/M69/M93 et M108/M114.**
 
@@ -214,7 +215,8 @@ Les chemins sont **proposés/planifiés**, non présumés existants. Les répert
 ├── src/ui/dayComponents.ts                [F53] icône gauche, validation droite, édition
 ├── tests/activities.test.ts               [F54] activités, complétions, report, récurrences
 ├── tests/navigation.test.ts               [F55] onglets, semaine 6+1, date sélectionnée
-└── tests/monthlyReview.test.ts            [F56] étoiles, filtres et états présumés
+├── tests/monthlyReview.test.ts            [F56] étoiles, filtres et états présumés
+└── public/illustrations/jour-lumiere.webp  [F57] illustration originale et décorative de l’écran Jour
 ```
 
 **F03 était l'alias `agent.md`, supprimé par demande explicite de l'utilisateur (2026-11-01) ; son identifiant reste réservé pour traçabilité et ne doit pas être réutilisé.**
