@@ -6,8 +6,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F7F5F0",
-  "theme_color": "#A4BFAF",
+  "background_color": "#FBF6ED",
+  "theme_color": "#FBF6ED",
   "lang": "fr",
   "dir": "ltr",
   "icons": [
@@ -15,9 +15,9 @@
     { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "app_version": {
-    "version": "0.1.2",
-    "cacheRevision": "s10-2",
+    "version": "0.1.3",
+    "cacheRevision": "s10-3",
     "catalogRevision": "0",
-    "releasedAt": "2026-11-21T12:00:00.000Z"
+    "releasedAt": "2026-11-21T12:55:00.000Z"
   }
 }

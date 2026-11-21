@@ -57,24 +57,25 @@ export function renderDay(date: LocalDate): void {
   if (!root) return;
   root.replaceChildren();
   const panel = document.createElement("section");
-  panel.className = "page-intro";
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = "UNE JOURNÉE À LA FOIS";
+  panel.className = "page-intro day-intro";
+  const localDate = new Date(date + "T12:00:00Z");
   const heading = document.createElement("h2");
-  heading.textContent = new Date(date + "T12:00:00Z").toLocaleDateString("fr-FR", {
-    timeZone: "UTC", weekday: "long", day: "numeric", month: "long",
-  });
-  const description = document.createElement("p");
-  description.className = "muted";
-  description.textContent = date === getAppState().daySelection.today
-    ? "Ton espace pour aujourd'hui." : "Les activités prévues pour cette date.";
+  const weekday = document.createElement("span");
+  weekday.className = "day-weekday";
+  weekday.textContent = localDate.toLocaleDateString("fr-FR", {timeZone: "UTC", weekday: "long"});
+  const day = document.createElement("span");
+  day.className = "day-date";
+  day.textContent = localDate.toLocaleDateString("fr-FR", {timeZone: "UTC", day: "numeric", month: "long"});
+  heading.append(weekday, " ", day);
   const actions = document.createElement("div");
   actions.className = "header-actions";
   const todayButton = document.createElement("button");
   todayButton.className = "soft-button";
   todayButton.type = "button";
-  todayButton.textContent = "Aujourd'hui";
+  todayButton.textContent = "Aujourd’hui";
+  todayButton.hidden = date === new Date().toLocaleDateString("sv-SE", {
+    timeZone: getAppState().preferences.timeZone,
+  });
   todayButton.onclick = () => {
     const today = new Date().toLocaleDateString("sv-SE", {
       timeZone: getAppState().preferences.timeZone,
@@ -85,16 +86,16 @@ export function renderDay(date: LocalDate): void {
   const addButton = document.createElement("button");
   addButton.type = "button";
   addButton.className = "primary-button compact";
-  addButton.textContent = "+ Activité";
+  addButton.textContent = "+ Nouvelle activité";
   addButton.onclick = () => openActivityEditor("");
-  actions.append(todayButton, addButton);
-  panel.append(eyebrow, heading, description, actions);
+  actions.append(addButton, todayButton);
+  panel.append(heading, actions);
   root.append(panel);
 
   // Deux sections, y compris dans les états vides, sans troisième catégorie.
-  const sections: {id: string; title: string; sub: string}[] = [
-    {id:"untimed", title:"Sans horaire", sub:"À ton rythme"},
-    {id:"timed", title:"Avec horaire", sub:"Dans l'ordre de la journée"},
+  const sections = [
+    {id:"untimed", title:"Sans horaire"},
+    {id:"timed", title:"Avec horaire"},
   ];
   for (const section of sections) {
     const block = document.createElement("section");
@@ -103,10 +104,7 @@ export function renderDay(date: LocalDate): void {
     header.className = "section-heading";
     const label = document.createElement("h3");
     label.textContent = section.title;
-    const tag = document.createElement("span");
-    tag.className = "subtle-tag";
-    tag.textContent = section.sub;
-    header.append(label, tag);
+    header.append(label);
     const list = document.createElement("div");
     list.id = "entries-" + section.id;
     list.className = "entry-list";
@@ -120,17 +118,14 @@ export function renderDay(date: LocalDate): void {
   if (!getAppState().user) {
     for (const id of ["untimed", "timed"]) {
       const target = document.getElementById("entries-" + id)!;
-      target.replaceChildren();
-      const note = document.createElement("p");
-      note.className = "empty-copy";
-      note.textContent = "Connecte-toi pour voir tes activités. Aucune donnée d'exemple n'est affichée.";
-      target.append(note);
+      target.textContent = "";
     }
-    const connect = document.createElement("button");
-    connect.className = "soft-button";
-    connect.textContent = "Me connecter";
-    connect.onclick = () => navigate({name:"signin"});
-    root.append(connect);
+    addButton.textContent = "Me connecter";
+    addButton.onclick = () => navigate({name:"signin"});
+    const note = document.createElement("p");
+    note.className = "empty-copy";
+    note.textContent = "Connecte-toi pour retrouver les activités de ta journée.";
+    panel.after(note);
     return;
   }
 
@@ -354,11 +349,14 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
   root.replaceChildren();
   const header = document.createElement("section");
   header.className = "page-intro";
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = "UN PEU DE RECUL";
   const heading = document.createElement("h2");
   heading.textContent = "Mon calendrier";
+  const start = Date.parse(monday + "T00:00:00Z");
+  const week = document.createElement("p");
+  week.className = "muted calendar-range";
+  week.textContent = new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  }).formatRange(start, start + 6 * 86_400_000);
   const bar = document.createElement("div");
   bar.className = "header-actions";
   for (const [text, offset, label] of [
@@ -387,12 +385,11 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
     };
     bar.append(button);
   }
-  header.append(eyebrow, heading, bar);
+  header.append(heading, week, bar);
   root.append(header);
 
   const days = document.createElement("div");
   days.className = "week-grid";
-  const start = Date.parse(monday + "T00:00:00Z");
   const selectedDate = getAppState().daySelection.selectedDate;
   const today = getAppState().daySelection.today;
   const buttons: HTMLButtonElement[] = [];
@@ -404,6 +401,7 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
       + (date === today ? " is-today" : "");
     cell.setAttribute("aria-label", new Date(date + "T12:00:00Z")
       .toLocaleDateString("fr-FR", {weekday:"long", day:"numeric", month:"long",timeZone:"UTC"}));
+    if (date === today) cell.setAttribute("aria-current", "date");
     const weekday = document.createElement("span");
     weekday.className = "calendar-weekday";
     weekday.textContent = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"][index];
@@ -433,7 +431,7 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
   root.insertBefore(days, root.querySelector(".sunday-toggle"));
   const notice = document.createElement("p");
   notice.className = "muted calendar-footnote";
-  notice.textContent = "Choisis une date pour ouvrir les activités de ce jour.";
+  notice.setAttribute("role", "status");
   root.append(notice);
   if (!getAppState().user) {
     const message = document.createElement("p");
@@ -462,10 +460,10 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
 export function renderTasks(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">L'ESPRIT LÉGER</p>
-    <h2>Mes tâches</h2><p class="muted">Tout ce que tu veux faire, sans être pressée.</p>
-    <button type="button" class="primary-button compact" id="new-task">+ Tâche</button></section>
-    <section class="day-section"><h3>À faire</h3><p id="task-status" role="status"></p>
+  root.innerHTML = `<section class="page-intro">
+    <h2>Mes tâches</h2>
+    <div class="header-actions"><button type="button" class="primary-button compact" id="new-task">Ajouter une tâche</button></div></section>
+    <section class="day-section"><p id="task-status" role="status"></p>
     <div id="task-list" class="entry-list"></div></section>`;
   root.querySelector<HTMLButtonElement>("#new-task")!.onclick = () => openActivityEditor("");
   const list = root.querySelector<HTMLElement>("#task-list")!;
@@ -558,10 +556,10 @@ export function renderTasks(): void {
 export function renderHabits(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">LES PETITS RITUELS</p>
-    <h2>Mes habitudes</h2><p class="muted">Un peu, souvent, à ta manière.</p>
-    <button type="button" id="new-habit" class="primary-button compact">+ Habitude</button></section>
-    <section class="day-section"><h3>Mes rituels</h3><div class="entry-list" id="habits-list"></div></section>`;
+  root.innerHTML = `<section class="page-intro">
+    <h2>Mes habitudes</h2>
+    <div class="header-actions"><button type="button" id="new-habit" class="primary-button compact">Ajouter une habitude</button></div></section>
+    <section class="day-section"><div class="entry-list" id="habits-list"></div></section>`;
   root.querySelector<HTMLButtonElement>("#new-habit")!.onclick = () => openActivityEditor("");
   const list = root.querySelector<HTMLElement>("#habits-list")!;
   if (!getAppState().user) { list.textContent = "Connecte-toi pour retrouver tes habitudes."; return; }
@@ -578,6 +576,7 @@ export function renderHabits(): void {
       const icon = document.createElement("span");
       icon.className = "habit-picto";
       icon.textContent = habit.iconId || "✿";
+      icon.setAttribute("aria-hidden", "true");
       const text = document.createElement("span");
       text.className = "habit-text";
       const title = document.createElement("strong");
@@ -591,6 +590,7 @@ export function renderHabits(): void {
       text.append(title, meta);
       const arrow = document.createElement("span");
       arrow.textContent = "›";
+      arrow.setAttribute("aria-hidden", "true");
       card.append(icon, text, arrow);
       card.onclick = () => openActivityEditor(habit.id);
       list.append(card);
@@ -602,11 +602,11 @@ export function renderHabits(): void {
 export function renderChecklists(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">LES CHOSES À NE PAS OUBLIER</p>
-    <h2>Mes listes</h2><p class="muted">Tes idées et tes petites choses à cocher.</p>
+  root.innerHTML = `<section class="page-intro">
+    <h2>Mes listes</h2>
     <form id="new-list-form" class="inline-form"><input aria-label="Nom de la liste" required maxlength="250"
-      name="name" placeholder="Une nouvelle liste"><button type="submit" class="primary-button compact">Créer</button></form></section>
-    <section class="day-section"><h3>Toutes mes listes</h3>
+      name="name" placeholder="Nom de la liste"><button type="submit" class="primary-button compact">Créer</button></form></section>
+    <section class="day-section">
       <div id="checklist-list" class="entry-list"></div>
       <div class="form-error" id="checklist-error" role="alert"></div></section>`;
   const box = root.querySelector<HTMLElement>("#checklist-list")!;
@@ -681,6 +681,7 @@ export function renderChecklists(): void {
           submit.type = "submit";
           submit.className = "soft-button";
           submit.textContent = "+";
+          submit.setAttribute("aria-label", "Ajouter l’article");
           add.append(input, submit);
           add.onsubmit = event => {
             event.preventDefault();
@@ -718,9 +719,9 @@ export function renderMusic(): void {
   const root = document.getElementById("view");
   if (!root) return;
   root.innerHTML =
-    "<section class='page-intro'><p class='eyebrow'>UNE PETITE PAUSE</p>" +
+    "<section class='page-intro'>" +
     "<h2>Ma musique</h2><p class='muted'>Les fichiers personnels restent sur cet appareil.</p>" +
-    "<button type='button' class='soft-button' data-back>← Revenir à Jour</button></section>" +
+    "<div class='header-actions'><button type='button' class='soft-button' data-back>← Retour à ma journée</button></div></section>" +
     "<section class='day-section'><h3>Ajouter un morceau</h3>" +
     "<form id='audio-import' class='media-import'><label>Fichier audio local" +
     "<input type='file' name='file' accept='audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac' required></label>" +
@@ -1049,9 +1050,9 @@ export function renderDecor(): void {
   const root = document.getElementById("view");
   if (!root) return;
   root.innerHTML =
-    "<section class='page-intro'><p class='eyebrow'>UNE TOUCHE PERSONNELLE</p>" +
+    "<section class='page-intro'>" +
     "<h2>Mes décors</h2><p class='muted'>Les images importées restent sur ce téléphone.</p>" +
-    "<button type='button' class='soft-button' data-back>← Revenir à Jour</button></section>" +
+    "<div class='header-actions'><button type='button' class='soft-button' data-back>← Retour à ma journée</button></div></section>" +
     "<section class='day-section'><h3>Apparence</h3>" +
     "<label>Thème <select id='decor-theme'>" +
     "<option value='sage'>Vert sauge</option><option value='cream'>Crème</option>" +
@@ -1291,53 +1292,74 @@ export function renderSettings(): void {
   const root = document.getElementById("view");
   if (!root) return;
   const state = getAppState();
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">MON PETIT ESPACE</p>
-    <h2>Paramètres</h2><p class="muted" id="account-label"></p></section>
-    <section class="day-section settings-list">
-    <button type="button" class="soft-button" id="settings-monthly">Voir mon bilan mensuel</button>
-    <button type="button" class="soft-button" id="settings-cache">Activer le mode hors ligne sur appareil de confiance</button>
-    <h3>Mises à jour de l'application</h3>
-    <button type="button" class="soft-button" id="settings-check-update">Vérifier les mises à jour</button>
-    <button type="button" class="soft-button" id="settings-apply-update" disabled>Installer la version proposée</button>
-    <p class="muted" id="settings-update-status" role="status" aria-live="polite">Aucune mise à jour demandée.</p>
-    <h3>Notifications sur cet iPhone</h3>
-    <p class="muted">Demander l'autorisation ne déclenche aucun rappel : l'abonnement et le serveur gratuit doivent encore être configurés.</p>
-    <button type="button" class="soft-button" id="settings-push-permission">Autoriser les notifications</button>
-    <button type="button" class="soft-button" id="settings-push-subscribe">Abonner cet appareil (après configuration)</button>
-    <button type="button" class="soft-button" id="settings-push-test">Demander un test de notification</button>
-    <button type="button" class="soft-button" id="settings-push-revoke">Retirer l'abonnement de cet appareil</button>
-    <p class="muted" id="settings-push-status" role="status" aria-live="polite">Aucun envoi distant n'est actif.</p>
-    <button type="button" class="soft-button" id="settings-signout">Se déconnecter</button>
-    <button type="button" class="soft-button" id="settings-login">Connexion</button>
-    <p class="muted" id="settings-status" role="status"></p>
-    <h3>Google Agenda (facultatif)</h3>
-    <p class="muted">La connexion Google est distincte de celle de l'organiseur. Aucune synchronisation n'est active sans autorisation explicite.</p>
-    <button type="button" class="soft-button" id="google-link">Connecter mon Google Agenda</button>
-    <button type="button" class="soft-button" id="google-status">Vérifier le statut Google</button>
-    <button type="button" class="soft-button" id="google-sync">Synchroniser maintenant</button>
-    <button type="button" class="soft-button" id="google-conflicts">Afficher les conflits</button>
-    <button type="button" class="soft-button" id="google-unlink">Délier Google Agenda</button>
-    <div id="google-conflict-list" class="entry-list"></div>
-    <p class="muted" id="google-feedback" role="status" aria-live="polite">Google Agenda n'est pas configuré.</p>
-    <h3>Sauvegardes indépendantes</h3>
-    <p class="muted">Les données de l'agenda et les fichiers personnels sont deux archives différentes. Les exports ne sont pas chiffrés : conserve-les dans un endroit privé. La restauration n'efface pas les données absentes d'une archive.</p>
-    <button type="button" class="soft-button" id="backup-export-json">Exporter mes données (JSON)</button>
-    <label class="muted">Archive de données
-      <input id="backup-import-json" type="file" accept=".json,application/json">
-    </label>
-    <label class="muted">Restauration
-      <select id="backup-json-mode">
-        <option value="merge">Ajouter sans modifier l'existant</option>
-        <option value="replace">Remplacer les ID présents dans l'archive (confirmation)</option>
-      </select>
-    </label>
-    <button type="button" class="soft-button" id="backup-restore-json">Restaurer les données</button>
-    <button type="button" class="soft-button" id="backup-export-media">Exporter mes musiques et images</button>
-    <label class="muted">Archive multimédia de l'ancien iPhone
-      <input id="backup-import-media" type="file" accept=".opmedia,application/octet-stream">
-    </label>
-    <button type="button" class="soft-button" id="backup-restore-media">Restaurer les médias locaux</button>
-    <p id="backup-feedback" role="status" aria-live="polite" class="muted">Aucune sauvegarde déclenchée automatiquement.</p></section>`;
+  root.innerHTML = `
+    <section class="page-intro">
+      <h2>Paramètres</h2>
+      <div class="header-actions"><button type="button" class="soft-button" id="settings-monthly">Voir mon bilan mensuel</button></div>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Compte et appareil</h3>
+      <p class="muted" id="account-label"></p>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="settings-login">Me connecter</button>
+        <button type="button" class="soft-button" id="settings-signout">Me déconnecter</button>
+        <button type="button" class="soft-button" id="settings-cache">Mémoriser cet appareil pour le hors-ligne</button>
+      </div>
+      <p class="muted" id="settings-status" role="status"></p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Mises à jour</h3>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="settings-check-update">Vérifier les mises à jour</button>
+        <button type="button" class="soft-button" id="settings-apply-update" disabled>Installer la version proposée</button>
+      </div>
+      <p class="muted" id="settings-update-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Notifications sur cet iPhone</h3>
+      <p class="muted">Les rappels à distance nécessitent l’abonnement de cet iPhone et la configuration du serveur.</p>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="settings-push-permission">Autoriser les notifications</button>
+        <button type="button" class="soft-button" id="settings-push-subscribe">Abonner cet iPhone</button>
+        <button type="button" class="soft-button" id="settings-push-test">Tester les notifications</button>
+        <button type="button" class="soft-button" id="settings-push-revoke">Retirer l’abonnement</button>
+      </div>
+      <p class="muted" id="settings-push-status" role="status" aria-live="polite">Les notifications à distance sont désactivées.</p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Google Agenda</h3>
+      <p class="muted">Tu peux relier ton compte Google séparément. La synchronisation est facultative et demande ton accord.</p>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="google-link">Connecter mon Google Agenda</button>
+        <button type="button" class="soft-button" id="google-status">Vérifier la connexion Google</button>
+        <button type="button" class="soft-button" id="google-sync">Synchroniser maintenant</button>
+        <button type="button" class="soft-button" id="google-conflicts">Afficher les conflits</button>
+        <button type="button" class="soft-button" id="google-unlink">Dissocier Google Agenda</button>
+      </div>
+      <div id="google-conflict-list" class="entry-list"></div>
+      <p class="muted" id="google-feedback" role="status" aria-live="polite">Google Agenda n’est pas configuré.</p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Sauvegardes</h3>
+      <p class="muted">Les données et les médias ont chacun leur archive. Conserve les archives dans un endroit privé, car elles sont exportées en clair. La restauration conserve les éléments absents de l’archive.</p>
+      <button type="button" class="soft-button" id="backup-export-json">Exporter mes données</button>
+      <label class="muted">Archive de données
+        <input id="backup-import-json" type="file" accept=".json,application/json">
+      </label>
+      <label class="muted">Mode de restauration
+        <select id="backup-json-mode">
+          <option value="merge">Ajouter sans modifier l’existant</option>
+          <option value="replace">Remplacer les éléments présents dans l’archive</option>
+        </select>
+      </label>
+      <button type="button" class="soft-button" id="backup-restore-json">Restaurer les données</button>
+      <button type="button" class="soft-button" id="backup-export-media">Exporter mes musiques et images</button>
+      <label class="muted">Archive de musiques et images
+        <input id="backup-import-media" type="file" accept=".opmedia,application/octet-stream">
+      </label>
+      <button type="button" class="soft-button" id="backup-restore-media">Restaurer les musiques et images</button>
+      <p id="backup-feedback" role="status" aria-live="polite" class="muted"></p>
+    </section>`;
   root.querySelector<HTMLElement>("#account-label")!.textContent =
     state.user?.email || "Aucun compte connecté.";
 
@@ -1635,7 +1657,7 @@ export function renderSettings(): void {
 export function renderSignIn(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">BIENVENUE</p>
+  root.innerHTML = `<section class="page-intro">
     <h2>Mon compte</h2><p class="muted">Connecte-toi pour retrouver tes activités.</p></section>
     <section class="auth-panel"><form id="auth-form">
       <label>Adresse e-mail <input type="email" name="email" autocomplete="email" required></label>

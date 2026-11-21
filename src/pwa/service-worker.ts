@@ -2,7 +2,7 @@
 import type { PushPayload, Result } from "../domain/types";
 
 const appScope = "/organiseur-personnel/";
-const shellRevision = "s10-2";
+const shellRevision = "s10-3";
 const cachePrefix = "organiseur-shell-";
 // F06 remplace cette liste uniquement dans le worker généré par le build.
 const buildAssets: readonly string[] = [];

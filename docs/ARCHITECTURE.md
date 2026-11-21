@@ -4,6 +4,8 @@
 > **Statut : ARCHITECTURE CIBLE EN COURS D'IMPLÉMENTATION**. Les strates S0 à S4 sont typées ; S5/S6 sont partiellement codées ; S7 comporte les cinq vues et médias ; les trois ajustements S8 approuvés D24 sont codés dans F15/F17/F19/F22/F48/F51/F52. La décision D23 reporte tous les tests à la recette finale : **aucun module S5–S9 n'est déclaré validé ni déployé**. **Ne jamais confondre code présent, contrat approuvé et fonctionnalité opérationnelle.**  
 > **Document de gouvernance :** [../AGENTS.md](../AGENTS.md) · **Périmètre fonctionnel :** [../ROADMAP.md](../ROADMAP.md).
 
+**Interface 0.1.3 · D22.** F08, F15 et F19 partagent le traitement crème, châtaigne et sauge. Les vues Jour et Calendrier privilégient la date, les paramètres sont regroupés par usage, les cinq onglets restent fixes et les commandes principales ont une cible de 44 pixels CSS. T20 reste à vérifier sur Safari iPhone avec VoiceOver.
+
 **État au 21 novembre 2026 (0.1.2).** F10, M49/M66/M68/M69/M96, M114 et D28 sont implémentés. La compilation inclut F37. Les essais locaux ont vérifié F42 sur émulateurs, le verrou et la reprise Google sur réponses simulées, ainsi que l'installation et la réouverture hors ligne sur Chrome mobile. Les récurrences Google horaires représentables sont projetées en O05. Les cas complexes créent O26. Une passe Google conserve son curseur tant que des modifications distantes restent à appliquer. La recette réelle sur iPhone et la mise en service D23/D25 restent à effectuer. Les états datés ci-dessous retracent les lots précédents.
 
 ## 0. Règle de changement obligatoire (BLOCAGE)

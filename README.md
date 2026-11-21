@@ -2,6 +2,10 @@
 
 Organiseur personnel pour iPhone, conçu comme une PWA. Il réunit les activités, le calendrier, les listes, la musique et les décors. **Objectif de fonctionnement : 0 €**.
 
+## Interface 0.1.3 · 21 novembre 2026
+
+L’interface adopte une palette crème, châtaigne et sauge, avec des titres inspirés du papier imprimé. La date structure l’écran Jour. Le calendrier affiche la semaine en cours et les paramètres sont regroupés par usage. La navigation basse et les commandes principales offrent des zones tactiles d’au moins 44 pixels CSS.
+
 ## État de la version 0.1.2 · 21 novembre 2026
 
 - Thèmes fixes ou saisonniers, fond d'écran à partir de la galerie, trois icônes d'installation. Le choix d'un appareil de confiance peut être mémorisé pour le cache Firestore.

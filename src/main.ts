@@ -86,7 +86,7 @@ export async function bootstrapApp(): Promise<Result<void>> {
   if (!config.apiKey || !config.authDomain || !config.projectId || !config.appId) {
     setAppState({sync: {
       state: "local", pendingCount: 0,
-      message: "Mode de présentation : Firebase n'est pas configuré.",
+      message: "Aperçu local · connexion à configurer",
     }});
     renderCommonStatus(getAppState().sync);
   } else {

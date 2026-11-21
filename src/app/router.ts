@@ -22,6 +22,10 @@ export function navigate(route: UiRoute): void {
   }
   setAppState({route: {...normalized, params: route.params}});
   renderRoute(normalized);
+  if (typeof window !== "undefined") {
+    window.scrollTo(0, 0);
+    document.getElementById("view")?.focus({preventScroll: true});
+  }
 }
 
 /** M04 · Compose le cadre des cinq onglets, puis la page courante. */
@@ -36,13 +40,16 @@ export function renderRoute(route: UiRoute): void {
   header.className = "app-top";
   const identity = document.createElement("div");
   identity.className = "identity";
-  const overline = document.createElement("span");
-  overline.className = "overline";
-  overline.textContent = "MON PETIT ORGANISEUR";
+  const mark = document.createElement("img");
+  mark.className = "app-mark";
+  mark.src = "./icons/icon-180.png";
+  mark.alt = "";
+  mark.width = 42;
+  mark.height = 42;
   const title = document.createElement("h1");
   title.className = "app-title";
-  title.textContent = "Ma journée";
-  identity.append(overline, title);
+  title.textContent = "Organiseur";
+  identity.append(mark, title);
   const tools = document.createElement("div");
   tools.className = "header-tools";
   for (const [name, symbol, label] of [
@@ -54,6 +61,7 @@ export function renderRoute(route: UiRoute): void {
     button.type = "button";
     button.textContent = symbol;
     button.setAttribute("aria-label", label);
+    if (route.name === name) button.setAttribute("aria-current", "page");
     button.title = label;
     button.onclick = () => navigate({name});
     tools.append(button);
@@ -82,9 +90,11 @@ export function renderRoute(route: UiRoute): void {
     button.type = "button";
     button.className = "tab-item" + (route.name === tab.name ? " active" : "")
       + (tab.name === "day" ? " tab-center" : "");
-    button.setAttribute("aria-current", route.name === tab.name ? "page" : "false");
+    button.dataset.tab = tab.name;
+    if (route.name === tab.name) button.setAttribute("aria-current", "page");
     const pictogram = document.createElement("span");
     pictogram.className = "tab-symbol";
+    pictogram.setAttribute("aria-hidden", "true");
     pictogram.textContent = tab.icon;
     const label = document.createElement("span");
     label.className = "tab-label";

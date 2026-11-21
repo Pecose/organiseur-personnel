@@ -1,13 +1,13 @@
 # Roadmap — Application personnelle iPhone (PWA)
 
-> **Statut :** version source 0.1.2. Compilation et vérifications locales réussies. Recette iPhone et mise en service en attente.
+> **Statut :** version source 0.1.3, avec la refonte visuelle des écrans et de la navigation. Recette iPhone et mise en service en attente.
 >
 > **GitHub cible :** compte **`Pecose`**, **jamais** l'organisation `T-C-Umbral`.  
 > **Dépôt créé :** `Pecose/organiseur-personnel` (public, branche `main`).  
 > **Utilisatrice cible :** une personne, sur iPhone.  
 > **Budget impératif :** **0 €** d'abonnement, d'hébergement et de compte Apple Developer.  
 > **Environnement de développement :** Windows.  
-> **Dernière mise à jour :** 21 novembre 2026 (D27 et D28).
+> **Dernière mise à jour :** 21 novembre 2026 (refonte visuelle D22).
 
 ## Tableau de bord des objectifs (lecture humaine)
 
