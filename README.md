@@ -2,9 +2,11 @@
 
 Organiseur personnel pour iPhone, conçu comme une PWA. Il réunit les activités, le calendrier, les listes, la musique et les décors. **Objectif de fonctionnement : 0 €**.
 
-## Interface 0.1.3 · 21 novembre 2026
+## Interface 0.1.4 · 21 novembre 2026
 
 L’interface adopte une palette crème, châtaigne et sauge, avec des titres inspirés du papier imprimé. La date structure l’écran Jour. Le calendrier affiche la semaine en cours et les paramètres sont regroupés par usage. La navigation basse et les commandes principales offrent des zones tactiles d’au moins 44 pixels CSS.
+
+L’écran Jour s’ouvre sur une illustration originale de thé et de carnet en lumière douce. Elle est chargée avec l’interface pour rester visible hors ligne.
 
 ## État de la version 0.1.2 · 21 novembre 2026
 

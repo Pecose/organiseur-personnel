@@ -149,6 +149,7 @@
     }
     .page-intro .muted { max-width: 48ch; }
     .day-intro {
+      --day-art: url("/illustrations/jour-lumiere.webp");
       position: relative;
       isolation: isolate;
       display: flex;
@@ -166,9 +167,10 @@
       inset: 0;
       z-index: -1;
       background:
-        linear-gradient(90deg, #2d2018f4 0%, #35261dd9 34%, #36261bb0 52%, #36261b18 88%),
-        var(--day-art, radial-gradient(ellipse at 83% 25%, #daa574 0%, #947253 30%, #654c39 62%));
-      background-position: center, center;
+        linear-gradient(90deg, #2d2018c9 0%, #35261d99 37%, #36261b66 59%, #36261b10 92%),
+        var(--day-art),
+        radial-gradient(ellipse at 83% 25%, #daa574 0%, #947253 30%, #654c39 62%);
+      background-position: center, center 43%, center;
       background-size: cover;
     }
     .day-intro h2 { color: #fff9eb; font-size: clamp(37px, 10.6vw, 69px); }

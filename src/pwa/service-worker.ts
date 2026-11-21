@@ -2,8 +2,9 @@
 import type { PushPayload, Result } from "../domain/types";
 
 const appScope = "/organiseur-personnel/";
-const shellRevision = "s10-3";
+const shellRevision = "s10-4";
 const cachePrefix = "organiseur-shell-";
+const dayArt = "illustrations/jour-lumiere.webp";
 // F06 remplace cette liste uniquement dans le worker généré par le build.
 const buildAssets: readonly string[] = [];
 
@@ -46,6 +47,7 @@ export async function cacheAppShell(revision: string): Promise<Result<void>> {
     const shell = [
       homeUrl,
       new URL(appScope + "manifest.webmanifest", location.origin).toString(),
+      new URL(dayArt, homeUrl).toString(),
       ...[180, 192, 512].map(size => new URL("icons/icon-" + size + ".png", homeUrl).toString()),
       ...buildAssets.map(path => new URL(path, homeUrl).toString()),
     ];
@@ -176,6 +178,7 @@ if (typeof document === "undefined" && "registration" in globalThis && "clients"
       relative === "" || relative === "index.html"
       || relative === "manifest.webmanifest"
       || relative === "service-worker.js"
+      || relative === dayArt
       || /^assets\/[a-zA-Z0-9._/-]+$/.test(relative)
       || /^icons\/icon-(180|192|512)\.png$/.test(relative)
       || /^catalog\/[a-zA-Z0-9._/-]+$/.test(relative)
