@@ -8,6 +8,8 @@ L’interface adopte une palette crème, châtaigne et sauge, avec des titres in
 
 L’écran Jour s’ouvre sur une illustration originale de thé et de carnet en lumière douce. Elle est chargée avec l’interface pour rester visible hors ligne.
 
+L’[aperçu d’installation sur iPhone](https://pecose.github.io/organiseur-personnel/) sert aux essais de l’interface, de l’écran d’accueil et du hors-ligne. Ouvre-le dans Safari, puis choisis **Partager → Sur l’écran d’accueil → Ajouter**. Active **Ouvrir comme app web** si le réglage apparaît. Les fonctions qui nécessitent un compte seront essayées après la configuration des services correspondants.
+
 ## État de la version 0.1.2 · 21 novembre 2026
 
 - Thèmes fixes ou saisonniers, fond d'écran à partir de la galerie, trois icônes d'installation. Le choix d'un appareil de confiance peut être mémorisé pour le cache Firestore.
@@ -41,7 +43,7 @@ npm run build
 npm run preview
 ```
 
-Le site Vite utilise la base de chemin **`/organiseur-personnel/`**, nécessaire pour une éventuelle publication sous GitHub Pages. `dist/` est un résultat de compilation, **pas un dossier à versionner**. Aucun workflow de déploiement GitHub Actions n'est actuellement enregistré ni activé.
+Le site Vite utilise la base de chemin **`/organiseur-personnel/`**, prévue pour GitHub Pages. La branche source garde le code de l’application. La branche `gh-pages` sert les fichiers générés dans `dist/` pour l’aperçu d’installation.
 
 ### Configuration publique Firebase
 
