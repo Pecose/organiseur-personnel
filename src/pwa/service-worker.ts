@@ -2,7 +2,7 @@
 import type { PushPayload, Result } from "../domain/types";
 
 const appScope = "/organiseur-personnel/";
-const shellRevision = "s10-6";
+const shellRevision = "s10-7";
 const cachePrefix = "organiseur-shell-";
 const dayArt = "illustrations/jour-lumiere.webp";
 // F06 remplace cette liste uniquement dans le worker généré par le build.
