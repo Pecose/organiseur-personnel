@@ -22,7 +22,7 @@ let state: AppState = {
   sync: { state: "local", pendingCount: 0, message: "Connexion non configurée." },
   version: {
     version: "0.1.8", cacheRevision: "s10-8", catalogRevision: "0",
-    releasedAt: "2026-11-22T15:30:00.000Z",
+    releasedAt: "2026-11-22T15:20:34.478Z",
   },
   preferences: {
     themeId: "sage", autoSeason: false, locale: "fr-FR",
