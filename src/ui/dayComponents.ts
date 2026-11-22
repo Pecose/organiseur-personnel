@@ -47,26 +47,35 @@ export function openActivityEditor(activityId: string): void {
         <label>Icône <input name="icon" maxlength="32" placeholder="✿"></label>
         <label>Importance <select name="stars"><option value="0">Sans étoile</option><option value="1">★</option><option value="2">★★</option><option value="3">★★★</option></select></label>
       </div>
-      <label>Date prévue <input name="plannedOn" type="date"></label>
-      <div class="form-columns">
-        <label>Heure de début <input name="start" type="time" step="60"></label>
-        <label>Heure de fin <input name="end" type="time" step="60"></label>
+      <div class="schedule-modes" role="tablist" aria-label="Type de programmation">
+        <button type="button" class="schedule-mode active" id="schedule-once-tab" role="tab" aria-selected="true" aria-controls="schedule-once">Une fois</button>
+        <button type="button" class="schedule-mode" id="schedule-weekly-tab" role="tab" aria-selected="false" aria-controls="schedule-weekly">Chaque semaine</button>
       </div>
+      <div id="schedule-once" role="tabpanel" aria-labelledby="schedule-once-tab" class="schedule-panel">
+        <label>Date prévue <input name="plannedOn" type="date"></label>
+        <div class="form-columns">
+          <label>Heure de début <input name="start" type="time" step="60"></label>
+          <label>Heure de fin <input name="end" type="time" step="60"></label>
+        </div>
+        <p class="muted">Une date précise, avec une heure pour un rendez-vous. L'heure reste facultative pour une tâche.</p>
+      </div>
+      <div id="schedule-weekly" role="tabpanel" aria-labelledby="schedule-weekly-tab" class="schedule-panel" hidden>
+        <fieldset class="weekday-field"><legend>Choisis les jours de la semaine</legend>
+          <label><input type="checkbox" name="weekday" value="1"> L</label>
+          <label><input type="checkbox" name="weekday" value="2"> M</label>
+          <label><input type="checkbox" name="weekday" value="3"> M</label>
+          <label><input type="checkbox" name="weekday" value="4"> J</label>
+          <label><input type="checkbox" name="weekday" value="5"> V</label>
+          <label><input type="checkbox" name="weekday" value="6"> S</label>
+          <label><input type="checkbox" name="weekday" value="7"> D</label>
+        </fieldset>
+        <div class="form-columns">
+          <label>Heure de début (facultative) <input name="weeklyStart" type="time" step="60"></label>
+          <label>Heure de fin (facultative) <input name="weeklyEnd" type="time" step="60"></label>
+        </div>
+      </div>
+      <p class="muted" id="schedule-legacy" hidden></p>
       <label class="inline-choice"><input type="checkbox" name="autoComplete"> Présumer l'activité terminée après son horaire (annulable)</label>
-      <label>Répétition <select name="recurrence">
-          <option value="none">Aucune</option><option value="daily">Chaque jour</option>
-          <option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option>
-          <option value="yearly">Chaque année</option>
-        </select></label>
-      <fieldset class="weekday-field"><legend>Jours de répétition hebdomadaire</legend>
-        <label><input type="checkbox" name="weekday" value="1"> L</label>
-        <label><input type="checkbox" name="weekday" value="2"> M</label>
-        <label><input type="checkbox" name="weekday" value="3"> M</label>
-        <label><input type="checkbox" name="weekday" value="4"> J</label>
-        <label><input type="checkbox" name="weekday" value="5"> V</label>
-        <label><input type="checkbox" name="weekday" value="6"> S</label>
-        <label><input type="checkbox" name="weekday" value="7"> D</label>
-      </fieldset>
       <label>Liste associée <select name="checklist"><option value="">Aucune</option></select></label>
       <label>Rappel pour cette occurrence <select name="lead">
         <option value="">Aucun</option><option value="0">À l’heure prévue</option>
@@ -96,12 +105,50 @@ export function openActivityEditor(activityId: string): void {
   let reminderDay: string | undefined;
   const timezone = getAppState().preferences.timeZone;
   const startField = field("start") as HTMLInputElement;
+  const weeklyStartField = field("weeklyStart") as HTMLInputElement;
   const autoField = field("autoComplete") as HTMLInputElement;
+  const onceTab = form.querySelector<HTMLButtonElement>("#schedule-once-tab")!;
+  const weeklyTab = form.querySelector<HTMLButtonElement>("#schedule-weekly-tab")!;
+  const oncePanel = form.querySelector<HTMLElement>("#schedule-once")!;
+  const weeklyPanel = form.querySelector<HTMLElement>("#schedule-weekly")!;
+  const legacyNote = form.querySelector<HTMLElement>("#schedule-legacy")!;
+  let scheduleMode: "once" | "weekly" = getAppState().route.name === "habits" ? "weekly" : "once";
+  let scheduleExplicitlySelected = false;
   let hadHour = false;
-  startField.onchange = () => {
-    if (startField.value && !hadHour) autoField.checked = true;
-    hadHour = Boolean(startField.value);
+  const displayScheduleMode = (): void => {
+    oncePanel.hidden = scheduleMode !== "once";
+    weeklyPanel.hidden = scheduleMode !== "weekly";
+    onceTab.classList.toggle("active", scheduleMode === "once");
+    weeklyTab.classList.toggle("active", scheduleMode === "weekly");
+    onceTab.setAttribute("aria-selected", String(scheduleMode === "once"));
+    weeklyTab.setAttribute("aria-selected", String(scheduleMode === "weekly"));
+    const incoming = scheduleMode === "weekly" ? weeklyStartField : startField;
+    const opposite = scheduleMode === "weekly" ? startField : weeklyStartField;
+    if (!incoming.value && opposite.value) incoming.value = opposite.value;
+    const endName = scheduleMode === "weekly" ? "weeklyEnd" : "end";
+    const otherEndName = scheduleMode === "weekly" ? "end" : "weeklyEnd";
+    if (!field(endName).value && field(otherEndName).value)
+      field(endName).value = field(otherEndName).value;
+    hadHour = Boolean(incoming.value);
+    if (activity?.recurrence && activity.recurrence.frequency !== "weekly" && !scheduleExplicitlySelected) {
+      legacyNote.hidden = false;
+      legacyNote.textContent = "Cette activité possède une ancienne répétition "
+        + activity.recurrence.frequency + ". Elle restera inchangée tant que tu ne choisis pas un nouveau mode.";
+    } else {
+      legacyNote.hidden = true;
+      legacyNote.textContent = "";
+    }
   };
+  onceTab.onclick = () => { scheduleExplicitlySelected = true; scheduleMode = "once"; displayScheduleMode(); };
+  weeklyTab.onclick = () => { scheduleExplicitlySelected = true; scheduleMode = "weekly"; displayScheduleMode(); };
+  for (const timeInput of [startField, weeklyStartField]) {
+    timeInput.onchange = () => {
+      const activeHour = scheduleMode === "weekly" ? weeklyStartField.value : startField.value;
+      if (activeHour && !hadHour) autoField.checked = true;
+      hadHour = Boolean(activeHour);
+    };
+  }
+  displayScheduleMode();
 
   void (async () => {
     if (activityId) {
@@ -125,11 +172,14 @@ export function openActivityEditor(activityId: string): void {
           }) : "");
         field("start").value = activity.startAt
           ? formatZonedTime(activity.startAt, activity.timeZone) : "";
+        field("weeklyStart").value = field("start").value;
         hadHour = Boolean(activity.startAt);
         field("end").value = activity.endAt
           ? formatZonedTime(activity.endAt, activity.timeZone) : "";
+        field("weeklyEnd").value = field("end").value;
         (field("autoComplete") as HTMLInputElement).checked = activity.autoComplete;
-        field("recurrence").value = activity.recurrence?.frequency || "none";
+        scheduleMode = activity.recurrence ? "weekly" : "once";
+        displayScheduleMode();
         const weekdays = activity.recurrence?.weekdays || [];
         form.querySelectorAll<HTMLInputElement>('input[name="weekday"]').forEach(box => {
           box.checked = weekdays.includes(Number(box.value) as 1 | 2 | 3 | 4 | 5 | 6 | 7);
@@ -162,7 +212,8 @@ export function openActivityEditor(activityId: string): void {
         field("plannedOn").value = getAppState().daySelection.selectedDate;
       }
       if (screen === "habits") {
-        field("recurrence").value = "weekly";
+        scheduleMode = "weekly";
+        displayScheduleMode();
         const day = new Date(getAppState().daySelection.selectedDate + "T00:00:00Z");
         const isoWeekday = ((day.getUTCDay() + 6) % 7 + 1).toString();
         const selected = form.querySelector<HTMLInputElement>(
@@ -171,6 +222,7 @@ export function openActivityEditor(activityId: string): void {
         if (selected) selected.checked = true;
       }
     }
+    displayScheduleMode();
     const lists = await listChecklists();
     if (lists.ok && overlay.isConnected) {
       const select = field("checklist") as HTMLSelectElement;
@@ -210,10 +262,14 @@ export function openActivityEditor(activityId: string): void {
     void (async () => {
       feedback.textContent = "";
       const title = field("title").value.trim();
-      const plannedOn = field("plannedOn").value;
-      const startTime = field("start").value;
-      const endTime = field("end").value;
+      const isWeekly = scheduleMode === "weekly";
+      const plannedOn = isWeekly
+        ? (activity?.plannedOn || new Date().toLocaleDateString("sv-SE", {timeZone: timezone}))
+        : field("plannedOn").value;
+      const startTime = isWeekly ? field("weeklyStart").value : field("start").value;
+      const endTime = isWeekly ? field("weeklyEnd").value : field("end").value;
       if (!title) { feedback.textContent = "Donne un nom à l'activité."; return; }
+      if (!plannedOn) { feedback.textContent = "Choisis une date pour cette activité."; return; }
       if ((startTime || endTime) && !plannedOn) {
         feedback.textContent = "Choisis une date avant d'ajouter une heure.";
         return;
@@ -249,23 +305,26 @@ export function openActivityEditor(activityId: string): void {
         feedback.textContent = "L'heure de fin doit suivre le début.";
         return;
       }
-      const frequency = field("recurrence").value;
       const weekdays = [...form.querySelectorAll<HTMLInputElement>('input[name="weekday"]:checked')]
         .map(box => Number(box.value) as 1 | 2 | 3 | 4 | 5 | 6 | 7);
       let recurrence: RecurrenceRule | undefined;
-      if (frequency !== "none") {
-        if (!plannedOn && !startAt && !activity?.startAt) {
-          feedback.textContent = "Une habitude doit avoir une date de départ.";
+      const preserveLegacy = Boolean(activity?.recurrence
+        && activity.recurrence.frequency !== "weekly" && !scheduleExplicitlySelected);
+      if (preserveLegacy) {
+        recurrence = activity!.recurrence;
+      } else if (isWeekly) {
+        if (!weekdays.length) {
+          feedback.textContent = "Choisis au moins un jour pour la répétition hebdomadaire.";
           return;
         }
         recurrence = {
-          frequency: frequency as RecurrenceRule["frequency"],
-          interval: activity?.recurrence?.frequency === frequency
+          frequency: "weekly",
+          interval: activity?.recurrence?.frequency === "weekly"
             ? activity.recurrence.interval : 1,
-          ...(frequency === "weekly" && weekdays.length ? {weekdays} : {}),
-          ...(activity?.recurrence?.frequency === frequency && activity.recurrence.count
+          weekdays,
+          ...(activity?.recurrence?.frequency === "weekly" && activity.recurrence.count
             ? {count: activity.recurrence.count} : {}),
-          ...(activity?.recurrence?.frequency === frequency && activity.recurrence.until
+          ...(activity?.recurrence?.frequency === "weekly" && activity.recurrence.until
             ? {until: activity.recurrence.until} : {}),
         };
       }
