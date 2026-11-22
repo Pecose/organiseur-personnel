@@ -1,9 +1,9 @@
 const appScope = "/organiseur-personnel/";
-const shellRevision = "s10-5";
+const shellRevision = "s10-6";
 const cachePrefix = "organiseur-shell-";
 const dayArt = "illustrations/jour-lumiere.webp";
 // F06 remplace cette liste uniquement dans le worker généré par le build.
-const buildAssets = ["assets/activities-DWHDwTq6.js","assets/habits-C5tSa4wh.js","assets/index-BD6IX1YT.js","assets/monthlyReview-f39awfmK.js","assets/screens-BdVgvvBy.js"];
+const buildAssets = ["assets/activities-DVdxXvKD.js","assets/habits-BIGW7tpg.js","assets/index-C4TYaVKb.js","assets/monthlyReview-CXespHFS.js","assets/screens-BCjBi93t.js"];
 /** M79 · Enregistrer uniquement en contexte HTTPS / Pages. */
 export async function registerServiceWorker() {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)
