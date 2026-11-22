@@ -53,14 +53,11 @@ export function openActivityEditor(activityId: string): void {
         <label>Heure de fin <input name="end" type="time" step="60"></label>
       </div>
       <label class="inline-choice"><input type="checkbox" name="autoComplete"> Présumer l'activité terminée après son horaire (annulable)</label>
-      <div class="form-columns">
-        <label>Répétition <select name="recurrence">
+      <label>Répétition <select name="recurrence">
           <option value="none">Aucune</option><option value="daily">Chaque jour</option>
           <option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option>
           <option value="yearly">Chaque année</option>
         </select></label>
-        <label>Tous les… <input type="number" name="interval" min="1" max="365" value="1"></label>
-      </div>
       <fieldset class="weekday-field"><legend>Jours de répétition hebdomadaire</legend>
         <label><input type="checkbox" name="weekday" value="1"> L</label>
         <label><input type="checkbox" name="weekday" value="2"> M</label>
@@ -133,7 +130,6 @@ export function openActivityEditor(activityId: string): void {
           ? formatZonedTime(activity.endAt, activity.timeZone) : "";
         (field("autoComplete") as HTMLInputElement).checked = activity.autoComplete;
         field("recurrence").value = activity.recurrence?.frequency || "none";
-        field("interval").value = String(activity.recurrence?.interval || 1);
         const weekdays = activity.recurrence?.weekdays || [];
         form.querySelectorAll<HTMLInputElement>('input[name="weekday"]').forEach(box => {
           box.checked = weekdays.includes(Number(box.value) as 1 | 2 | 3 | 4 | 5 | 6 | 7);
@@ -254,11 +250,6 @@ export function openActivityEditor(activityId: string): void {
         return;
       }
       const frequency = field("recurrence").value;
-      const interval = Number(field("interval").value);
-      if (!Number.isInteger(interval) || interval < 1 || interval > 365) {
-        feedback.textContent = "L'intervalle de répétition est invalide.";
-        return;
-      }
       const weekdays = [...form.querySelectorAll<HTMLInputElement>('input[name="weekday"]:checked')]
         .map(box => Number(box.value) as 1 | 2 | 3 | 4 | 5 | 6 | 7);
       let recurrence: RecurrenceRule | undefined;
@@ -269,7 +260,8 @@ export function openActivityEditor(activityId: string): void {
         }
         recurrence = {
           frequency: frequency as RecurrenceRule["frequency"],
-          interval,
+          interval: activity?.recurrence?.frequency === frequency
+            ? activity.recurrence.interval : 1,
           ...(frequency === "weekly" && weekdays.length ? {weekdays} : {}),
           ...(activity?.recurrence?.frequency === frequency && activity.recurrence.count
             ? {count: activity.recurrence.count} : {}),
