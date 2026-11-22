@@ -77,3 +77,10 @@ Le cache Firestore persistant est **soumis à la confirmation que l'appareil est
 Le scénario T05 dans `tests/security.test.ts` utilise exclusivement les émulateurs locaux Firebase Auth et Firestore avec `FIREBASE_EMULATOR_TEST=1`. Il couvre aussi le verrou Google, le profil du propriétaire et deux coches simultanées d'une tâche sans date. Les tests Google de `npm run test:core` utilisent des réponses simulées.
 
 **Propriétaire :** `Pecose`. Indépendant de tout dépôt `T-C-Umbral`.
+
+## Publication 0.1.7 · 22 novembre 2026
+
+- L'origine publique du Worker Cloudflare est `https://organiseur-personnel-reminders.pecose-billos.workers.dev/`. Au build, définir `VITE_WORKER_ORIGIN` avec cette valeur pour activer uniquement les routes Google autorisées par F46. Les clés privées restent exclusivement dans les secrets Cloudflare.
+- La notice F58 est disponible à `https://pecose.github.io/organiseur-personnel/confidentialite.html`.
+- Versions PWA `0.1.7` / cache `s10-7`; l'activation des mises à jour reste soumise au geste de confirmation prévu en Paramètres. Ne pas effacer les données ou fichiers locaux.
+- Les tests Google Agenda sur iPhone et les notifications distantes réelles restent à réaliser. Aucune tâche Cron n'est activée par cette publication.
