@@ -38,8 +38,37 @@ export async function putCloudRecord<T>(
     const target = doc(getUserCollection(uid, kind), id);
     await setDoc(target, data as DocumentData);
     return { ok: true, value: undefined };
-  } catch {
-    return { ok: false, error: { code: "CLOUD_WRITE_FAILED", message: "Écriture refusée ou indisponible." } };
+  } catch (error: unknown) {
+    // N'exposer que le code standard du SDK, jamais une réponse brute
+    // ni les identifiants, chemins, jetons ou données du document.
+    const code = typeof error === "object" && error !== null && "code" in error
+      && typeof error.code === "string" ? error.code : "";
+    const failure: Readonly<Record<string, {code: string; message: string}>> = {
+      "permission-denied": {
+        code: "CLOUD_WRITE_PERMISSION_DENIED",
+        message: "Firestore refuse cette écriture. Vérifie que les règles de sécurité du projet sont publiées pour ton compte.",
+      },
+      "unauthenticated": {
+        code: "CLOUD_WRITE_UNAUTHENTICATED",
+        message: "Session Firebase non reconnue. Déconnecte-toi puis reconnecte-toi à l'organiseur.",
+      },
+      "unavailable": {
+        code: "CLOUD_WRITE_UNAVAILABLE",
+        message: "Firestore est indisponible ou l'iPhone est hors connexion. Vérifie le réseau et réessaie.",
+      },
+      "failed-precondition": {
+        code: "CLOUD_WRITE_PRECONDITION",
+        message: "Une condition Firebase empêche l'enregistrement. Vérifie l'initialisation de Firestore.",
+      },
+      "resource-exhausted": {
+        code: "CLOUD_WRITE_QUOTA",
+        message: "Limite d'utilisation Firebase atteinte. Réessaie après vérification des quotas gratuits.",
+      },
+    };
+    return {ok:false,error:failure[code] ?? {
+      code:"CLOUD_WRITE_FAILED",
+      message:"Firestore n'a pas confirmé l'écriture. Réessaie en ligne.",
+    }};
   }
 }
 
