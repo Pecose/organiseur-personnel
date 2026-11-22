@@ -482,6 +482,13 @@
       .calendar-day { padding: 8px; }
       .tab-label { font-size: .63rem; }
     }
+  
+    /* D33 : deux modes de programmation distincts, accessibles au toucher. */
+    .schedule-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 17px}
+    .schedule-mode{min-height:48px;padding:11px;border:1px solid #d6dfd1;border-radius:15px;background:#f8f5ee;color:#556756;font-weight:650}
+    .schedule-mode.active,.schedule-mode[aria-selected="true"]{background:#d8e8d7;color:#335c48;border-color:#8baf97}
+    .schedule-panel{display:grid;gap:12px;margin-bottom:14px}
+    .schedule-panel[hidden],#schedule-legacy[hidden]{display:none!important}
   </style>
   <script type="module" src="/src/main.ts"></script>
 </head>
