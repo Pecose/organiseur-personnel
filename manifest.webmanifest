@@ -6,14 +6,18 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F7F5F0",
-  "theme_color": "#A4BFAF",
+  "background_color": "#FBF6ED",
+  "theme_color": "#FBF6ED",
   "lang": "fr",
   "dir": "ltr",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
   "app_version": {
-    "version": "0.1.1",
-    "cacheRevision": "s10-1",
+    "version": "0.1.8",
+    "cacheRevision": "s10-8",
     "catalogRevision": "0",
-    "releasedAt": "2026-11-12T18:40:00.000Z"
+    "releasedAt": "2026-11-22T15:20:34.478Z"
   }
 }

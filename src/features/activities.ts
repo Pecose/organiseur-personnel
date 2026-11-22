@@ -193,11 +193,16 @@ export async function updateActivity(activity: Activity): Promise<Result<Activit
     if (existing.deletedAt) return { ok: false, error: {
       code: "ACTIVITY_ARCHIVED", message: "Activité déjà supprimée.",
     }};
+    const link = existing.googleLink ?? activity.googleLink;
+    const changesGoogle = activity.title !== existing.title || activity.startAt !== existing.startAt
+      || activity.endAt !== existing.endAt || activity.timeZone !== existing.timeZone
+      || JSON.stringify(activity.recurrence) !== JSON.stringify(existing.recurrence);
     const candidate: Activity = {
       ...activity,
       uid: user.uid,
       id: existing.id,
-      googleLink: activity.googleLink ?? existing.googleLink,
+      googleLink: link && changesGoogle && link.pending !== "delete"
+        ? {...link, pending: "upsert"} : link,
       updatedAt: new Date().toISOString(),
     };
     const valid = validateActivity(candidate);
@@ -439,8 +444,13 @@ export async function setOccurrenceCompletion(
         },
       } as Result<ActivityCompletion>;
       const parent = record.data() as Activity;
+      const now = new Date();
+      const dateOnCompletion = mode === "manual_done" && !parent.plannedOn
+        && !parent.startAt && !parent.recurrence
+        && now.toLocaleDateString("sv-SE", {timeZone: parent.timeZone}) === day;
+      const dated = dateOnCompletion ? {...parent, plannedOn: day, updatedAt: now.toISOString()} : parent;
       const center = Date.parse(day + "T00:00:00Z");
-      const matches = expandActivityOccurrences(parent, {
+      const matches = expandActivityOccurrences(dated, {
         from: new Date(center - 2 * 86_400_000).toISOString(),
         to: new Date(center + 3 * 86_400_000).toISOString(),
       });
@@ -451,6 +461,7 @@ export async function setOccurrenceCompletion(
       } as Result<ActivityCompletion>;
       const before = existing.exists() ? existing.data() as ActivityCompletion : null;
       if (before?.status === "manual_done" && mode === "manual_done") {
+        if (dateOnCompletion) tx.set(activityRef, dated);
         return {ok: true, value: before} as Result<ActivityCompletion>;
       }
       if (mode === "pending" && before && before.status !== "pending") return {
@@ -458,12 +469,13 @@ export async function setOccurrenceCompletion(
           code: "USE_MANUAL_UNDO", message: "Utilise l'annulation manuelle pour retirer la coche.",
         },
       } as Result<ActivityCompletion>;
-      const now = new Date().toISOString();
+      const instant = now.toISOString();
       const completion: ActivityCompletion = {
         id: key, activityId, occurrenceKey: key,
-        status: mode, updatedAt: now,
-        ...(mode === "manual_done" ? {completedAt: now} : {}),
+        status: mode, updatedAt: instant,
+        ...(mode === "manual_done" ? {completedAt: instant} : {}),
       };
+      if (dateOnCompletion) tx.set(activityRef, dated);
       tx.set(completionRef, completion);
       return {ok: true, value: completion} as Result<ActivityCompletion>;
     });

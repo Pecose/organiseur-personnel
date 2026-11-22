@@ -9,6 +9,7 @@ import { setSelectedDay } from "../app/state";
 import { getCalendarWeek, selectCalendarDate } from "../features/agenda";
 import { listTasks } from "../features/tasks";
 import { listHabits } from "../features/habits";
+import { getDueReminders } from "../features/reminders";
 import { groupDayEntries, getDayEntries, getCarryOverPrompt, applyCarryOver } from "../features/day";
 import {
   getOccurrenceCompletion, setOccurrenceCompletion, undoOccurrenceCompletion,
@@ -25,7 +26,10 @@ import {
 } from "../features/player";
 import { readMedia } from "../storage/mediaDb";
 import { resolveCatalogAsset } from "../storage/catalog";
-import { listImages, importImage, cropImage, composeDecorImage } from "../features/decor";
+import {
+  listImages, importImage, selectTheme, setBackground, updateImageMetadata,
+  removeImportedImage, cropImage, composeDecorImage,
+} from "../features/decor";
 import {
   exportDataJson, validateBackup, restoreData,
   exportMediaArchive, importMediaArchive,
@@ -53,24 +57,32 @@ export function renderDay(date: LocalDate): void {
   if (!root) return;
   root.replaceChildren();
   const panel = document.createElement("section");
-  panel.className = "page-intro";
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = "UNE JOURNÉE À LA FOIS";
+  panel.className = "page-intro day-intro";
+  const user = getAppState().user;
+  if (user) {
+    const greeting = document.createElement("p");
+    greeting.className = "day-session";
+    greeting.textContent = "Bonjour ! Ta session est ouverte.";
+    panel.append(greeting);
+  }
+  const localDate = new Date(date + "T12:00:00Z");
   const heading = document.createElement("h2");
-  heading.textContent = new Date(date + "T12:00:00Z").toLocaleDateString("fr-FR", {
-    timeZone: "UTC", weekday: "long", day: "numeric", month: "long",
-  });
-  const description = document.createElement("p");
-  description.className = "muted";
-  description.textContent = date === getAppState().daySelection.today
-    ? "Ton espace pour aujourd'hui." : "Les activités prévues pour cette date.";
+  const weekday = document.createElement("span");
+  weekday.className = "day-weekday";
+  weekday.textContent = localDate.toLocaleDateString("fr-FR", {timeZone: "UTC", weekday: "long"});
+  const day = document.createElement("span");
+  day.className = "day-date";
+  day.textContent = localDate.toLocaleDateString("fr-FR", {timeZone: "UTC", day: "numeric", month: "long"});
+  heading.append(weekday, " ", day);
   const actions = document.createElement("div");
   actions.className = "header-actions";
   const todayButton = document.createElement("button");
   todayButton.className = "soft-button";
   todayButton.type = "button";
-  todayButton.textContent = "Aujourd'hui";
+  todayButton.textContent = "Aujourd’hui";
+  todayButton.hidden = date === new Date().toLocaleDateString("sv-SE", {
+    timeZone: getAppState().preferences.timeZone,
+  });
   todayButton.onclick = () => {
     const today = new Date().toLocaleDateString("sv-SE", {
       timeZone: getAppState().preferences.timeZone,
@@ -81,16 +93,16 @@ export function renderDay(date: LocalDate): void {
   const addButton = document.createElement("button");
   addButton.type = "button";
   addButton.className = "primary-button compact";
-  addButton.textContent = "+ Activité";
+  addButton.textContent = "+ Nouvelle activité";
   addButton.onclick = () => openActivityEditor("");
-  actions.append(todayButton, addButton);
-  panel.append(eyebrow, heading, description, actions);
+  actions.append(addButton, todayButton);
+  panel.append(heading, actions);
   root.append(panel);
 
   // Deux sections, y compris dans les états vides, sans troisième catégorie.
-  const sections: {id: string; title: string; sub: string}[] = [
-    {id:"untimed", title:"Sans horaire", sub:"À ton rythme"},
-    {id:"timed", title:"Avec horaire", sub:"Dans l'ordre de la journée"},
+  const sections = [
+    {id:"untimed", title:"Sans horaire"},
+    {id:"timed", title:"Avec horaire"},
   ];
   for (const section of sections) {
     const block = document.createElement("section");
@@ -99,10 +111,7 @@ export function renderDay(date: LocalDate): void {
     header.className = "section-heading";
     const label = document.createElement("h3");
     label.textContent = section.title;
-    const tag = document.createElement("span");
-    tag.className = "subtle-tag";
-    tag.textContent = section.sub;
-    header.append(label, tag);
+    header.append(label);
     const list = document.createElement("div");
     list.id = "entries-" + section.id;
     list.className = "entry-list";
@@ -113,20 +122,17 @@ export function renderDay(date: LocalDate): void {
     block.append(header, list);
     root.append(block);
   }
-  if (!getAppState().user) {
+  if (!user) {
     for (const id of ["untimed", "timed"]) {
       const target = document.getElementById("entries-" + id)!;
-      target.replaceChildren();
-      const note = document.createElement("p");
-      note.className = "empty-copy";
-      note.textContent = "Connecte-toi pour voir tes activités. Aucune donnée d'exemple n'est affichée.";
-      target.append(note);
+      target.textContent = "";
     }
-    const connect = document.createElement("button");
-    connect.className = "soft-button";
-    connect.textContent = "Me connecter";
-    connect.onclick = () => navigate({name:"signin"});
-    root.append(connect);
+    addButton.textContent = "Me connecter";
+    addButton.onclick = () => navigate({name:"signin"});
+    const note = document.createElement("p");
+    note.className = "empty-copy";
+    note.textContent = "Connecte-toi pour retrouver les activités de ta journée.";
+    panel.after(note);
     return;
   }
 
@@ -237,7 +243,9 @@ export function renderDay(date: LocalDate): void {
     });
   }
 
-  void getDayEntries(date).then(result => {
+  void Promise.all([
+    getDayEntries(date), date === realToday ? getDueReminders(new Date().toISOString()) : undefined,
+  ]).then(([result, reminders]) => {
     if (!root.isConnected || getAppState().route.name !== "day"
       || getAppState().daySelection.selectedDate !== date) return;
     if (!result.ok) {
@@ -248,6 +256,7 @@ export function renderDay(date: LocalDate): void {
       return;
     }
     const grouped = groupDayEntries(result.value);
+    const due = new Set(reminders?.ok ? reminders.value.map(item => item.occurrenceKey) : []);
     for (const [id, items] of [
       ["untimed", grouped.withoutTime],
       ["timed", grouped.withTime],
@@ -289,6 +298,10 @@ export function renderDay(date: LocalDate): void {
           }
         }
         if (item.activity.stars) chunks.push("★".repeat(item.activity.stars));
+        if (due.has(item.occurrence.occurrenceKey)
+          && item.completion?.status !== "manual_done" && item.completion?.status !== "auto_assumed") {
+          chunks.push("Rappel arrivé");
+        }
         if (item.completion?.status === "auto_assumed") chunks.push("Présumé terminé");
         if (item.completion?.status === "manually_undone") chunks.push("Annulation conservée");
         meta.textContent = chunks.join(" · ");
@@ -343,11 +356,14 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
   root.replaceChildren();
   const header = document.createElement("section");
   header.className = "page-intro";
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = "UN PEU DE RECUL";
   const heading = document.createElement("h2");
   heading.textContent = "Mon calendrier";
+  const start = Date.parse(monday + "T00:00:00Z");
+  const week = document.createElement("p");
+  week.className = "muted calendar-range";
+  week.textContent = new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  }).formatRange(start, start + 6 * 86_400_000);
   const bar = document.createElement("div");
   bar.className = "header-actions";
   for (const [text, offset, label] of [
@@ -376,12 +392,11 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
     };
     bar.append(button);
   }
-  header.append(eyebrow, heading, bar);
+  header.append(heading, week, bar);
   root.append(header);
 
   const days = document.createElement("div");
   days.className = "week-grid";
-  const start = Date.parse(monday + "T00:00:00Z");
   const selectedDate = getAppState().daySelection.selectedDate;
   const today = getAppState().daySelection.today;
   const buttons: HTMLButtonElement[] = [];
@@ -393,6 +408,7 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
       + (date === today ? " is-today" : "");
     cell.setAttribute("aria-label", new Date(date + "T12:00:00Z")
       .toLocaleDateString("fr-FR", {weekday:"long", day:"numeric", month:"long",timeZone:"UTC"}));
+    if (date === today) cell.setAttribute("aria-current", "date");
     const weekday = document.createElement("span");
     weekday.className = "calendar-weekday";
     weekday.textContent = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"][index];
@@ -422,7 +438,7 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
   root.insertBefore(days, root.querySelector(".sunday-toggle"));
   const notice = document.createElement("p");
   notice.className = "muted calendar-footnote";
-  notice.textContent = "Choisis une date pour ouvrir les activités de ce jour.";
+  notice.setAttribute("role", "status");
   root.append(notice);
   if (!getAppState().user) {
     const message = document.createElement("p");
@@ -451,12 +467,14 @@ export function renderCalendarWeek(monday: LocalDate, showSunday: boolean): void
 export function renderTasks(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">L'ESPRIT LÉGER</p>
-    <h2>Mes tâches</h2><p class="muted">Tout ce que tu veux faire, sans être pressée.</p>
-    <button type="button" class="primary-button compact" id="new-task">+ Tâche</button></section>
-    <section class="day-section"><h3>À faire</h3><div id="task-list" class="entry-list"></div></section>`;
+  root.innerHTML = `<section class="page-intro">
+    <h2>Mes tâches</h2>
+    <div class="header-actions"><button type="button" class="primary-button compact" id="new-task">Ajouter une tâche</button></div></section>
+    <section class="day-section"><p id="task-status" role="status"></p>
+    <div id="task-list" class="entry-list"></div></section>`;
   root.querySelector<HTMLButtonElement>("#new-task")!.onclick = () => openActivityEditor("");
   const list = root.querySelector<HTMLElement>("#task-list")!;
+  const feedback = root.querySelector<HTMLElement>("#task-status")!;
   if (!getAppState().user) {
     list.textContent = "Connecte-toi pour voir tes tâches.";
     return;
@@ -490,9 +508,19 @@ export function renderTasks(): void {
       check.className = "check-control";
       check.textContent = "○";
       if (!task.plannedOn) {
-        check.disabled = true;
-        check.title = "Ajoute une date pour valider une occurrence.";
-        check.setAttribute("aria-label", "Ajoute une date pour terminer " + task.title);
+        check.title = "Cocher et dater d’aujourd’hui";
+        check.setAttribute("aria-label", "Cocher et dater d’aujourd’hui : " + task.title);
+        check.onclick = async () => {
+          check.disabled = true;
+          const today = new Date().toLocaleDateString("sv-SE", {timeZone: task.timeZone});
+          const checked = await setOccurrenceCompletion(task.id + "@" + today, "manual_done");
+          if (!check.isConnected) return;
+          if (checked.ok) renderTasks();
+          else {
+            check.disabled = false;
+            feedback.textContent = checked.error.message;
+          }
+        };
       } else {
         const key = task.id + "@" + task.plannedOn;
         check.setAttribute("aria-label", "Terminer " + task.title);
@@ -510,7 +538,7 @@ export function renderTasks(): void {
                 check.setAttribute("aria-label",
                   (checked ? "Terminer " : "Annuler la validation de ") + task.title);
               } else {
-                check.title = result.error.message;
+                feedback.textContent = result.error.message;
               }
             });
         };
@@ -535,10 +563,10 @@ export function renderTasks(): void {
 export function renderHabits(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">LES PETITS RITUELS</p>
-    <h2>Mes habitudes</h2><p class="muted">Un peu, souvent, à ta manière.</p>
-    <button type="button" id="new-habit" class="primary-button compact">+ Habitude</button></section>
-    <section class="day-section"><h3>Mes rituels</h3><div class="entry-list" id="habits-list"></div></section>`;
+  root.innerHTML = `<section class="page-intro">
+    <h2>Mes habitudes</h2>
+    <div class="header-actions"><button type="button" id="new-habit" class="primary-button compact">Ajouter une habitude</button></div></section>
+    <section class="day-section"><div class="entry-list" id="habits-list"></div></section>`;
   root.querySelector<HTMLButtonElement>("#new-habit")!.onclick = () => openActivityEditor("");
   const list = root.querySelector<HTMLElement>("#habits-list")!;
   if (!getAppState().user) { list.textContent = "Connecte-toi pour retrouver tes habitudes."; return; }
@@ -555,6 +583,7 @@ export function renderHabits(): void {
       const icon = document.createElement("span");
       icon.className = "habit-picto";
       icon.textContent = habit.iconId || "✿";
+      icon.setAttribute("aria-hidden", "true");
       const text = document.createElement("span");
       text.className = "habit-text";
       const title = document.createElement("strong");
@@ -568,6 +597,7 @@ export function renderHabits(): void {
       text.append(title, meta);
       const arrow = document.createElement("span");
       arrow.textContent = "›";
+      arrow.setAttribute("aria-hidden", "true");
       card.append(icon, text, arrow);
       card.onclick = () => openActivityEditor(habit.id);
       list.append(card);
@@ -579,11 +609,11 @@ export function renderHabits(): void {
 export function renderChecklists(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">LES CHOSES À NE PAS OUBLIER</p>
-    <h2>Mes listes</h2><p class="muted">Tes idées et tes petites choses à cocher.</p>
+  root.innerHTML = `<section class="page-intro">
+    <h2>Mes listes</h2>
     <form id="new-list-form" class="inline-form"><input aria-label="Nom de la liste" required maxlength="250"
-      name="name" placeholder="Une nouvelle liste"><button type="submit" class="primary-button compact">Créer</button></form></section>
-    <section class="day-section"><h3>Toutes mes listes</h3>
+      name="name" placeholder="Nom de la liste"><button type="submit" class="primary-button compact">Créer</button></form></section>
+    <section class="day-section">
       <div id="checklist-list" class="entry-list"></div>
       <div class="form-error" id="checklist-error" role="alert"></div></section>`;
   const box = root.querySelector<HTMLElement>("#checklist-list")!;
@@ -658,6 +688,7 @@ export function renderChecklists(): void {
           submit.type = "submit";
           submit.className = "soft-button";
           submit.textContent = "+";
+          submit.setAttribute("aria-label", "Ajouter l’article");
           add.append(input, submit);
           add.onsubmit = event => {
             event.preventDefault();
@@ -695,9 +726,9 @@ export function renderMusic(): void {
   const root = document.getElementById("view");
   if (!root) return;
   root.innerHTML =
-    "<section class='page-intro'><p class='eyebrow'>UNE PETITE PAUSE</p>" +
+    "<section class='page-intro'>" +
     "<h2>Ma musique</h2><p class='muted'>Les fichiers personnels restent sur cet appareil.</p>" +
-    "<button type='button' class='soft-button' data-back>← Revenir à Jour</button></section>" +
+    "<div class='header-actions'><button type='button' class='soft-button' data-back>← Retour à ma journée</button></div></section>" +
     "<section class='day-section'><h3>Ajouter un morceau</h3>" +
     "<form id='audio-import' class='media-import'><label>Fichier audio local" +
     "<input type='file' name='file' accept='audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/aac' required></label>" +
@@ -991,11 +1022,17 @@ export function renderMusic(): void {
         remove.textContent = "Retirer";
         remove.setAttribute("aria-label", "Retirer " + track.title + " du catalogue, sans effacer son fichier");
         remove.onclick = () => {
-          if (!window.confirm("Retirer « " + track.title +
-            " » de la bibliothèque et des playlists ? Le fichier local sera conservé pour éviter toute perte.")) return;
+          if (!window.confirm("Retirer « " + track.title + " » de la bibliothèque et des playlists ?")) return;
+          const deleteLocalFile = Boolean(track.mediaId) && window.confirm(
+            "Effacer aussi le fichier sur cet iPhone ? Choisis Annuler pour conserver le fichier.",
+          );
           remove.disabled = true;
-          void removeTrack(track.id, false).then(result => {
+          void removeTrack(track.id, deleteLocalFile).then(result => {
             if (result.ok) renderMusic();
+            else if (result.error.code === "TRACK_REMOVED_FILE_KEPT") {
+              row.remove();
+              feedback.textContent = result.error.message;
+            }
             else {
               remove.disabled = false;
               feedback.textContent = result.error.message;
@@ -1020,9 +1057,16 @@ export function renderDecor(): void {
   const root = document.getElementById("view");
   if (!root) return;
   root.innerHTML =
-    "<section class='page-intro'><p class='eyebrow'>UNE TOUCHE PERSONNELLE</p>" +
+    "<section class='page-intro'>" +
     "<h2>Mes décors</h2><p class='muted'>Les images importées restent sur ce téléphone.</p>" +
-    "<button type='button' class='soft-button' data-back>← Revenir à Jour</button></section>" +
+    "<div class='header-actions'><button type='button' class='soft-button' data-back>← Retour à ma journée</button></div></section>" +
+    "<section class='day-section'><h3>Apparence</h3>" +
+    "<label>Thème <select id='decor-theme'>" +
+    "<option value='sage'>Vert sauge</option><option value='cream'>Crème</option>" +
+    "<option value='lavender'>Lavande</option><option value='blue'>Bleu poudré</option>" +
+    "<option value='seasonal'>Selon la saison</option></select></label> " +
+    "<button type='button' class='soft-button' id='decor-reset'>Retirer le fond</button>" +
+    "<p id='decor-theme-status' class='muted' role='status'></p></section>" +
     "<section class='day-section'><h3>Importer une image</h3>" +
     "<form id='image-import' class='media-import'><label>Image de ton appareil" +
     "<input type='file' name='file' accept='image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif' required></label>" +
@@ -1033,6 +1077,29 @@ export function renderDecor(): void {
     "<input id='decor-caption' type='text' maxlength='160' placeholder='Une phrase, un rappel…'></label>" +
     "<div id='decor-list' class='image-gallery'></div></section>";
   root.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => navigate({name:"day"});
+  const themeSelect = root.querySelector<HTMLSelectElement>("#decor-theme")!;
+  const reset = root.querySelector<HTMLButtonElement>("#decor-reset")!;
+  const themeStatus = root.querySelector<HTMLElement>("#decor-theme-status")!;
+  const {preferences, user} = getAppState();
+  themeSelect.value = preferences.autoSeason ? "seasonal" : preferences.themeId;
+  if (!themeSelect.value) themeSelect.value = "sage";
+  themeSelect.disabled = !user;
+  reset.disabled = !user || !preferences.backgroundImageId;
+  if (!user) themeStatus.textContent = "Connecte-toi pour personnaliser l’apparence.";
+  themeSelect.onchange = async () => {
+    themeSelect.disabled = true;
+    const result = await selectTheme(themeSelect.value);
+    themeSelect.disabled = false;
+    themeStatus.textContent = result.ok ? "Thème enregistré." : result.error.message;
+    const current = getAppState().preferences;
+    themeSelect.value = current.autoSeason ? "seasonal" : current.themeId;
+  };
+  reset.onclick = async () => {
+    reset.disabled = true;
+    const result = await setBackground("");
+    reset.disabled = result.ok;
+    themeStatus.textContent = result.ok ? "Fond retiré." : result.error.message;
+  };
   const feedback = root.querySelector<HTMLElement>("#image-feedback")!;
   const target = root.querySelector<HTMLElement>("#decor-list")!;
   const form = root.querySelector<HTMLFormElement>("#image-import")!;
@@ -1151,7 +1218,55 @@ export function renderDecor(): void {
           feedback.textContent="Recadrage indisponible sur cet appareil.";
         });
       };
-      actions.append(portrait,square);
+      const background = document.createElement("button");
+      background.type = "button";
+      background.className = "soft-button compact";
+      background.textContent = "Utiliser comme fond";
+      background.setAttribute("aria-label", "Utiliser " + image.name + " comme fond");
+      background.disabled = !user;
+      background.onclick = async () => {
+        background.disabled = true;
+        const result = await setBackground(image.id);
+        background.disabled = false;
+        if (result.ok) reset.disabled = false;
+        feedback.textContent = result.ok ? "Fond appliqué." : result.error.message;
+      };
+      actions.append(background, portrait, square);
+      if (image.source === "imported") {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "soft-button compact";
+        edit.textContent = "Modifier le nom et les étiquettes";
+        edit.onclick = async () => {
+          const name = window.prompt("Nom de l’image", image.name);
+          if (name === null) return;
+          const tags = window.prompt("Étiquettes séparées par des virgules", image.tags.join(", "));
+          if (tags === null) return;
+          edit.disabled = true;
+          const result = await updateImageMetadata({
+            ...image, name, tags: tags.split(",").map(tag => tag.trim()).filter(Boolean),
+          });
+          edit.disabled = false;
+          if (result.ok && tile.isConnected) renderDecor();
+          else if (!result.ok) feedback.textContent = result.error.message;
+        };
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "soft-button compact destructive";
+        remove.textContent = "Effacer de cet iPhone";
+        remove.disabled = !user;
+        remove.onclick = async () => {
+          if (!window.confirm("Effacer définitivement « " + image.name + " » de cet iPhone ?")) return;
+          remove.disabled = true;
+          const result = await removeImportedImage(image.id);
+          if (result.ok && tile.isConnected) renderDecor();
+          else if (!result.ok) {
+            remove.disabled = false;
+            feedback.textContent = result.error.message;
+          }
+        };
+        actions.append(edit, remove);
+      }
       tile.append(actions);
       target.append(tile);
       if (image.source === "imported" && image.mediaId) {
@@ -1184,55 +1299,77 @@ export function renderSettings(): void {
   const root = document.getElementById("view");
   if (!root) return;
   const state = getAppState();
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">MON PETIT ESPACE</p>
-    <h2>Paramètres</h2><p class="muted" id="account-label"></p></section>
-    <section class="day-section settings-list">
-    <button type="button" class="soft-button" id="settings-monthly">Voir mon bilan mensuel</button>
-    <button type="button" class="soft-button" id="settings-cache">Activer le mode hors ligne sur appareil de confiance</button>
-    <h3>Mises à jour de l'application</h3>
-    <button type="button" class="soft-button" id="settings-check-update">Vérifier les mises à jour</button>
-    <button type="button" class="soft-button" id="settings-apply-update" disabled>Installer la version proposée</button>
-    <p class="muted" id="settings-update-status" role="status" aria-live="polite">Aucune mise à jour demandée.</p>
-    <h3>Notifications sur cet iPhone</h3>
-    <p class="muted">Demander l'autorisation ne déclenche aucun rappel : l'abonnement et le serveur gratuit doivent encore être configurés.</p>
-    <button type="button" class="soft-button" id="settings-push-permission">Autoriser les notifications</button>
-    <button type="button" class="soft-button" id="settings-push-subscribe">Abonner cet appareil (après configuration)</button>
-    <button type="button" class="soft-button" id="settings-push-test">Demander un test de notification</button>
-    <button type="button" class="soft-button" id="settings-push-revoke">Retirer l'abonnement de cet appareil</button>
-    <p class="muted" id="settings-push-status" role="status" aria-live="polite">Aucun envoi distant n'est actif.</p>
-    <button type="button" class="soft-button" id="settings-signout">Se déconnecter</button>
-    <button type="button" class="soft-button" id="settings-login">Connexion</button>
-    <p class="muted" id="settings-status" role="status"></p>
-    <h3>Google Agenda (facultatif)</h3>
-    <p class="muted">La connexion Google est distincte de celle de l'organiseur. Aucune synchronisation n'est active sans autorisation explicite.</p>
-    <button type="button" class="soft-button" id="google-link">Connecter mon Google Agenda</button>
-    <button type="button" class="soft-button" id="google-status">Vérifier le statut Google</button>
-    <button type="button" class="soft-button" id="google-sync">Synchroniser maintenant</button>
-    <button type="button" class="soft-button" id="google-conflicts">Afficher les conflits</button>
-    <button type="button" class="soft-button" id="google-unlink">Délier Google Agenda</button>
-    <div id="google-conflict-list" class="entry-list"></div>
-    <p class="muted" id="google-feedback" role="status" aria-live="polite">Google Agenda n'est pas configuré.</p>
-    <h3>Sauvegardes indépendantes</h3>
-    <p class="muted">Les données de l'agenda et les fichiers personnels sont deux archives différentes. Les exports ne sont pas chiffrés : conserve-les dans un endroit privé. La restauration n'efface pas les données absentes d'une archive.</p>
-    <button type="button" class="soft-button" id="backup-export-json">Exporter mes données (JSON)</button>
-    <label class="muted">Archive de données
-      <input id="backup-import-json" type="file" accept=".json,application/json">
-    </label>
-    <label class="muted">Restauration
-      <select id="backup-json-mode">
-        <option value="merge">Ajouter sans modifier l'existant</option>
-        <option value="replace">Remplacer les ID présents dans l'archive (confirmation)</option>
-      </select>
-    </label>
-    <button type="button" class="soft-button" id="backup-restore-json">Restaurer les données</button>
-    <button type="button" class="soft-button" id="backup-export-media">Exporter mes musiques et images</button>
-    <label class="muted">Archive multimédia de l'ancien iPhone
-      <input id="backup-import-media" type="file" accept=".opmedia,application/octet-stream">
-    </label>
-    <button type="button" class="soft-button" id="backup-restore-media">Restaurer les médias locaux</button>
-    <p id="backup-feedback" role="status" aria-live="polite" class="muted">Aucune sauvegarde déclenchée automatiquement.</p></section>`;
+  root.innerHTML = `
+    <section class="page-intro">
+      <h2>Paramètres</h2>
+      <div class="header-actions"><button type="button" class="soft-button" id="settings-monthly">Voir mon bilan mensuel</button></div>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Compte et appareil</h3>
+      <p class="muted" id="account-label"></p>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="settings-login">Me connecter</button>
+        <button type="button" class="soft-button" id="settings-signout">Me déconnecter</button>
+        <button type="button" class="soft-button" id="settings-cache">Mémoriser cet appareil pour le hors-ligne</button>
+      </div>
+      <p class="muted" id="settings-status" role="status"></p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Mises à jour</h3>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="settings-check-update">Vérifier les mises à jour</button>
+        <button type="button" class="soft-button" id="settings-apply-update" disabled>Installer la version proposée</button>
+      </div>
+      <p class="muted" id="settings-update-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Notifications sur cet iPhone</h3>
+      <p class="muted">Les rappels à distance nécessitent l’abonnement de cet iPhone et la configuration du serveur.</p>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="settings-push-permission">Autoriser les notifications</button>
+        <button type="button" class="soft-button" id="settings-push-subscribe">Abonner cet iPhone</button>
+        <button type="button" class="soft-button" id="settings-push-test">Tester les notifications</button>
+        <button type="button" class="soft-button" id="settings-push-revoke">Retirer l’abonnement</button>
+      </div>
+      <p class="muted" id="settings-push-status" role="status" aria-live="polite">Les notifications à distance sont désactivées.</p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Google Agenda</h3>
+      <p class="muted">Tu peux relier ton compte Google séparément. La synchronisation est facultative et demande ton accord.</p>
+      <div class="header-actions">
+        <button type="button" class="soft-button" id="google-link">Connecter mon Google Agenda</button>
+        <button type="button" class="soft-button" id="google-status">Vérifier la connexion Google</button>
+        <button type="button" class="soft-button" id="google-sync">Synchroniser maintenant</button>
+        <button type="button" class="soft-button" id="google-conflicts">Afficher les conflits</button>
+        <button type="button" class="soft-button" id="google-unlink">Dissocier Google Agenda</button>
+      </div>
+      <div id="google-conflict-list" class="entry-list"></div>
+      <p class="muted" id="google-feedback" role="status" aria-live="polite"></p>
+    </section>
+    <section class="day-section settings-list settings-group">
+      <h3>Sauvegardes</h3>
+      <p class="muted">Les données et les médias ont chacun leur archive. Conserve les archives dans un endroit privé, car elles sont exportées en clair. La restauration conserve les éléments absents de l’archive.</p>
+      <button type="button" class="soft-button" id="backup-export-json">Exporter mes données</button>
+      <label class="muted">Archive de données
+        <input id="backup-import-json" type="file" accept=".json,application/json">
+      </label>
+      <label class="muted">Mode de restauration
+        <select id="backup-json-mode">
+          <option value="merge">Ajouter sans modifier l’existant</option>
+          <option value="replace">Remplacer les éléments présents dans l’archive</option>
+        </select>
+      </label>
+      <button type="button" class="soft-button" id="backup-restore-json">Restaurer les données</button>
+      <button type="button" class="soft-button" id="backup-export-media">Exporter mes musiques et images</button>
+      <label class="muted">Archive de musiques et images
+        <input id="backup-import-media" type="file" accept=".opmedia,application/octet-stream">
+      </label>
+      <button type="button" class="soft-button" id="backup-restore-media">Restaurer les musiques et images</button>
+      <p id="backup-feedback" role="status" aria-live="polite" class="muted"></p>
+    </section>`;
   root.querySelector<HTMLElement>("#account-label")!.textContent =
-    state.user?.email || "Aucun compte connecté.";
+    state.user?.email ? "Session ouverte avec " + state.user.email
+      : state.user ? "Ta session est ouverte." : "Aucun compte connecté.";
 
   // F36/M82/M83 : vérifier sans écrire ; activer uniquement après confirmation.
   const checkUpdate = root.querySelector<HTMLButtonElement>("#settings-check-update")!;
@@ -1427,9 +1564,17 @@ export function renderSettings(): void {
   const feedback = root.querySelector<HTMLElement>("#settings-status")!;
   const googleFeedback = root.querySelector<HTMLElement>("#google-feedback")!;
   const conflicts = root.querySelector<HTMLElement>("#google-conflict-list")!;
+  const googleServiceConfigured = Boolean(import.meta.env.VITE_WORKER_ORIGIN || "https://organiseur-personnel-reminders.pecose-billos.workers.dev/");
   const googleIds = ["google-link","google-status","google-sync","google-conflicts","google-unlink"];
   for (const id of googleIds)
-    root.querySelector<HTMLButtonElement>("#"+id)!.disabled = !state.user;
+    root.querySelector<HTMLButtonElement>("#"+id)!.disabled = !state.user || !googleServiceConfigured;
+  if (!googleServiceConfigured) {
+    googleFeedback.textContent = "Google Agenda sera disponible une fois son service de synchronisation configuré.";
+  } else if (!state.user) {
+    googleFeedback.textContent = "Connecte-toi à l’organiseur pour relier ton agenda Google.";
+  } else {
+    googleFeedback.textContent = "Service configuré dans l’application. Vérifie maintenant la connexion Google.";
+  }
   root.querySelector<HTMLButtonElement>("#google-link")!.onclick = () => {
     googleFeedback.textContent = "Préparation du consentement Google…";
     void startGoogleCalendarLink().then(result => {
@@ -1510,9 +1655,8 @@ export function renderSettings(): void {
 
   cache.onclick = () => {
     void configurePersistence().then(result => {
-      feedback.textContent = result.ok
-        ? "Mode local configuré. Vérifie le comportement sur iPhone lors de la recette."
-        : result.error.message;
+      if (result.ok) location.reload();
+      else feedback.textContent = result.error.message;
     });
   };
   logout.onclick = () => {
@@ -1529,7 +1673,7 @@ export function renderSettings(): void {
 export function renderSignIn(): void {
   const root = document.getElementById("view");
   if (!root) return;
-  root.innerHTML = `<section class="page-intro"><p class="eyebrow">BIENVENUE</p>
+  root.innerHTML = `<section class="page-intro">
     <h2>Mon compte</h2><p class="muted">Connecte-toi pour retrouver tes activités.</p></section>
     <section class="auth-panel"><form id="auth-form">
       <label>Adresse e-mail <input type="email" name="email" autocomplete="email" required></label>

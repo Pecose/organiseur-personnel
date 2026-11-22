@@ -1,33 +1,34 @@
 # Roadmap — Application personnelle iPhone (PWA)
 
-> **Statut :** implémentation des strates S0–S8 avancée, **non testée et non déployée** ; S9 partiellement codée, S10 en cours de codage, non testée.  
+> **Statut :** version source 0.1.4, avec la refonte visuelle et une illustration originale sur Jour. Recette iPhone et mise en service en attente.
+>
 > **GitHub cible :** compte **`Pecose`**, **jamais** l'organisation `T-C-Umbral`.  
 > **Dépôt créé :** `Pecose/organiseur-personnel` (public, branche `main`).  
 > **Utilisatrice cible :** une personne, sur iPhone.  
 > **Budget impératif :** **0 €** d'abonnement, d'hébergement et de compte Apple Developer.  
 > **Environnement de développement :** Windows.  
-> **Dernière mise à jour :** 12 novembre 2026 (S10/F36 et M93 non destructif codés ; recette globale D23 toujours différée).
+> **Dernière mise à jour :** 21 novembre 2026 (refonte D22 et illustration D29).
 
 ## Tableau de bord des objectifs (lecture humaine)
 
-**Ce tableau est le suivi des objectifs officiel.** Il sert à comparer ce que nous voulons obtenir avec les contrats techniques de [l'architecture](docs/ARCHITECTURE.md). **Validation du périmètre ≠ fonctionnalité validée** : les strates S0–S8 comportent désormais du code **non testé**. S9 dispose d'un code préparatoire non testé ; S10 M70–M74 est codée mais non testée ; M82–M83 restent. L'agent doit actualiser cette correspondance à chaque évolution approuvée.
+Le tableau indique l’avancement actuel. Les sections datées ci-dessous retracent l’historique du développement.
 
 | ID objectif | Résultat attendu | Architecture à consulter | Test / jalon | Statut |
 |---|---|---|---|---|
-| **G01** | PWA installable iPhone, fonctionnement hors ligne et mises à jour | D01/D06/D09 ; F08–F09/F14/F35–F36 ; M01/M79–M83 ; C10/C15–C16 | T06 ; **S5/S10** | M82/M83/F36 codés ; icônes, tests, publication et iPhone manquants |
-| **G02** | **Calendrier hebdomadaire** 6 jours visibles + dimanche dépliable, choix de date, connexion bidirectionnelle **Google Agenda** | D04/D11–D13/D21 ; O24–O31/O37 ; F21/F37/F45–F47 ; M103–M120/M127–M128/M150/M156 ; C20–C27/C33 | T10–T15 ; **S7/S9A** | Partiellement codé, non testé : S9/D25 |
-| **G03** | **Tâches** non horaires/non cycliques, avec ou sans date, édition et report facultatif | D15/D18 ; O31–O33/O36 ; F22/F48/F51 ; M121–M125/M135–M138 ; C27–C30 | T02/T15/T17 ; **S6–S8** | Codé (reports groupés), non testé S8/D23 |
-| **G04** | Firebase : compte, données essentielles, synchronisation et restauration | D05/D08 ; O01/O15–O16/O31–O36 ; F27–F30/F34/F39 ; M16–M27/M70–M72/M89–M90 ; C02–C05/C17 | T04/T05/T09 ; **S5/S10** | Auth/Firestore et sauvegardes JSON codés ; non testés, aucun cloud activé |
-| **G05** | Rappels et notifications iPhone, avec limites Web Push documentées | D07 ; O06/O14/O19/O22/O31–O33 ; F23/F33/F35/F37 ; M41–M44/M75–M78/M81/M84–M88/M100 ; C11–C14/C18–C19 | T07/T16 ; **S9B** | Partiellement codé, non testé : S9/D25 |
-| **G06** | Musiques Suno, lecteur, playlists et favoris | O08–O10/O13/O18 ; F11–F12/F24–F25/F31–F32 ; M46–M63/M92–M94/M99 ; C06–C08 | T03/T08 ; **S6–S8/S10** | Lecteur, playlists et retrait de piste sans effacement codés, non testés ; M49 physique bloquée |
-| **G07** | Galerie, imports d'images et thèmes saisonniers | O07/O10–O13 ; F13/F26/F31 ; M64–M69/M95–M98 ; C06–C07 | T03 ; **S6–S8** | Galerie + crop/composition codés, non testés ; thèmes/fond non appliqués |
-| **G08** | Export, changement d'iPhone et mises à jour sans perte de données | D08/D09 ; O16/O21 ; F34–F36 ; M70–M74/M82–M83 ; C09–C10/C16–C17 | T04/T06/T09 ; **S10** | M70–M74 + M82–M83 codés, non testés ; icônes, déploiement et restauration iPhone manquants |
-| **G09** | Gouvernance, confidentialité, gratuité et traçabilité | D02/D03/D10/D13 ; F00–F05/F39 ; AGENTS.md ; règles §0 de l'architecture | T05/T07/T10 ; **S0/S5/S10** | Documentation approuvée ; tests à faire |
-| **G10** | **Jour central**, date choisie, une seule liste visuelle en **deux groupes : sans horaire, puis avec horaire chronologique** | D14–D16/D22 ; O20/O31–O33/O37 ; F19/F48/F51/F53 ; M124/M128–M131/M148–M149 ; C27–C28 | T15/T20 ; **S7** | Codé partiellement, non testé (S7/D23) |
-| **G11** | **Habitudes** répétées selon jours/fréquences, avec ou sans heure, validation par occurrence | D15/D17 ; O05/O31–O33 ; F49 ; M126/M130/M132–M134/M139/M151 ; C28/C31 | T01/T16 ; **S2–S3/S6–S8** | À développer |
-| **G12** | **Listes** de courses, bagages, etc., liées à plusieurs activités sans validation du parent | D20 ; O31/O34–O35 ; F50 ; M142–M146/M152/M159–M160 ; C29 | T18 ; **S1/S6–S7** | À développer |
-| **G13** | **Bilan mensuel** filtrable par 1, 2 ou 3 étoiles ; réalisations confirmées et présumées distinguées | D19 ; O31–O33/O38 ; F52/F56 ; M140/M147 ; C32 | T19 ; **S4/S8** | Codé (bilan filtrable), non testé S8/D23 |
-| **G14** | **Ergonomie sobre** : couleurs apaisantes, arrondis, icône éditable à gauche, coche à droite, navigation simple | D14/D17/D22 ; F19–F20/F53 ; M149/M153 ; C27–C28 | T20 ; **S7** | Codé partiellement, non testé (S7/D23) |
+| **G01** | PWA installable iPhone, fonctionnement hors ligne et mises à jour | D01/D06/D09 ; F08–F09/F14/F35–F36 ; M01/M79–M83 ; C10/C15–C16 | T06 ; **S5/S10** | Icônes, manifeste et cache vérifiés sur Chrome mobile. Safari iPhone et publication à faire. |
+| **G02** | **Calendrier hebdomadaire** 6 jours visibles + dimanche dépliable, choix de date, connexion bidirectionnelle **Google Agenda** | D04/D11–D13/D21 ; O24–O31/O37 ; F21/F37/F45–F47 ; M103–M120/M127–M128/M150/M156 ; C20–C27/C33 | T10–T15 ; **S7/S9A** | Liaison, conflits, règles simples et passage en arrière-plan codés. Verrou et reprise simulés. Intégration Google et Cron réels à valider. |
+| **G03** | **Tâches** non horaires/non cycliques, avec ou sans date, édition et report facultatif | D15/D18 ; O31–O33/O36 ; F22/F48/F51 ; M121–M125/M135–M138 ; C27–C30 | T02/T15/T17 ; **S6–S8** | Coche et datation atomiques vérifiées en émulateur. Tests des reports et du parcours iPhone à finir. |
+| **G04** | Firebase : compte, données essentielles, synchronisation et restauration | D05/D08 ; O01/O15–O16/O31–O36 ; F27–F30/F34/F39 ; M16–M27/M70–M72/M89–M90 ; C02–C05/C17 | T04/T05/T09 ; **S5/S10** | Isolation de deux UID et lecture du profil vérifiées en émulateur. Restauration iPhone et mise en service à faire. |
+| **G05** | Rappels et notifications iPhone, avec limites Web Push documentées | D07 ; O06/O14/O19/O22/O31–O33 ; F23/F33/F35/F37 ; M41–M44/M75–M78/M81/M84–M88/M100 ; C11–C14/C18–C19 | T07/T16 ; **S9B** | Rappel par occurrence et Worker codés. Envoi distant désactivé jusqu'à la recette iPhone. |
+| **G06** | Musiques Suno, lecteur, playlists et favoris | O08–O10/O13/O18 ; F11–F12/F24–F25/F31–F32 ; M46–M63/M92–M94/M99 ; C06–C08 | T03/T08 ; **S6–S8/S10** | Lecteur, playlists et retrait codés. Effacement local conditionnel D27. Audio verrouillé sur iPhone à tester. |
+| **G07** | Galerie, imports d'images et thèmes saisonniers | O07/O10–O13 ; F13/F26/F31 ; M64–M69/M95–M98 ; C06–C07 | T03 ; **S6–S8** | Galerie, thèmes, fond et effacement conditionnel codés. Galerie et IndexedDB à vérifier sur iPhone. |
+| **G08** | Export, changement d'iPhone et mises à jour sans perte de données | D08/D09 ; O16/O21 ; F34–F36 ; M70–M74/M82–M83 ; C09–C10/C16–C17 | T04/T06/T09 ; **S10** | Icônes et cache du site vérifiés sur Chrome mobile. Restauration et passage entre versions à vérifier sur iPhone. |
+| **G09** | Gouvernance, confidentialité, gratuité et traçabilité | D02/D03/D10/D13 ; F00–F05/F39 ; AGENTS.md ; règles §0 de l'architecture | T05/T07/T10 ; **S0/S5/S10** | D27/D28 enregistrées avant le code. Tests UID et protections serveur réussis en émulateur. |
+| **G10** | **Jour central**, date choisie, une seule liste visuelle en **deux groupes : sans horaire, puis avec horaire chronologique** | D14–D16/D22 ; O20/O31–O33/O37 ; F19/F48/F51/F53 ; M124/M128–M131/M148–M149 ; C27–C28 | T15/T20 ; **S7** | Navigation et deux groupes vérifiés sur Chrome mobile. Essais d'utilisation sur Safari à faire. |
+| **G11** | **Habitudes** répétées selon jours/fréquences, avec ou sans heure, validation par occurrence | D15/D17 ; O05/O31–O33 ; F49 ; M126/M130/M132–M134/M139/M151 ; C28/C31 | T01/T16 ; **S2–S3/S6–S8** | Récurrences et occurrences vérifiées localement. Parcours complet sur iPhone à tester. |
+| **G12** | **Listes** de courses, bagages, etc., liées à plusieurs activités sans validation du parent | D20 ; O31/O34–O35 ; F50 ; M142–M146/M152/M159–M160 ; C29 | T18 ; **S1/S6–S7** | Listes indépendantes, articles et liens avec les activités codés. Parcours sur iPhone à tester. |
+| **G13** | **Bilan mensuel** filtrable par 1, 2 ou 3 étoiles ; réalisations confirmées et présumées distinguées | D19 ; O31–O33/O38 ; F52/F56 ; M140/M147 ; C32 | T19 ; **S4/S8** | Bilan filtrable codé. Tri, filtres et présomptions vérifiés localement. |
+| **G14** | **Ergonomie sobre** : couleurs apaisantes, arrondis, icône éditable à gauche, coche à droite, navigation simple | D14/D17/D22 ; F19–F20/F53 ; M149/M153 ; C27–C28 | T20 ; **S7** | Thèmes, navigation et fiches codés. Lisibilité et VoiceOver à vérifier sur iPhone. |
 
 **Légende :** `À développer` = spécifié, pas fonctionnel ; `En cours` = développement commencé et non validé ; `Validé` = testé dans l'environnement cible. Si un objectif n'a aucune correspondance technique, l'agent doit **STOP**, demander un accord explicite, actualiser **d'abord** l'architecture, puis ce tableau et enfin coder.
 
@@ -209,7 +210,7 @@ Les playlists cloud contiennent **des références/métadonnées** ; les fichier
 
 > **Règle d'exécution (D23, 3 novembre 2026) :** construire les objets et fonctions par **dépendances documentées** ; les **tests de toutes les strates sont regroupés à la recette finale** à la demande de l'utilisateur. Une strate peut être **codée** avant validation technique de la précédente, si ses contrats et dépendances existent dans le code. Son statut reste **NON TESTÉ / NON VALIDÉ**. Aucune activation de Firebase réel, aucune donnée privée, aucun déploiement ou facturation avant validation de sécurité et d'iPhone. Ce chapitre conserve le périmètre initial.
 >
-> **Statut :** architecture enregistrée ; S0–S9 partiellement codées, non validées sur iPhone et non déployées. Les identifiants **O/F/M/C/T/D** sont ceux du [registre architectural](docs/ARCHITECTURE.md) ; **aucun nouveau contrat n'est introduit ici**. Seules les entités **O01, O05–O38 sauf O02–O04**, soit **35 objets actifs**, doivent être réalisées. **O02, O03 et O04 sont SUPERSEDED**, ne jamais les coder.
+> **Historique :** les identifiants O/F/M/C/T/D renvoient au [registre architectural](docs/ARCHITECTURE.md). Les anciennes entités O02, O03 et O04 ont été remplacées par le modèle d'activité unique.
 >
 > Un « objet autonome » veut dire **autonome vis-à-vis des autres objets métier**. Déclarer le type `AuthUser` (O01) ne signifie pas que Firebase Authentication est opérationnel. De même, une interface type ne nécessite pas que Firestore, Cloudflare ou Safari soient déjà configurés.
 

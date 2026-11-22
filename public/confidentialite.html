@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Politique de confidentialité de l'application Mon petit organiseur.">
+  <meta name="robots" content="index,follow">
+  <title>Confidentialité · Mon petit organiseur</title>
+  <style>
+    :root{color-scheme:light;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#3a4e42;background:#fbf6ed}
+    *{box-sizing:border-box}body{margin:0;line-height:1.65}main{max-width:780px;padding:32px 22px 70px;margin:auto}h1,h2{color:#405f50;line-height:1.2}h1{font-size:clamp(1.9rem,5vw,2.8rem)}h2{font-size:1.2rem;margin-top:2rem}a{color:#316d58}a:focus-visible{outline:3px solid #658e78;outline-offset:3px}.intro{color:#64786a}.panel{padding:20px 24px;border:1px solid #deded0;border-radius:20px;background:#fffdf9}footer{margin-top:32px;border-top:1px solid #dadfd4;padding-top:18px;font-size:.9rem}
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="./">← Retour à Mon petit organiseur</a></p>
+  <h1>Politique de confidentialité</h1>
+  <p class="intro">Application <strong>Mon petit organiseur</strong>, éditée pour un usage personnel par le compte GitHub <strong>Pecose</strong>. Dernière mise à jour : 22 novembre 2026.</p>
+  <div class="panel"><strong>En bref :</strong> tes activités et préférences peuvent être synchronisées via Firebase ; tes fichiers audio et images importés restent sur ton appareil. Google Agenda est facultatif et ne s'active qu'après ton autorisation. Aucune utilisation publicitaire ni vente de tes données n'est prévue.</div>
+  <h2>1. Données de l'organiseur</h2>
+  <p>L'application utilise Firebase Authentication pour la connexion et Cloud Firestore pour enregistrer, sous ton compte, les activités, tâches, événements, habitudes, dates, heures, récurrences, listes, validations, préférences et métadonnées nécessaires à la synchronisation. Les fichiers audio et les images que tu importes sont conservés dans le stockage local de ton navigateur, et ne sont pas automatiquement transférés vers Firebase.</p>
+  <h2>2. Google Agenda, uniquement si tu le relies</h2>
+  <p>Lorsque tu choisis de relier ton Google Agenda, l'application demande un accès à Google Calendar pour consulter et synchroniser les événements de ton agenda principal, y compris <strong>titres, descriptions lorsque nécessaires, dates, horaires, récurrences et identifiants techniques</strong>. Selon tes choix et les opérations demandées, elle peut créer, modifier ou supprimer des événements dans Google Agenda et répercuter les modifications dans l'organiseur. Les conflits qui ne peuvent pas être résolus prudemment te sont présentés pour décision.</p>
+  <p>La connexion Google est distincte de la connexion Firebase. Les jetons OAuth Google sont traités par un Worker Cloudflare, et le jeton de renouvellement est stocké chiffré côté serveur. Il n'est pas envoyé au navigateur ni inclus dans le dépôt GitHub public. Les données provenant des API Google sont utilisées pour les fonctions d'agenda décrites ici, pas pour la publicité ni pour être vendues.</p>
+  <h2>3. Retirer ton autorisation Google</h2>
+  <p>Dans l'application, ouvre <strong>Paramètres → Google Agenda → Dissocier Google Agenda</strong>. Cette action demande la révocation de l'autorisation Google et désactive la liaison en supprimant le jeton actif stocké côté serveur. Tu peux également retirer l'accès depuis <a href="https://myaccount.google.com/connections">les connexions de ton compte Google</a>. La dissociation <strong>ne supprime pas automatiquement</strong> tes événements déjà présents dans Google Agenda ou dans Firestore.</p>
+  <h2>4. Conservation, sécurité et suppression</h2>
+  <p>Les données Firestore demeurent liées à ton compte jusqu'à suppression des éléments concernés ou demande de suppression. Les médias locaux demeurent sur l'appareil jusqu'à leur suppression ou celle des données du navigateur. L'application s'appuie sur l'authentification Firebase, des règles d'accès par compte et le chiffrement des autorisations Google côté serveur. Aucun système ne garantit cependant une sécurité absolue.</p>
+  <p>Pour demander une suppression plus large des données de ton compte, contacte le responsable du projet par <a href="https://github.com/Pecose/organiseur-personnel/issues">le dépôt GitHub de l'application</a>, sans publier d'identifiants privés, de jetons, de titres d'agenda ou d'autres données personnelles dans une discussion publique. Un canal privé pourra être convenu pour vérifier la demande.</p>
+  <h2>5. Services utilisés</h2>
+  <p><strong>GitHub Pages</strong> sert les fichiers publics de l'application ; <strong>Google Firebase</strong> fournit l'authentification et la base Firestore ; <strong>Cloudflare Workers</strong> traite les opérations sécurisées de connexion à Google ; et <strong>Google Calendar</strong> n'est contacté que si tu choisis d'utiliser sa synchronisation. Chacun de ces services applique également ses propres conditions et pratiques de sécurité.</p>
+  <h2>6. Évolution de cette politique</h2>
+  <p>La politique peut être ajustée lorsque les fonctions de l'application changent. La version à jour restera accessible publiquement à cette adresse.</p>
+  <footer><a href="./">Retour à l'application</a> · <a href="https://github.com/Pecose/organiseur-personnel">Projet GitHub</a></footer>
+</main>
+</body>
+</html>

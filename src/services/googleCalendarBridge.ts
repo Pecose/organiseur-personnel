@@ -24,7 +24,8 @@ export async function workerRequest<T>(
   if (accepted[route] !== method) return {ok:false,error:{
     code:"WORKER_ROUTE_FORBIDDEN",message:"Opération distante non autorisée.",
   }};
-  const address = import.meta.env.VITE_WORKER_ORIGIN as string | undefined;
+  const address = (import.meta.env.VITE_WORKER_ORIGIN as string | undefined)
+    || "https://organiseur-personnel-reminders.pecose-billos.workers.dev/";
   if (!address) return {ok:false,error:{
     code:"WORKER_NOT_CONFIGURED",
     message:"Le service gratuit externe n'est pas encore configuré.",
@@ -56,14 +57,16 @@ export async function workerRequest<T>(
       credentials:"omit",
       redirect:"error",
     });
-    if (!response.ok) return {ok:false,error:{
+    const data: unknown = await response.json().catch(() => null);
+    if (!response.ok && !(data && typeof data === "object" && "ok" in data && data.ok === false)) {
+      return {ok:false,error:{
       code:"WORKER_HTTP_" + response.status,
       message:response.status===401?"Session expirée ou non reconnue.":
         response.status===403?"Accès au service refusé.":
         response.status===429?"Trop de demandes, réessaie plus tard.":
         "Le service distant n'a pas confirmé cette opération.",
-    }};
-    const data: unknown = await response.json();
+      }};
+    }
     if (!data || typeof data !== "object" || !("ok" in data)) throw Error("Bad envelope");
     const result = data as Result<T>;
     if (result.ok) return result;

@@ -5,7 +5,7 @@
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { fetchCloudRecords, putCloudRecord, removeCloudRecord } from "../services/cloudRepository";
-import { storeMedia } from "../storage/mediaDb";
+import { removeMedia, storeMedia } from "../storage/mediaDb";
 import { loadBundledCatalog } from "../storage/catalog";
 import type { Playlist, Result, TrackMetadata } from "../domain/types";
 
@@ -206,8 +206,7 @@ export async function deletePlaylist(playlistId: string): Promise<Result<void>> 
 /** M93 · Retirer une piste importée de la bibliothèque du compte.
  * On retire d'abord les références des playlists puis O08 ; l'ID des
  * playlists et tous les médias locaux restent inchangés.
- * L'effacement physique demandé est refusé tant que M49 ne peut pas
- * prouver l'absence de références sur tous les appareils/comptes.
+ * L'effacement du fichier sur cet appareil reste conditionné par M49.
  * D23 : cette séquence multi-documents doit être testée en recette.
  */
 export async function removeTrack(
@@ -232,10 +231,6 @@ export async function removeTrack(
       code:"BUNDLED_TRACK_READ_ONLY",
       message:"Un morceau du catalogue public ne peut pas être supprimé.",
     }};
-    if (deleteLocalFile) return {ok:false,error:{
-      code:"MEDIA_DELETE_UNVERIFIED",
-      message:"Effacement du fichier bloqué : références croisées non vérifiées. Retire seulement le morceau en conservant le fichier.",
-    }};
     const playlists = await listPlaylists();
     if (!playlists.ok) return playlists;
     for (const playlist of playlists.value) {
@@ -253,6 +248,13 @@ export async function removeTrack(
       code:"TRACK_REMOVE_PARTIAL",
       message:"Le morceau est conservé dans le compte, mais certaines playlists ont été modifiées. Réessaie.",
     }};
+    if (deleteLocalFile) {
+      const local = track.mediaId ? await removeMedia(track.mediaId) : undefined;
+      if (!local?.ok) return {ok:false,error:{
+        code:"TRACK_REMOVED_FILE_KEPT",
+        message:"Le morceau a été retiré de la bibliothèque. Le fichier local n’a pas été effacé.",
+      }};
+    }
     return {ok:true,value:undefined};
   } catch {
     return {ok:false,error:{
