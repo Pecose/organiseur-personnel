@@ -91,3 +91,9 @@ Le scénario T05 dans `tests/security.test.ts` utilise exclusivement les émulat
 - F53/M153 supprime le contrôle « Tous les… » et son contrôle parasite. Les nouvelles récurrences sont espacées d’une période ; les intervalles préexistants d’une série éditée restent inchangés.
 - Les métadonnées PWA passent à `0.1.8` / `s10-8`. Les caches applicatifs seuls sont remplacés sur consentement ; aucun média importé ni donnée Firestore n'est supprimé.
 - Les tests d'intégration Firestore / Google en conditions réelles et la recette Safari restent à réaliser. L'origine du Worker et la connexion réelle Google doivent être vérifiées sur l'iPhone après la mise à jour.
+
+## Correctifs iPhone 0.1.9 · 22 novembre 2026
+
+- D33 : formulaire M153 en deux modes exclusifs « Une fois » et « Chaque semaine ». Une fois : date et heure facultative (les tâches sans horaire restent possibles) ; Chaque semaine : jours L–D multiples et heure facultative, sans intervalle visible. Les anciennes séries restent non destructives.
+- M22 distingue les erreurs de règles Firestore, session, indisponibilité et quotas sans afficher d'informations privées. Les règles Firestore réelles doivent être publiées séparément dans Firebase ; une mise à jour GitHub Pages ne les déploie pas.
+- PWA 0.1.9 / cache s10-9 : nouveaux noms pour les cinq modules compilés afin d'éviter les actifs JavaScript anciens mis en cache sur iPhone. Aucune donnée locale ne doit être supprimée ; test de la synchronisation Firebase et de Safari à réaliser sur appareil.
