@@ -1564,7 +1564,7 @@ export function renderSettings(): void {
   const feedback = root.querySelector<HTMLElement>("#settings-status")!;
   const googleFeedback = root.querySelector<HTMLElement>("#google-feedback")!;
   const conflicts = root.querySelector<HTMLElement>("#google-conflict-list")!;
-  const googleServiceConfigured = Boolean(import.meta.env.VITE_WORKER_ORIGIN);
+  const googleServiceConfigured = Boolean(import.meta.env.VITE_WORKER_ORIGIN || "https://organiseur-personnel-reminders.pecose-billos.workers.dev/");
   const googleIds = ["google-link","google-status","google-sync","google-conflicts","google-unlink"];
   for (const id of googleIds)
     root.querySelector<HTMLButtonElement>("#"+id)!.disabled = !state.user || !googleServiceConfigured;
