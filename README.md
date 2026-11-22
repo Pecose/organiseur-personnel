@@ -84,3 +84,10 @@ Le scénario T05 dans `tests/security.test.ts` utilise exclusivement les émulat
 - La notice F58 est disponible à `https://pecose.github.io/organiseur-personnel/confidentialite.html`.
 - Versions PWA `0.1.7` / cache `s10-7`; l'activation des mises à jour reste soumise au geste de confirmation prévu en Paramètres. Ne pas effacer les données ou fichiers locaux.
 - Les tests Google Agenda sur iPhone et les notifications distantes réelles restent à réaliser. Aucune tâche Cron n'est activée par cette publication.
+
+## Correctifs iPhone 0.1.8 · 22 novembre 2026
+
+- D32 : F19/M10 rend accessibles les boutons Google Agenda lorsque la session est ouverte. F19 et F46 utilisent la même origine publique D31 en repli de la variable de compilation, sans exposer les secrets du Worker.
+- F53/M153 supprime le contrôle « Tous les… » et son contrôle parasite. Les nouvelles récurrences sont espacées d’une période ; les intervalles préexistants d’une série éditée restent inchangés.
+- Les métadonnées PWA passent à `0.1.8` / `s10-8`. Les caches applicatifs seuls sont remplacés sur consentement ; aucun média importé ni donnée Firestore n'est supprimé.
+- Les tests d'intégration Firestore / Google en conditions réelles et la recette Safari restent à réaliser. L'origine du Worker et la connexion réelle Google doivent être vérifiées sur l'iPhone après la mise à jour.
