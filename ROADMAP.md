@@ -524,3 +524,9 @@ Les flèches pleines donnent l'**ordre de livraison recommandé et ses portes de
 **Fonctionnement humain :** le tableau de bord G01–G14 en tête de roadmap indique la valeur attendue, mais **la section 7 dicte l'ordre concret de fabrication**. `docs/ARCHITECTURE.md` reste l'unique source pour les signatures et les dépendances exactes, et `AGENTS.md` impose l'autorisation explicite avant tout ajout hors architecture.
 
 > **Choix encore à arbitrer** : nom final de l'application, palette exacte, détail de la présentation des listes longues et des reports plus anciens qu'hier, tolérance aux limites de la musique/verrouillage et des notifications PWA. Aucune décision non prise ne doit être présentée comme implémentée.
+
+## 22 novembre 2026 · Correctif D33 (0.1.9)
+
+- G03/G11 : éditeur F53 à deux onglets exclusifs, date pour « Une fois » et cases de semaine pour « Chaque semaine » ; conservation de l'objet Activity et du rythme enregistré lors des modifications d'anciennes séries.
+- G04 : M22 affiche le code d'erreur Firebase sans révéler de donnée personnelle. La photo de recette affiche « Écriture refusée ou indisponible » : erreur réelle non déterminée, règles de sécurité à vérifier dans Firebase. GitHub ne les publie pas.
+- G01/G08 : évolution du cache vers s10-9 et renommage des fichiers publics pour garantir un changement d'URL des modules du site. Recette iPhone et sécurité Firebase toujours à confirmer.
