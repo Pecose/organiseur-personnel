@@ -24,7 +24,8 @@ export async function workerRequest<T>(
   if (accepted[route] !== method) return {ok:false,error:{
     code:"WORKER_ROUTE_FORBIDDEN",message:"Opération distante non autorisée.",
   }};
-  const address = import.meta.env.VITE_WORKER_ORIGIN as string | undefined;
+  const address = (import.meta.env.VITE_WORKER_ORIGIN as string | undefined)
+    || "https://organiseur-personnel-reminders.pecose-billos.workers.dev/";
   if (!address) return {ok:false,error:{
     code:"WORKER_NOT_CONFIGURED",
     message:"Le service gratuit externe n'est pas encore configuré.",
