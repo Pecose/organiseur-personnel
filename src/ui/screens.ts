@@ -1572,6 +1572,8 @@ export function renderSettings(): void {
     googleFeedback.textContent = "Google Agenda sera disponible une fois son service de synchronisation configuré.";
   } else if (!state.user) {
     googleFeedback.textContent = "Connecte-toi à l’organiseur pour relier ton agenda Google.";
+  } else {
+    googleFeedback.textContent = "Service configuré dans l’application. Vérifie maintenant la connexion Google.";
   }
   root.querySelector<HTMLButtonElement>("#google-link")!.onclick = () => {
     googleFeedback.textContent = "Préparation du consentement Google…";
