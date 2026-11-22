@@ -58,6 +58,13 @@ export function renderDay(date: LocalDate): void {
   root.replaceChildren();
   const panel = document.createElement("section");
   panel.className = "page-intro day-intro";
+  const user = getAppState().user;
+  if (user) {
+    const greeting = document.createElement("p");
+    greeting.className = "day-session";
+    greeting.textContent = "Bonjour ! Ta session est ouverte.";
+    panel.append(greeting);
+  }
   const localDate = new Date(date + "T12:00:00Z");
   const heading = document.createElement("h2");
   const weekday = document.createElement("span");
@@ -115,7 +122,7 @@ export function renderDay(date: LocalDate): void {
     block.append(header, list);
     root.append(block);
   }
-  if (!getAppState().user) {
+  if (!user) {
     for (const id of ["untimed", "timed"]) {
       const target = document.getElementById("entries-" + id)!;
       target.textContent = "";
@@ -1337,7 +1344,7 @@ export function renderSettings(): void {
         <button type="button" class="soft-button" id="google-unlink">Dissocier Google Agenda</button>
       </div>
       <div id="google-conflict-list" class="entry-list"></div>
-      <p class="muted" id="google-feedback" role="status" aria-live="polite">Google Agenda n’est pas configuré.</p>
+      <p class="muted" id="google-feedback" role="status" aria-live="polite"></p>
     </section>
     <section class="day-section settings-list settings-group">
       <h3>Sauvegardes</h3>
@@ -1361,7 +1368,8 @@ export function renderSettings(): void {
       <p id="backup-feedback" role="status" aria-live="polite" class="muted"></p>
     </section>`;
   root.querySelector<HTMLElement>("#account-label")!.textContent =
-    state.user?.email || "Aucun compte connecté.";
+    state.user?.email ? "Session ouverte avec " + state.user.email
+      : state.user ? "Ta session est ouverte." : "Aucun compte connecté.";
 
   // F36/M82/M83 : vérifier sans écrire ; activer uniquement après confirmation.
   const checkUpdate = root.querySelector<HTMLButtonElement>("#settings-check-update")!;
@@ -1556,9 +1564,15 @@ export function renderSettings(): void {
   const feedback = root.querySelector<HTMLElement>("#settings-status")!;
   const googleFeedback = root.querySelector<HTMLElement>("#google-feedback")!;
   const conflicts = root.querySelector<HTMLElement>("#google-conflict-list")!;
+  const googleServiceConfigured = Boolean(import.meta.env.VITE_WORKER_ORIGIN);
   const googleIds = ["google-link","google-status","google-sync","google-conflicts","google-unlink"];
   for (const id of googleIds)
-    root.querySelector<HTMLButtonElement>("#"+id)!.disabled = !state.user;
+    root.querySelector<HTMLButtonElement>("#"+id)!.disabled = !state.user || !googleServiceConfigured;
+  if (!googleServiceConfigured) {
+    googleFeedback.textContent = "Google Agenda sera disponible une fois son service de synchronisation configuré.";
+  } else if (!state.user) {
+    googleFeedback.textContent = "Connecte-toi à l’organiseur pour relier ton agenda Google.";
+  }
   root.querySelector<HTMLButtonElement>("#google-link")!.onclick = () => {
     googleFeedback.textContent = "Préparation du consentement Google…";
     void startGoogleCalendarLink().then(result => {
