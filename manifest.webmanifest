@@ -15,9 +15,9 @@
     { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "app_version": {
-    "version": "0.1.8",
-    "cacheRevision": "s10-8",
+    "version": "0.1.9",
+    "cacheRevision": "s10-9",
     "catalogRevision": "0",
-    "releasedAt": "2026-11-22T15:20:34.478Z"
+    "releasedAt": "2026-11-22T16:14:52.618Z"
   }
 }
