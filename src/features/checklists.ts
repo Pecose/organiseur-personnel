@@ -194,7 +194,9 @@ export async function deleteChecklist(id: string): Promise<Result<void>> {
     const activities = await fetchCloudRecords<Activity>(user.uid, "activities");
     if (!activities.ok) return activities;
     for (const item of activities.value) {
-      if (item.checklistId === id) {
+      // Les tombstones O31 sont immuables : elles ne nécessitent pas de détachement
+      // et M142 refuserait leur modification, empêchant l'archivage de la liste.
+      if (!item.deletedAt && item.checklistId === id) {
         const removedLink = await attachChecklist(item.id, null);
         if (!removedLink.ok) return removedLink;
       }
