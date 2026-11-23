@@ -9,7 +9,10 @@ import { getUserCollection } from "../services/cloudRepository";
 import {
   createActivity, updateActivity,
 } from "../features/activities";
-import { listChecklists } from "../features/checklists";
+import {
+  listChecklists, saveChecklist, getChecklistDetails,
+  saveChecklistItem, setChecklistItemChecked,
+} from "../features/checklists";
 import { getAppState } from "../app/state";
 import { renderRoute, navigate } from "../app/router";
 import type { Activity, ActivityDraft, RecurrenceRule } from "../domain/types";
@@ -67,6 +70,18 @@ export function openActivityEditor(activityId: string): void {
         <label><input type="checkbox" name="weekday" value="7"> D</label>
       </fieldset>
       <label>Liste associée <select name="checklist"><option value="">Aucune</option></select></label>
+      <fieldset class="activity-steps-field"><legend>Décomposer en étapes</legend>
+        <p class="muted">Crée une liste d'étapes ou sélectionne une liste existante. Chaque coche reste indépendante de la tâche.</p>
+        <div class="inline-form">
+          <input name="newChecklist" maxlength="250" placeholder="Nom d'une nouvelle liste" aria-label="Nom d'une nouvelle liste d'étapes">
+          <button type="button" id="new-checklist-in-editor" class="soft-button">Créer</button>
+        </div>
+        <div id="editor-checklist-items" class="editor-checklist-items" aria-live="polite">Sélectionne une liste pour voir ses étapes.</div>
+        <div class="inline-form">
+          <input name="newStep" maxlength="500" placeholder="Nouvelle étape" aria-label="Nouvelle étape de la tâche">
+          <button type="button" id="add-checklist-step" class="soft-button">Ajouter</button>
+        </div>
+      </fieldset>
       <p class="form-error" role="alert" aria-live="polite"></p>
       <button type="submit" class="primary-button">Enregistrer l'activité</button>
     </form>`;
@@ -83,6 +98,102 @@ export function openActivityEditor(activityId: string): void {
   const submit = form.querySelector<HTMLButtonElement>("[type=submit]")!;
   let activity: Activity | undefined;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris";
+  const listSelect = field("checklist") as HTMLSelectElement;
+  const stepsBox = dialog.querySelector<HTMLElement>("#editor-checklist-items")!;
+  const newList = field("newChecklist") as HTMLInputElement;
+  const newStep = field("newStep") as HTMLInputElement;
+  const newListButton = dialog.querySelector<HTMLButtonElement>("#new-checklist-in-editor")!;
+  const addStepButton = dialog.querySelector<HTMLButtonElement>("#add-checklist-step")!;
+
+  listSelect.onchange = () => {
+    const id = listSelect.value;
+    stepsBox.textContent = id ? "Chargement des étapes…" : "Sélectionne une liste pour voir ses étapes.";
+    if (!id) return;
+    void getChecklistDetails(id).then(loaded => {
+      if (!overlay.isConnected || listSelect.value !== id) return;
+      stepsBox.replaceChildren();
+      if (!loaded.ok) { stepsBox.textContent = loaded.error.message; return; }
+      if (!loaded.value.items.length) {
+        stepsBox.textContent = "Aucune étape pour le moment.";
+      }
+      for (const item of loaded.value.items) {
+        const row = document.createElement("label");
+        row.className = "checklist-item";
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.checked = item.checked;
+        check.setAttribute("aria-label", "Terminer l'étape " + item.text);
+        const name = document.createElement("span");
+        name.textContent = item.text;
+        name.classList.toggle("is-step-checked", item.checked);
+        check.onchange = () => {
+          const wanted = check.checked;
+          check.disabled = true;
+          void setChecklistItemChecked(item.id, wanted).then(saved => {
+            check.disabled = false;
+            if (saved.ok) {
+              name.classList.toggle("is-step-checked", saved.value.checked);
+            } else {
+              check.checked = !wanted;
+              feedback.textContent = saved.error.message;
+            }
+          }).catch(() => {
+            check.disabled = false;
+            check.checked = !wanted;
+            feedback.textContent = "Impossible de cocher cette étape.";
+          });
+        };
+        row.append(check, name);
+        stepsBox.append(row);
+      }
+    }).catch(() => {
+      if (stepsBox.isConnected) stepsBox.textContent = "Impossible de charger les étapes.";
+    });
+  };
+  newListButton.onclick = () => {
+    const name = newList.value.trim();
+    if (!name) { feedback.textContent = "Donne un nom à la liste d'étapes."; return; }
+    newListButton.disabled = true;
+    void saveChecklist({name}).then(saved => {
+      newListButton.disabled = false;
+      if (!saved.ok) { feedback.textContent = saved.error.message; return; }
+      const option = document.createElement("option");
+      option.value = saved.value.id;
+      option.textContent = saved.value.name;
+      listSelect.append(option);
+      listSelect.value = saved.value.id;
+      listSelect.dispatchEvent(new Event("change"));
+      newList.value = "";
+      feedback.textContent = "Liste créée. Enregistre l'activité pour l'y associer.";
+    }).catch(() => {
+      newListButton.disabled = false;
+      feedback.textContent = "Création de la liste impossible.";
+    });
+  };
+  addStepButton.onclick = () => {
+    const listId = listSelect.value;
+    const text = newStep.value.trim();
+    if (!listId || !text) {
+      feedback.textContent = "Sélectionne une liste et saisis une étape.";
+      return;
+    }
+    addStepButton.disabled = true;
+    void getChecklistDetails(listId).then(loaded => {
+      if (!loaded.ok) { feedback.textContent = loaded.error.message; return null; }
+      const position = loaded.value.items.reduce((max, item) => Math.max(max, item.position), -1) + 1;
+      return saveChecklistItem({checklistId:listId, text, checked:false, position});
+    }).then(saved => {
+      addStepButton.disabled = false;
+      if (!saved) return;
+      if (!saved.ok) { feedback.textContent = saved.error.message; return; }
+      newStep.value = "";
+      feedback.textContent = "";
+      listSelect.dispatchEvent(new Event("change"));
+    }).catch(() => {
+      addStepButton.disabled = false;
+      feedback.textContent = "Impossible d'ajouter cette étape.";
+    });
+  };
 
   void (async () => {
     if (activityId) {
@@ -142,6 +253,9 @@ export function openActivityEditor(activityId: string): void {
         select.append(option);
       }
       if (activity?.checklistId) select.value = activity.checklistId;
+      select.dispatchEvent(new Event("change"));
+    } else if (!lists.ok && overlay.isConnected) {
+      feedback.textContent = lists.error.message;
     }
   })();
 
