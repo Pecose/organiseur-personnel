@@ -454,22 +454,51 @@ export function renderTasks(): void {
   root.innerHTML = `<section class="page-intro"><p class="eyebrow">L'ESPRIT LÉGER</p>
     <h2>Mes tâches</h2><p class="muted">Tout ce que tu veux faire, sans être pressée.</p>
     <button type="button" class="primary-button compact" id="new-task">+ Tâche</button></section>
-    <section class="day-section"><h3>À faire</h3><div id="task-list" class="entry-list"></div></section>`;
+    <section class="day-section"><h3>À faire</h3><div id="task-list" class="entry-list"></div>
+      <p id="tasks-empty" class="empty-copy" hidden></p></section>
+    <section class="day-section" id="completed-task-section" hidden>
+      <details class="completed-task-details"><summary>Tâches terminées
+        <span id="completed-task-count">0</span></summary>
+        <div id="completed-task-list" class="entry-list"></div>
+      </details>
+    </section>
+    <p class="form-error" id="task-feedback" role="alert" aria-live="polite"></p>`;
   root.querySelector<HTMLButtonElement>("#new-task")!.onclick = () => openActivityEditor("");
   const list = root.querySelector<HTMLElement>("#task-list")!;
+  const finished = root.querySelector<HTMLElement>("#completed-task-list")!;
+  const section = root.querySelector<HTMLElement>("#completed-task-section")!;
+  const count = root.querySelector<HTMLElement>("#completed-task-count")!;
+  const empty = root.querySelector<HTMLElement>("#tasks-empty")!;
+  const feedback = root.querySelector<HTMLElement>("#task-feedback")!;
   if (!getAppState().user) {
     list.textContent = "Connecte-toi pour voir tes tâches.";
     return;
   }
   list.textContent = "Chargement…";
-  void listTasks().then(result => {
+  void listTasks().then(async result => {
+    if (!root.isConnected || getAppState().route.name !== "tasks") return;
+    if (!result.ok) { list.textContent = result.error.message; return; }
+    // Lecture parallèle des O33 avant répartition : aucune tâche O31 n'est dupliquée.
+    const states = await Promise.all(result.value.map(task => task.plannedOn
+      ? getOccurrenceCompletion(task.id + "@" + task.plannedOn) : Promise.resolve(null)));
     if (!root.isConnected || getAppState().route.name !== "tasks") return;
     list.replaceChildren();
-    if (!result.ok) { list.textContent = result.error.message; return; }
-    if (!result.value.length) { list.textContent = "Aucune tâche pour le moment."; return; }
-    for (const task of result.value) {
+    finished.replaceChildren();
+    if (!result.value.length) {
+      empty.textContent = "Aucune tâche pour le moment.";
+      empty.hidden = false;
+      return;
+    }
+    if (states.some(state => state !== null && !state.ok)) {
+      feedback.textContent = "Certaines validations n'ont pas pu être vérifiées. Réessaie après reconnexion.";
+    }
+    result.value.forEach((task, index) => {
+      const state = states[index];
+      let completed = state !== null && state.ok &&
+        (state.value?.status === "manual_done" || state.value?.status === "auto_assumed");
       const card = document.createElement("article");
       card.className = "activity-row";
+      card.classList.toggle("is-completed", completed);
       const icon = document.createElement("button");
       icon.type = "button";
       icon.className = "activity-icon";
@@ -484,51 +513,62 @@ export function renderTasks(): void {
       date.className = "activity-meta";
       date.textContent = (task.plannedOn || "Sans date") +
         (task.stars ? " · " + "★".repeat(task.stars) : "");
-      details.append(title, date);
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "task-edit-link";
+      edit.textContent = "Modifier / étapes";
+      edit.setAttribute("aria-label", "Modifier ou décomposer " + task.title);
+      edit.onclick = () => openActivityEditor(task.id);
+      details.append(title, date, edit);
       const check = document.createElement("button");
       check.type = "button";
       check.className = "check-control";
-      check.textContent = "○";
+      check.textContent = completed ? "✓" : "○";
+      check.classList.toggle("is-checked", completed);
+      check.dataset.completed = String(completed);
       if (!task.plannedOn) {
         check.disabled = true;
         check.title = "Ajoute une date pour valider une occurrence.";
         check.setAttribute("aria-label", "Ajoute une date pour terminer " + task.title);
       } else {
         const key = task.id + "@" + task.plannedOn;
-        check.setAttribute("aria-label", "Terminer " + task.title);
+        check.setAttribute("aria-label",
+          (completed ? "Annuler la validation de " : "Terminer ") + task.title);
         check.onclick = () => {
-          const checked = check.dataset.completed === "true";
+          const previous = completed;
           check.disabled = true;
-          void (checked
-            ? undoOccurrenceCompletion(key)
-            : setOccurrenceCompletion(key, "manual_done")).then(result => {
-              check.disabled = false;
-              if (result.ok) {
-                check.dataset.completed = checked ? "false" : "true";
-                check.textContent = checked ? "○" : "✓";
-                check.classList.toggle("is-checked", !checked);
-                check.setAttribute("aria-label",
-                  (checked ? "Terminer " : "Annuler la validation de ") + task.title);
-              } else {
-                check.title = result.error.message;
-              }
-            });
+          const operation = previous
+            ? undoOccurrenceCompletion(key) : setOccurrenceCompletion(key, "manual_done");
+          void operation.then(saved => {
+            check.disabled = false;
+            if (!saved.ok) { feedback.textContent = saved.error.message; return; }
+            feedback.textContent = "";
+            completed = !previous;
+            check.dataset.completed = String(completed);
+            check.textContent = completed ? "✓" : "○";
+            check.classList.toggle("is-checked", completed);
+            check.setAttribute("aria-label",
+              (completed ? "Annuler la validation de " : "Terminer ") + task.title);
+            card.classList.toggle("is-completed", completed);
+            (completed ? finished : list).append(card);
+            count.textContent = String(finished.childElementCount);
+            section.hidden = finished.childElementCount === 0;
+            empty.textContent = "Toutes tes tâches sont terminées.";
+            empty.hidden = list.childElementCount !== 0;
+          }).catch(() => {
+            check.disabled = false;
+            feedback.textContent = "Impossible de modifier cette validation. Réessaie.";
+          });
         };
-        void getOccurrenceCompletion(key).then(result => {
-          if (!result.ok || !check.isConnected) return;
-          const checked = result.value?.status === "manual_done"
-            || result.value?.status === "auto_assumed";
-          check.dataset.completed = checked ? "true" : "false";
-          check.textContent = checked ? "✓" : "○";
-          check.classList.toggle("is-checked", checked);
-          check.setAttribute("aria-label",
-            (checked ? "Annuler la validation de " : "Terminer ") + task.title);
-        });
       }
       card.append(icon, details, check);
-      list.append(card);
-    }
-  });
+      (completed ? finished : list).append(card);
+    });
+    count.textContent = String(finished.childElementCount);
+    section.hidden = finished.childElementCount === 0;
+    empty.textContent = "Toutes tes tâches sont terminées.";
+    empty.hidden = list.childElementCount !== 0;
+  }).catch(() => { if (list.isConnected) list.textContent = "Impossible de charger les tâches."; });
 }
 
 /** M151 · Les habitudes sont des vues de O31 et peuvent avoir un horaire. */
@@ -613,6 +653,65 @@ export function renderChecklists(): void {
       button.className = "checklist-open";
       button.textContent = (list.iconId || "☷") + "  " + list.name;
       button.setAttribute("aria-expanded", "false");
+      const header = document.createElement("div");
+      header.className = "checklist-header";
+      const actions = document.createElement("div");
+      actions.className = "checklist-actions";
+      const rename = document.createElement("button");
+      rename.type = "button";
+      rename.className = "text-button";
+      rename.textContent = "Renommer";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "text-button destructive";
+      remove.textContent = "Supprimer";
+      remove.setAttribute("aria-label", "Supprimer la liste " + list.name);
+      remove.onclick = () => {
+        remove.disabled = true;
+        void deleteChecklist(list.id).then(saved => {
+          remove.disabled = false;
+          if (saved.ok) renderChecklists();
+          else if (saved.error.code !== "CANCELLED") feedback.textContent = saved.error.message;
+        }).catch(() => {
+          remove.disabled = false;
+          feedback.textContent = "Impossible de supprimer cette liste.";
+        });
+      };
+      const renameForm = document.createElement("form");
+      renameForm.className = "inline-form checklist-rename-form";
+      renameForm.hidden = true;
+      const renameInput = document.createElement("input");
+      renameInput.value = list.name;
+      renameInput.required = true;
+      renameInput.maxLength = 250;
+      renameInput.setAttribute("aria-label", "Nouveau nom de la liste " + list.name);
+      const renameSave = document.createElement("button");
+      renameSave.type = "submit";
+      renameSave.className = "soft-button";
+      renameSave.textContent = "Enregistrer";
+      renameForm.append(renameInput, renameSave);
+      rename.onclick = () => {
+        renameForm.hidden = !renameForm.hidden;
+        if (!renameForm.hidden) { renameInput.focus(); renameInput.select(); }
+      };
+      renameForm.onsubmit = event => {
+        event.preventDefault();
+        const name = renameInput.value.trim();
+        if (!name) { feedback.textContent = "Le nom de la liste ne peut pas être vide."; return; }
+        renameSave.disabled = true;
+        void saveChecklist({id:list.id, name, iconId:list.iconId,
+          ...(list.archived !== undefined ? {archived:list.archived} : {}),
+        }).then(saved => {
+          renameSave.disabled = false;
+          if (saved.ok) renderChecklists();
+          else feedback.textContent = saved.error.message;
+        }).catch(() => {
+          renameSave.disabled = false;
+          feedback.textContent = "Impossible de renommer cette liste.";
+        });
+      };
+      actions.append(rename, remove);
+      header.append(button, actions);
       const details = document.createElement("div");
       details.className = "checklist-detail";
       button.onclick = () => {
@@ -671,20 +770,9 @@ export function renderChecklists(): void {
             });
           };
           details.append(add);
-          const remove = document.createElement("button");
-          remove.type = "button";
-          remove.className = "text-button destructive";
-          remove.textContent = "Archiver cette liste";
-          remove.onclick = () => {
-            void deleteChecklist(list.id).then(saved => {
-              if (saved.ok) renderChecklists();
-              else if (saved.error.code !== "CANCELLED") feedback.textContent = saved.error.message;
-            });
-          };
-          details.append(remove);
         });
       };
-      article.append(button, details);
+      article.append(header, renameForm, details);
       box.append(article);
     }
   });
